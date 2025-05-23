@@ -24,7 +24,6 @@ import (
 
 	"github.com/TencentBlueKing/bkmonitor-datalink/pkg/unify-query/internal/function"
 	"github.com/TencentBlueKing/bkmonitor-datalink/pkg/unify-query/internal/json"
-	"github.com/TencentBlueKing/bkmonitor-datalink/pkg/unify-query/internal/set"
 	"github.com/TencentBlueKing/bkmonitor-datalink/pkg/unify-query/log"
 	"github.com/TencentBlueKing/bkmonitor-datalink/pkg/unify-query/metadata"
 	"github.com/TencentBlueKing/bkmonitor-datalink/pkg/unify-query/query/structured"
@@ -142,6 +141,7 @@ func mapProperties(prefix string, data map[string]any, res map[string]string) {
 type ValueAgg struct {
 	Name     string
 	FuncType string
+	Field    string
 
 	Args   []any
 	KwArgs map[string]any
@@ -150,16 +150,24 @@ type ValueAgg struct {
 type TimeAgg struct {
 	Name     string
 	Window   time.Duration
-	Timezone string
+	TimeZone string
 }
 
 type TermAgg struct {
-	Name   string
-	Orders metadata.Orders
+	Name             string
+	Orders           metadata.Orders
+	AttachedValueAgg *ValueAgg
 }
 
 type NestedAgg struct {
 	Name string
+}
+
+// ReverseNestedAgg represents a reverse_nested aggregation.
+// It's a placeholder in aggInfoList to signal f.Agg() to create a reverse_nested aggregation.
+// The Name field is not strictly necessary for reverse_nested itself but kept for consistency with other agg types.
+type ReverseNestedAgg struct {
+	Name string // Can be an empty string or a descriptive name for clarity in logs/debugging
 }
 
 type aggInfoList []any
@@ -355,7 +363,7 @@ func (f *FormatFactory) RangeQuery() (elastic.Query, error) {
 func (f *FormatFactory) timeAgg(name string, window time.Duration, timezone string) {
 	f.aggInfoList = append(
 		f.aggInfoList, TimeAgg{
-			Name: name, Window: window, Timezone: timezone,
+			Name: name, Window: window, TimeZone: timezone,
 		},
 	)
 }
@@ -379,10 +387,10 @@ func (f *FormatFactory) termAgg(name string, isFirst bool) {
 	f.aggInfoList = append(f.aggInfoList, info)
 }
 
-func (f *FormatFactory) valueAgg(name, funcType string, args ...any) {
+func (f *FormatFactory) valueAgg(name, funcType string, fieldForAgg string, args ...any) {
 	f.aggInfoList = append(
 		f.aggInfoList, ValueAgg{
-			Name: name, FuncType: funcType, Args: args,
+			Name: name, FuncType: funcType, Field: fieldForAgg, Args: args,
 		},
 	)
 }
@@ -411,6 +419,45 @@ func (f *FormatFactory) nestedAgg(key string) {
 	}
 
 	return
+}
+
+// buildElasticValueAgg creates an elastic.Aggregation from a ValueAgg helper struct.
+func buildElasticValueAgg(info ValueAgg) (elastic.Aggregation, error) {
+	switch info.FuncType {
+	case Min:
+		return elastic.NewMinAggregation().Field(info.Field), nil
+	case Max:
+		return elastic.NewMaxAggregation().Field(info.Field), nil
+	case Avg:
+		return elastic.NewAvgAggregation().Field(info.Field), nil
+	case Sum:
+		return elastic.NewSumAggregation().Field(info.Field), nil
+	case Count:
+		return elastic.NewValueCountAggregation().Field(info.Field), nil
+	case Cardinality:
+		return elastic.NewCardinalityAggregation().Field(info.Field), nil
+	case Percentiles:
+		percents := make([]float64, 0)
+		for _, arg := range info.Args {
+			var percent float64
+			switch v := arg.(type) {
+			case float64:
+				percent = v
+			case int:
+				percent = float64(v)
+			case int32:
+				percent = float64(v)
+			case int64:
+				percent = float64(v)
+			default:
+				return nil, fmt.Errorf("percent type is error: %T, %+v", v, v)
+			}
+			percents = append(percents, percent)
+		}
+		return elastic.NewPercentilesAggregation().Field(info.Field).Percentiles(percents...), nil
+	default:
+		return nil, fmt.Errorf("valueagg aggregation is not support this type %s, info: %+v", info.FuncType, info)
+	}
 }
 
 // AggDataFormat 解析 es 的聚合计算
@@ -508,100 +555,30 @@ func (f *FormatFactory) Agg() (name string, agg elastic.Aggregation, err error) 
 		}
 	}()
 
-	for _, aggInfo := range f.aggInfoList {
+	// aggInfoList is now ordered from outermost to innermost logical aggregation
+	// We will iterate it, and 'agg' will hold the result of the *previous* (inner) aggregation.
+	// 'name' will hold the *name/key* for that previous (inner) aggregation.
+
+	var currentAgg elastic.Aggregation // This will be built from innermost to outermost
+	var innerAggName string            // Name/key for the currentAgg when it becomes an inner agg
+
+	for i := len(f.aggInfoList) - 1; i >= 0; i-- { // Iterate from innermost to outermost from aggInfoList
+		aggInfo := f.aggInfoList[i]
+		var nextAgg elastic.Aggregation // The aggregation generated in this iteration
+		var nextAggName string          // The name/key for nextAgg
+
 		switch info := aggInfo.(type) {
-		case ValueAgg:
-			switch info.FuncType {
-			case Min:
-				curName := FieldValue
-				curAgg := elastic.NewMinAggregation().Field(f.valueField)
-				if agg != nil {
-					curAgg = curAgg.SubAggregation(name, agg)
-				}
-
-				agg = curAgg
-				name = curName
-			case Max:
-				curName := FieldValue
-				curAgg := elastic.NewMaxAggregation().Field(f.valueField)
-				if agg != nil {
-					curAgg = curAgg.SubAggregation(name, agg)
-				}
-
-				agg = curAgg
-				name = curName
-			case Avg:
-				curName := FieldValue
-				curAgg := elastic.NewAvgAggregation().Field(f.valueField)
-				if agg != nil {
-					curAgg = curAgg.SubAggregation(name, agg)
-				}
-
-				agg = curAgg
-				name = curName
-			case Sum:
-				curName := FieldValue
-				curAgg := elastic.NewSumAggregation().Field(f.valueField)
-				if agg != nil {
-					curAgg = curAgg.SubAggregation(name, agg)
-				}
-
-				agg = curAgg
-				name = curName
-			case Count:
-				curName := FieldValue
-				curAgg := elastic.NewValueCountAggregation().Field(f.valueField)
-				if agg != nil {
-					curAgg = curAgg.SubAggregation(name, agg)
-				}
-
-				agg = curAgg
-				name = curName
-			case Cardinality:
-				curName := FieldValue
-				curAgg := elastic.NewCardinalityAggregation().Field(f.valueField)
-				if agg != nil {
-					curAgg = curAgg.SubAggregation(name, agg)
-				}
-
-				agg = curAgg
-				name = curName
-			case Percentiles:
-				percents := make([]float64, 0)
-				for _, arg := range info.Args {
-					var percent float64
-					switch v := arg.(type) {
-					case float64:
-						percent = float64(int(v))
-					case int:
-						percent = float64(v)
-					case int32:
-						percent = float64(v)
-					case int64:
-						percent = float64(v)
-					default:
-						err = fmt.Errorf("percent type is error: %T, %+v", v, v)
-					}
-					percents = append(percents, percent)
-				}
-
-				curAgg := elastic.NewPercentilesAggregation().Field(f.valueField).Percentiles(percents...)
-				curName := FieldValue
-				if agg != nil {
-					curAgg = curAgg.SubAggregation(name, agg)
-				}
-
-				agg = curAgg
-				name = curName
-			default:
-				err = fmt.Errorf("valueagg aggregation is not support this type %s, info: %+v", info.FuncType, info)
+		case ValueAgg: // This case handles standalone ValueAggs (not attached ones)
+			nextAggName = info.Name // Typically FieldValue
+			var buildErr error
+			nextAgg, buildErr = buildElasticValueAgg(info)
+			if buildErr != nil {
+				err = buildErr
 				return
 			}
 		case TimeAgg:
-			curName := info.Name
-
+			nextAggName = info.Name
 			var interval string
-
 			if f.timeField.Type == TimeFieldTypeInt {
 				interval, err = f.toFixInterval(info.Window)
 				if err != nil {
@@ -610,49 +587,75 @@ func (f *FormatFactory) Agg() (name string, agg elastic.Aggregation, err error) 
 			} else {
 				interval = shortDur(info.Window)
 			}
-
-			curAgg := elastic.NewDateHistogramAggregation().
+			ta := elastic.NewDateHistogramAggregation().
 				Field(f.timeField.Name).Interval(interval).MinDocCount(0).
 				ExtendedBounds(f.timeFieldUnix(f.start), f.timeFieldUnix(f.end))
-			// https://github.com/elastic/elasticsearch/issues/42270 非date类型不支持timezone, time format也无效
 			if f.timeField.Type == TimeFieldTypeTime {
-				curAgg = curAgg.TimeZone(info.Timezone)
+				ta = ta.TimeZone(info.TimeZone)
 			}
-			if agg != nil {
-				curAgg = curAgg.SubAggregation(name, agg)
+			if currentAgg != nil { // Embed previously built (inner) aggregation
+				ta = ta.SubAggregation(innerAggName, currentAgg)
 			}
-
-			agg = curAgg
-			name = curName
+			nextAgg = ta
 		case NestedAgg:
-			agg = elastic.NewNestedAggregation().Path(info.Name).SubAggregation(name, agg)
-			name = info.Name
+			nextAggName = info.Name // Path of the nested field
+			na := elastic.NewNestedAggregation().Path(info.Name)
+			if currentAgg != nil {
+				na = na.SubAggregation(innerAggName, currentAgg)
+			}
+			nextAgg = na
+		case ReverseNestedAgg:
+			nextAggName = info.Name // Name for the reverse_nested block itself (e.g. "reverse_nested_aggregation")
+			if info.Name == "" {    // Default name if not specified
+				nextAggName = "reverse_nested"
+			}
+			rna := elastic.NewReverseNestedAggregation()
+			if currentAgg != nil {
+				rna = rna.SubAggregation(innerAggName, currentAgg)
+			}
+			nextAgg = rna
 		case TermAgg:
-			curName := info.Name
-			curAgg := elastic.NewTermsAggregation().Field(info.Name)
+			nextAggName = info.Name // Field name, becomes the key for this terms agg
+			ta := elastic.NewTermsAggregation().Field(info.Name)
 			fieldType, ok := f.mapping[info.Name]
 			if !ok || fieldType == Text || fieldType == KeyWord {
-				curAgg = curAgg.Missing(" ")
+				ta = ta.Missing(" ")
 			}
-
 			if f.size > 0 {
-				curAgg = curAgg.Size(f.size)
+				ta = ta.Size(f.size)
+			} else {
+				ta = ta.Size(0)
 			}
 			for _, order := range info.Orders {
-				curAgg = curAgg.Order(order.Name, order.Ast)
-			}
-			if agg != nil {
-				curAgg = curAgg.SubAggregation(name, agg)
+				ta = ta.Order(order.Name, order.Ast)
 			}
 
-			agg = curAgg
-			name = curName
+			// Handle attached metric aggregation
+			if info.AttachedValueAgg != nil {
+				metricAgg, buildErr := buildElasticValueAgg(*info.AttachedValueAgg)
+				if buildErr != nil {
+					err = buildErr
+					return // Propagate error
+				}
+				if metricAgg != nil {
+					ta = ta.SubAggregation(info.AttachedValueAgg.Name /* typically FieldValue */, metricAgg)
+				}
+			}
+
+			if currentAgg != nil { // This is for the chained (e.g., further nested) aggregation
+				ta = ta.SubAggregation(innerAggName, currentAgg)
+			}
+			nextAgg = ta
 		default:
 			err = fmt.Errorf("aggInfoList aggregation is not support this type %T, info: %+v", info, info)
 			return
 		}
+		currentAgg = nextAgg
+		innerAggName = nextAggName
 	}
-
+	// After loop, currentAgg is the outermost aggregation, innerAggName is its name
+	agg = currentAgg
+	name = innerAggName
 	return
 }
 
@@ -673,48 +676,271 @@ func (f *FormatFactory) HighLight(queryString string, maxAnalyzedOffset int) *el
 	return hl
 }
 
-func (f *FormatFactory) EsAgg(aggregates metadata.Aggregates) (string, elastic.Aggregation, error) {
-	if len(aggregates) == 0 {
-		err := errors.New("aggregate_method_list is empty")
-		return "", nil, err
+// FieldPathInfo holds metadata about a field's path and name.
+// Used to determine nesting and the correct field string for aggregations.
+// Example: For "events.name", Path="events", FieldName="events.name", IsNested=true.
+// For "name", Path="", FieldName="name", IsNested=false.
+// Note: FieldName is always the OriginalField, Path is the longest prefix found in mappings as "nested".
+type FieldPathInfo struct {
+	OriginalField string // e.g., "events.name" or "name"
+	Path          string // e.g., "events" or "" (empty if not nested or path not in mapping)
+	FieldName     string // Always the OriginalField, used in terms/metric aggregations
+	IsNested      bool
+}
+
+// getFieldPathInfo analyzes a field string to determine its nested path status and an effective field name.
+// It checks f.mapping to identify if any prefix of the field corresponds to a known nested path.
+func (f *FormatFactory) getFieldPathInfo(field string) FieldPathInfo {
+	if field == "" {
+		// Return non-nested if field is empty, though this should ideally be handled by callers.
+		return FieldPathInfo{OriginalField: field, FieldName: field, Path: "", IsNested: false}
 	}
-	nestedAggSet := set.New[string]()
 
-	for _, am := range aggregates {
-		switch am.Name {
-		case DateHistogram:
-			f.timeAgg(f.timeField.Name, am.Window, am.TimeZone)
-		case Max, Min, Avg, Sum, Count, Cardinality, Percentiles:
-			f.valueAgg(FieldValue, am.Name, am.Args...)
-			nestedAggSet.Add(f.valueField)
+	parts := strings.Split(field, ESStep)
 
-			if am.Window > 0 && !am.Without {
-				// 增加时间函数
-				f.timeAgg(f.timeField.Name, am.Window, am.TimeZone)
+	// Iterate from the longest possible path prefix down to the first part.
+	// For a field like "a.b.c", it will test prefixes "a.b", then "a".
+	for i := len(parts) - 1; i >= 1; i-- { // loop from parts[0:len-1] down to parts[0:1]
+		currentPathPrefix := strings.Join(parts[0:i], ESStep)
+		if typ, ok := f.mapping[currentPathPrefix]; ok && typ == Nested {
+			// Found the longest prefix that is a known nested path.
+			return FieldPathInfo{
+				OriginalField: field,
+				Path:          currentPathPrefix, // The identified nested path
+				FieldName:     field,             // The full original field for aggregations
+				IsNested:      true,
 			}
-
-			for idx, dim := range am.Dimensions {
-				if dim == labels.MetricName {
-					continue
-				}
-				if f.decode != nil {
-					dim = f.decode(dim)
-				}
-
-				f.termAgg(dim, idx == 0)
-				nestedAggSet.Add(dim)
-			}
-		default:
-			err := fmt.Errorf("esAgg aggregation is not support with: %+v", am)
-			return "", nil, err
 		}
 	}
 
-	for _, nestedAgg := range nestedAggSet.ToArray() {
-		f.nestedAgg(nestedAgg)
+	// If no prefix is a known nested path, check if the field *itself* is defined as type "nested".
+	// This handles cases like `groupBy: ["events"]` where "events" itself is the nested object path.
+	if typ, ok := f.mapping[field]; ok && typ == Nested {
+		return FieldPathInfo{
+			OriginalField: field,
+			Path:          field, // The field itself is the nested path
+			FieldName:     field, // Aggregating by the path itself
+			IsNested:      true,
+		}
 	}
 
-	return f.Agg()
+	// Default: field is not considered nested based on prefixes or its own type in mapping.
+	return FieldPathInfo{
+		OriginalField: field,
+		Path:          "",    // No specific nested path identified from prefixes
+		FieldName:     field, // Use the original field name
+		IsNested:      false,
+	}
+}
+
+// handlePathTransition manages the transition between currentLogicalPath and targetPath,
+// adding ReverseNestedAgg and NestedAgg to f.aggInfoList as needed.
+// It updates and returns the new currentLogicalPath.
+func (f *FormatFactory) handlePathTransition(currentLogicalPath, targetPath string, targetIsNested bool) string {
+	if targetIsNested {
+		if targetPath != currentLogicalPath {
+			// Break down paths into components
+			currentParts := strings.Split(currentLogicalPath, ESStep)
+			if currentLogicalPath == "" { // handle empty string case for Split
+				currentParts = []string{}
+			}
+			targetParts := strings.Split(targetPath, ESStep)
+
+			// Find common prefix length
+			commonPrefixLen := 0
+			for commonPrefixLen < len(currentParts) && commonPrefixLen < len(targetParts) && currentParts[commonPrefixLen] == targetParts[commonPrefixLen] {
+				commonPrefixLen++
+			}
+
+			// Add ReverseNestedAggs to go up from currentLogicalPath to common ancestor
+			for i := len(currentParts) - 1; i >= commonPrefixLen; i-- {
+				f.aggInfoList = append(f.aggInfoList, ReverseNestedAgg{Name: "reverse_nested"}) // Standardized name
+			}
+
+			// Add NestedAggs to go down from common ancestor to targetPath
+			for i := commonPrefixLen; i < len(targetParts); i++ {
+				pathToNest := strings.Join(targetParts[0:i+1], ESStep)
+				f.aggInfoList = append(f.aggInfoList, NestedAgg{Name: pathToNest})
+			}
+			return targetPath
+		}
+		return currentLogicalPath // No transition needed if paths are same
+	} else { // Target is not nested
+		if currentLogicalPath != "" {
+			f.aggInfoList = append(f.aggInfoList, ReverseNestedAgg{Name: "reverse_nested"}) // Standardized name
+		}
+		return "" // New path is root
+	}
+}
+
+// EsAgg generates the Elasticsearch aggregation structure.
+func (f *FormatFactory) EsAgg(aggregates metadata.Aggregates) (string, elastic.Aggregation, error) {
+	if len(aggregates) == 0 {
+		return "", nil, errors.New("aggregate_method_list is empty")
+	}
+	aggDef := aggregates[0]
+
+	f.aggInfoList = make(aggInfoList, 0)
+	currentLogicalPath := ""
+
+	// Determine metric field and info early for some decisions
+	metricFieldForOp := aggDef.Field
+	if metricFieldForOp == "" && aggDef.Name == Count {
+		metricFieldForOp = f.valueField
+	}
+	metricFieldInfo := f.getFieldPathInfo(metricFieldForOp)
+
+	// Order of processing: Dimensions first, then Time Aggregation, then Metric Aggregation.
+	// This makes dimensions outermost if they exist.
+	var metricAggAttached bool // Flag to track if the primary metric has been attached to a TermAgg
+
+	// 1. Dimension Aggregations
+	for i, dim := range aggDef.Dimensions {
+		if dim == labels.MetricName {
+			continue
+		}
+		decodedDim := dim
+		if f.decode != nil {
+			decodedDim = f.decode(dim)
+		}
+		dimInfo := f.getFieldPathInfo(decodedDim)
+
+		currentLogicalPath = f.handlePathTransition(currentLogicalPath, dimInfo.Path, dimInfo.IsNested)
+
+		termAgg := TermAgg{Name: dimInfo.FieldName}
+		// Apply orders:
+		// If this is the first dimension (i=0), it's the outermost dimension group.
+		// Orders by this dimension's key (KeyValue) or by metric (FieldValue) apply here.
+		if i == 0 {
+			for _, order := range f.orders {
+				if dimInfo.OriginalField == order.Name {
+					termAgg.Orders = append(termAgg.Orders, metadata.Order{Name: KeyValue, Ast: order.Ast})
+				} else if order.Name == FieldValue {
+					termAgg.Orders = append(termAgg.Orders, order)
+				}
+			}
+		} else {
+			// For inner dimensions, only apply order if it's explicitly for this dimension's key.
+			for _, order := range f.orders {
+				if dimInfo.OriginalField == order.Name {
+					termAgg.Orders = append(termAgg.Orders, metadata.Order{Name: KeyValue, Ast: order.Ast})
+				}
+			}
+		}
+
+		// Check if this dimension is also the metric field, AND the metric field itself is nested.
+		// This is for scenarios like scene_7 where the metric on a nested dimension field
+		// should be a sibling to further reverse_nested operations from that nested context.
+		if !metricAggAttached && aggDef.Name != DateHistogram &&
+			dimInfo.OriginalField == metricFieldInfo.OriginalField && // Current dim is the metric field
+			metricFieldInfo.IsNested && // AND metric field itself is nested
+			aggDef.Window == 0 { // AND there is no time windowing for this aggregate definition
+
+			termAgg.AttachedValueAgg = &ValueAgg{
+				Name:     FieldValue, // Standard name for the metric value aggregation
+				FuncType: aggDef.Name,
+				Field:    metricFieldInfo.OriginalField, // Use the original field of the metric
+				Args:     aggDef.Args,
+			}
+			metricAggAttached = true
+			log.Debugf(f.ctx, "EsAgg: Attached ValueAgg for NESTED field '%s' (NO window) to TermAgg for dimension '%s'", metricFieldInfo.OriginalField, dimInfo.OriginalField)
+		}
+
+		f.aggInfoList = append(f.aggInfoList, termAgg)
+	}
+
+	// 2. Time Aggregation (if window > 0)
+	if aggDef.Window > 0 && !aggDef.Without {
+		// Time aggregation should generally be at the root or directly within the current logical path
+		// established by dimensions. If dimensions created a nested path, time agg might be inside or outside.
+		// For typical TSDB queries (group by dim, then time bucket), time agg is *inside* the dimension.
+		// If the current path is nested, and we want time agg outside, transition to root.
+		// However, if the test expects Term(Time(Value)), TimeAgg should be added after TermAgg
+		// within the same logical path or by transitioning as needed.
+		// The current `currentLogicalPath` is the path of the *innermost* dimension.
+		// If time bucketing is desired within each such dimensional group, we add it here.
+		// If time bucketing should be more "global" or at root, a path transition would be needed.
+		// For RangeQueryAndAggregates, the expected is Term(Time(Value)), meaning TimeAgg is *inner* to TermAgg.
+		// So, we add TimeAgg now, inheriting currentLogicalPath if it implies nesting, or it applies at current level.
+		// Critically, date_histogram in ES isn't "path" aware like nested/terms. It operates on a root-level date field.
+		// So, if currentLogicalPath is nested, date_histogram still uses the root f.timeField.Name.
+		// The `handlePathTransition` to root before time agg logic in previous versions was to ensure
+		// time agg wasn't *incorrectly* thought to be part of a nested structure for its *own* operation.
+		// Given Term(Time(Value)) order:
+		// - Dimensions establish `currentLogicalPath`.
+		// - TimeAgg is added. It will become a sub-aggregation of the innermost dimension.
+		// No explicit path transition for TimeAgg itself, as it uses a global time field.
+		f.aggInfoList = append(f.aggInfoList, TimeAgg{
+			Name:     f.timeField.Name, // This is the key for the time agg block
+			Window:   aggDef.Window,
+			TimeZone: aggDef.TimeZone,
+		})
+	}
+
+	// 3. Metric Aggregation (only if not already attached)
+	// This handles cases where the metric field is not a dimension, or for non-TermAgg scenarios.
+	if !metricAggAttached && aggDef.Name != DateHistogram { // DateHistogram is handled by TimeAgg
+		fieldForMetricValueAgg := metricFieldForOp
+		if aggDef.Field == "" && aggDef.Name == Count {
+			// Uses f.valueField (via metricFieldForOp) or explicitly set aggDef.Field.
+		} else if aggDef.Field != "" {
+			fieldForMetricValueAgg = aggDef.Field // Prioritize explicitly set aggDef.Field
+		}
+
+		// The currentLogicalPath is the state after processing all dimensions and time aggs.
+		// The metric (ValueAgg) needs to be placed in the context of its own field (metricFieldInfo).
+		// Call handlePathTransition to add any necessary NestedAgg or ReverseNestedAgg
+		// to transition from currentLogicalPath to metricFieldInfo.Path.
+		currentLogicalPath = f.handlePathTransition(currentLogicalPath, metricFieldInfo.Path, metricFieldInfo.IsNested)
+
+		f.aggInfoList = append(f.aggInfoList, ValueAgg{
+			Name:     FieldValue, // Standard name for the metric value aggregation
+			FuncType: aggDef.Name,
+			Field:    fieldForMetricValueAgg,
+			Args:     aggDef.Args,
+		})
+		log.Debugf(f.ctx, "EsAgg: Added standalone ValueAgg for field '%s' with path '%s'", fieldForMetricValueAgg, currentLogicalPath)
+	}
+
+	log.Debugf(f.ctx, "EsAgg: Constructed aggInfoList: %+v", f.aggInfoList)
+
+	_, mainAgg, err := f.Agg()
+	if err != nil {
+		return "", nil, err
+	}
+
+	// Determine outermostAggName:
+	// Priority: First Dimension > Time Window > Metric Field Path/Name
+	outermostAggName := ""
+	if len(aggDef.Dimensions) > 0 {
+		firstDimDecoded := aggDef.Dimensions[0]
+		if f.decode != nil {
+			firstDimDecoded = f.decode(firstDimDecoded)
+		}
+		firstDimInfo := f.getFieldPathInfo(firstDimDecoded)
+		if firstDimInfo.IsNested { // If first dim is like "events.name", path "events" is outer.
+			outermostAggName = firstDimInfo.Path
+		} else { // If first dim is like "name", field "name" is outer.
+			outermostAggName = firstDimInfo.FieldName
+		}
+	} else if aggDef.Window > 0 && !aggDef.Without {
+		outermostAggName = f.timeField.Name // Key used for the TimeAgg block
+	} else if aggDef.Name != DateHistogram { // Metric is the only component
+		if metricFieldInfo.IsNested {
+			outermostAggName = metricFieldInfo.Path
+		} else {
+			if metricFieldForOp != "" {
+				outermostAggName = metricFieldForOp
+			} else {
+				outermostAggName = FieldValue // Fallback for global metric
+			}
+		}
+	} else {
+		return "", nil, errors.New("unable to determine outermost aggregation name")
+	}
+
+	log.Debugf(f.ctx, "EsAgg: Determined outermost name: %s", outermostAggName)
+	return outermostAggName, mainAgg, err
 }
 
 func (f *FormatFactory) Orders() metadata.Orders {
@@ -774,104 +1000,166 @@ func (f *FormatFactory) getQuery(key string, qs ...elastic.Query) (q elastic.Que
 
 // Query 把 ts 的 conditions 转换成 es 查询
 func (f *FormatFactory) Query(allConditions metadata.AllConditions) (elastic.Query, error) {
-	bootQueries := make([]elastic.Query, 0)
 	orQuery := make([]elastic.Query, 0, len(allConditions))
 
 	for _, conditions := range allConditions {
-		// Track nested fields separately for each condition group
-		nestedFields := set.New[string]()
-		nestedQueries := make(map[string][]elastic.Query)
-		nonNestedQueries := make([]elastic.Query, 0)
+		nestedPathQueries := make(map[string][]elastic.Query) // Stores queries that should be ANDed under a specific nested path
+		rootLevelQueries := make([]elastic.Query, 0)          // Stores non-nested queries and fully formed must_not(nested) queries
 
-		// First pass: process all conditions and separate nested from non-nested
 		for _, con := range conditions {
 			key := con.DimensionName
 			if f.decode != nil {
 				key = f.decode(key)
 			}
 
-			// Check if this dimension is in a nested field
-			nf := f.NestedField(con.DimensionName)
+			nestedPath := f.NestedField(con.DimensionName)
 
 			var q elastic.Query
+			isNegativeOperator := false
+			positiveOperator := con.Operator // Used if we handle negativity at a higher level for nested queries
+
+			switch con.Operator {
+			case structured.ConditionNotEqual,
+				structured.ConditionNotContains,
+				structured.ConditionNotRegEqual,
+				structured.ConditionNotExisted:
+				isNegativeOperator = true
+				// Determine the positive equivalent operator for nested must_not cases
+				switch con.Operator {
+				case structured.ConditionNotEqual: // match_phrase
+					positiveOperator = structured.ConditionEqual
+				case structured.ConditionNotContains: // wildcard or match_phrase
+					positiveOperator = structured.ConditionContains
+				case structured.ConditionNotRegEqual: // regexp
+					positiveOperator = structured.ConditionRegEqual
+				case structured.ConditionNotExisted: // exists
+					positiveOperator = structured.ConditionExisted
+				}
+			}
+
+			if nestedPath != "" && isNegativeOperator && con.Operator != structured.ConditionNotExisted {
+				// Handle must_not(nested(positive_condition)) scenario
+				// Construct the positive query part first
+				positiveQueries := make([]elastic.Query, 0)
+				fieldType, _ := f.mapping[key]
+				for _, value := range con.Value {
+					var positiveQueryPart elastic.Query
+					switch positiveOperator {
+					case structured.ConditionEqual: // from NotEqual
+						if con.IsPrefix {
+							positiveQueryPart = elastic.NewMatchPhrasePrefixQuery(key, value)
+						} else {
+							positiveQueryPart = elastic.NewMatchPhraseQuery(key, value)
+						}
+					case structured.ConditionContains: // from NotContains
+						if fieldType == KeyWord {
+							value = fmt.Sprintf("*%s*", value)
+						}
+						if !con.IsWildcard && fieldType == Text {
+							if con.IsPrefix {
+								positiveQueryPart = elastic.NewMatchPhrasePrefixQuery(key, value)
+							} else {
+								positiveQueryPart = elastic.NewMatchPhraseQuery(key, value)
+							}
+						} else {
+							positiveQueryPart = elastic.NewWildcardQuery(key, value)
+						}
+					case structured.ConditionRegEqual: // from NotRegEqual
+						positiveQueryPart = elastic.NewRegexpQuery(key, value)
+					// Add other positive operators if needed for other negative ones
+					default:
+						return nil, fmt.Errorf("unhandled positive operator mapping for %s -> %s", con.Operator, positiveOperator)
+					}
+					if positiveQueryPart != nil {
+						positiveQueries = append(positiveQueries, positiveQueryPart)
+					}
+				}
+				if len(positiveQueries) > 0 {
+					positiveBoolQuery := f.getQuery(Should, positiveQueries...) // If multiple values for NotEqual, they are ORed for the positive match inside nested
+					nestedQ := elastic.NewNestedQuery(nestedPath, positiveBoolQuery)
+					q = f.getQuery(MustNot, nestedQ)
+					rootLevelQueries = append(rootLevelQueries, q)
+				}
+				continue // Handled this condition, move to next
+			}
+
+			// Original logic for non-special-nested-must_not or all positive queries
 			switch con.Operator {
 			case structured.ConditionExisted:
 				q = elastic.NewExistsQuery(key)
 			case structured.ConditionNotExisted:
-				q = f.getQuery(MustNot, elastic.NewExistsQuery(key))
+				// For ConditionNotExisted, if it's nested, it should be must_not(nested(exists(...)))
+				if nestedPath != "" {
+					existsQuery := elastic.NewExistsQuery(key)
+					nestedExistsQuery := elastic.NewNestedQuery(nestedPath, existsQuery)
+					q = f.getQuery(MustNot, nestedExistsQuery)
+				} else {
+					q = f.getQuery(MustNot, elastic.NewExistsQuery(key))
+				}
 			default:
-				// 根据字段类型，判断是否使用 isExistsQuery 方法判断非空
 				fieldType, ok := f.mapping[key]
-				isExistsQuery := true
-				if ok {
-					if fieldType == Text || fieldType == KeyWord {
-						isExistsQuery = false
-					}
+				isExistsQuery := true // Should this be used for empty value check?
+				if ok && (fieldType == Text || fieldType == KeyWord) {
+					isExistsQuery = false
 				}
 
 				queries := make([]elastic.Query, 0)
 				for _, value := range con.Value {
-					var query elastic.Query
+					var queryPart elastic.Query
 					if con.DimensionName != "" {
-						// 如果是字符串类型，则需要使用 match_phrase 进行非空判断
-						if value == "" && isExistsQuery {
-							query = elastic.NewExistsQuery(key)
+						if value == "" && isExistsQuery && (con.Operator == structured.ConditionEqual || con.Operator == structured.ConditionContains || con.Operator == structured.ConditionNotEqual || con.Operator == structured.ConditionNotContains) {
+							existsQ := elastic.NewExistsQuery(key)
 							switch con.Operator {
-							case structured.ConditionEqual, structured.Contains:
-								query = f.getQuery(MustNot, query)
-							case structured.ConditionNotEqual, structured.Ncontains:
-								query = f.getQuery(Must, query)
+							case structured.ConditionEqual, structured.ConditionContains:
+								queryPart = f.getQuery(MustNot, existsQ)
+							case structured.ConditionNotEqual, structured.ConditionNotContains:
+								queryPart = f.getQuery(Must, existsQ)
 							default:
-								return nil, fmt.Errorf("operator is not support with empty, %+v", con)
+								// This case should ideally not be reached if handled by prior empty string checks.
 							}
-							continue
 						} else {
-							// 非空才进行验证
 							switch con.Operator {
 							case structured.ConditionEqual, structured.ConditionNotEqual:
 								if con.IsPrefix {
-									query = elastic.NewMatchPhrasePrefixQuery(key, value)
+									queryPart = elastic.NewMatchPhrasePrefixQuery(key, value)
 								} else {
-									query = elastic.NewMatchPhraseQuery(key, value)
+									queryPart = elastic.NewMatchPhraseQuery(key, value)
 								}
 							case structured.ConditionContains, structured.ConditionNotContains:
 								if fieldType == KeyWord {
 									value = fmt.Sprintf("*%s*", value)
 								}
-
 								if !con.IsWildcard && fieldType == Text {
 									if con.IsPrefix {
-										query = elastic.NewMatchPhrasePrefixQuery(key, value)
+										queryPart = elastic.NewMatchPhrasePrefixQuery(key, value)
 									} else {
-										query = elastic.NewMatchPhraseQuery(key, value)
+										queryPart = elastic.NewMatchPhraseQuery(key, value)
 									}
 								} else {
-									query = elastic.NewWildcardQuery(key, value)
+									queryPart = elastic.NewWildcardQuery(key, value)
 								}
 							case structured.ConditionRegEqual, structured.ConditionNotRegEqual:
-								query = elastic.NewRegexpQuery(key, value)
+								queryPart = elastic.NewRegexpQuery(key, value)
 							case structured.ConditionGt:
-								query = elastic.NewRangeQuery(key).Gt(value)
+								queryPart = elastic.NewRangeQuery(key).Gt(value)
 							case structured.ConditionGte:
-								query = elastic.NewRangeQuery(key).Gte(value)
+								queryPart = elastic.NewRangeQuery(key).Gte(value)
 							case structured.ConditionLt:
-								query = elastic.NewRangeQuery(key).Lt(value)
+								queryPart = elastic.NewRangeQuery(key).Lt(value)
 							case structured.ConditionLte:
-								query = elastic.NewRangeQuery(key).Lte(value)
+								queryPart = elastic.NewRangeQuery(key).Lte(value)
 							default:
-								return nil, fmt.Errorf("operator is not support, %+v", con)
+								return nil, fmt.Errorf("operator is not supported: %+v", con)
 							}
 						}
 					} else {
-						query = elastic.NewQueryStringQuery(value)
+						queryPart = elastic.NewQueryStringQuery(value)
 					}
-
-					if query != nil {
-						queries = append(queries, query)
+					if queryPart != nil {
+						queries = append(queries, queryPart)
 					}
 				}
 
-				// 非空才进行验证
 				switch con.Operator {
 				case structured.ConditionEqual, structured.ConditionContains, structured.ConditionRegEqual:
 					q = f.getQuery(Should, queries...)
@@ -879,62 +1167,68 @@ func (f *FormatFactory) Query(allConditions metadata.AllConditions) (elastic.Que
 					q = f.getQuery(MustNot, queries...)
 				case structured.ConditionGt, structured.ConditionGte, structured.ConditionLt, structured.ConditionLte:
 					q = f.getQuery(Must, queries...)
+					// ConditionExisted and ConditionNotExisted are handled above or by special nested logic.
 				default:
-					return nil, fmt.Errorf("operator is not support, %+v", con)
+					// This path might be taken by ConditionExisted/NotExisted if not handled by special nested logic.
+					// Ensure q is not nil if those were processed to avoid erroring out.
+					if q == nil { // if q was set by ConditionExisted/NotExisted, this won't be true
+						return nil, fmt.Errorf("operator is not supported or q remained nil: %+v", con)
+					}
 				}
 			}
 
-			// Add to the appropriate query collection
-			if nf != "" {
-				nestedFields.Add(nf)
-				nestedQueries[nf] = append(nestedQueries[nf], q)
-			} else if q != nil {
-				nonNestedQueries = append(nonNestedQueries, q)
+			if q == nil {
+				continue // Skip if no query was generated for this condition
+			}
+
+			if nestedPath != "" && !(isNegativeOperator && con.Operator != structured.ConditionNotExisted) && con.Operator != structured.ConditionNotExisted {
+				// This is a positive condition on a nested field, or a negative one that isn't handled as must_not(nested())
+				// or a NotExisted on nested (which becomes must_not(nested(exists))) that still needs grouping by path.
+				// For ConditionNotExisted on a nested path, 'q' is already must_not(nested(exists(key))). This should not go into nestedPathQueries.
+				// It should go to rootLevelQueries.
+				// The check `con.Operator != structured.ConditionNotExisted` is because that specific case now forms a root-level query.
+
+				// If q is already a fully formed nested query (like from NotExisted), add to rootLevelQueries.
+				// This distinction is getting complicated. Let's simplify:
+				// If the condition resulted in a query `q` that is *not* one of the special must_not(nested) cases handled above,
+				// and it *is* for a nested field, then group it for later wrapping. Otherwise, it's a root level query.
+
+				// Re-evaluating: The special handling for negative nested queries already puts them in rootLevelQueries.
+				// The special handling for ConditionNotExisted on nested path also puts it in rootLevelQueries.
+				// So, if nestedPath != "" here, it means it's a *positive* condition on a nested field.
+				nestedPathQueries[nestedPath] = append(nestedPathQueries[nestedPath], q)
+			} else {
+				rootLevelQueries = append(rootLevelQueries, q)
 			}
 		}
 
-		// Combine nested queries by field
-		nestedFieldQueries := make([]elastic.Query, 0, nestedFields.Size())
-		nestedFieldsArray := nestedFields.ToArray()
+		// Combine queries for each nested path
+		// To ensure consistent order for tests, sort the paths
+		paths := make([]string, 0, len(nestedPathQueries))
+		for path := range nestedPathQueries {
+			paths = append(paths, path)
+		}
+		sort.Strings(paths)
 
-		// 排序输出
-		sort.Strings(nestedFieldsArray)
-
-		for _, field := range nestedFieldsArray {
-			if queries, ok := nestedQueries[field]; ok && len(queries) > 0 {
-				// Create a nested query for this field
-				nestedQuery := elastic.NewNestedQuery(field, f.getQuery(Must, queries...))
-				nestedFieldQueries = append(nestedFieldQueries, nestedQuery)
+		for _, path := range paths { // Iterate over sorted paths
+			nqs := nestedPathQueries[path]
+			if len(nqs) > 0 {
+				pathQuery := f.getQuery(Must, nqs...)
+				nestedQuery := elastic.NewNestedQuery(path, pathQuery)
+				rootLevelQueries = append(rootLevelQueries, nestedQuery)
 			}
 		}
 
-		// Combine all queries (nested and non-nested)
-		var allQueries []elastic.Query
-		allQueries = append(allQueries, nonNestedQueries...)
-		allQueries = append(allQueries, nestedFieldQueries...)
-
-		// Add to OR query
-		if len(allQueries) > 0 {
-			aq := f.getQuery(Must, allQueries...)
-			if aq != nil {
-				orQuery = append(orQuery, aq)
+		if len(rootLevelQueries) > 0 {
+			andQuery := f.getQuery(Must, rootLevelQueries...)
+			if andQuery != nil {
+				orQuery = append(orQuery, andQuery)
 			}
 		}
 	}
 
-	oq := f.getQuery(Should, orQuery...)
-	if oq != nil {
-		bootQueries = append(bootQueries, oq)
-	}
-
-	var resQuery elastic.Query
-	if len(bootQueries) > 1 {
-		resQuery = elastic.NewBoolQuery().Must(bootQueries...)
-	} else if len(bootQueries) == 1 {
-		resQuery = bootQueries[0]
-	}
-
-	return resQuery, nil
+	finalQuery := f.getQuery(Should, orQuery...)
+	return finalQuery, nil
 }
 
 func (f *FormatFactory) Sample() (prompb.Sample, error) {
