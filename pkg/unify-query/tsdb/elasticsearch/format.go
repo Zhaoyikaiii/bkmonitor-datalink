@@ -879,11 +879,13 @@ func (f *FormatFactory) Query(allConditions metadata.AllConditions) (elastic.Que
 			}
 
 			// Add to the appropriate query collection
-			if nf != "" {
-				nestedFields[nf] = struct{}{}
-				nestedQueries[nf] = append(nestedQueries[nf], q)
-			} else if q != nil {
-				nonNestedQueries = append(nonNestedQueries, q)
+			if q != nil {
+				if nf != "" {
+					nestedFields[nf] = struct{}{}
+					nestedQueries[nf] = append(nestedQueries[nf], q)
+				} else {
+					nonNestedQueries = append(nonNestedQueries, q)
+				}
 			}
 		}
 
