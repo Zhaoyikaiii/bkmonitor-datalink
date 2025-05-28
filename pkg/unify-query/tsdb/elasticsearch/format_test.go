@@ -856,3 +856,541 @@ func TestBuildQuery(t *testing.T) {
 		})
 	}
 }
+
+func TestFormatFactory_AggWithMapping(t *testing.T) {
+	// Common mapping for all scenarios
+	commonMapping := []map[string]any{
+		{
+			"properties": map[string]any{
+				"name": map[string]any{
+					"type": "keyword",
+				},
+				"age": map[string]any{
+					"type": "integer",
+				},
+				"events": map[string]any{
+					"type": "nested",
+					"properties": map[string]any{
+						"name": map[string]any{
+							"type": "keyword",
+						},
+					},
+				},
+			},
+		},
+	}
+	t.Log(commonMapping)
+	testCases := map[string]struct {
+		aggregates          metadata.Aggregates
+		expected            string
+		directAgg           func() (string, elastic.Aggregation)
+		expectedAggInfoList []any
+		valueField          string
+	}{
+		"scenario 1: dimension and metric are same nested field": {
+			aggregates: metadata.Aggregates{
+				{
+					Name:       "count",
+					Dimensions: []string{"events.name"},
+					Field:      "events.name",
+				},
+			},
+			valueField: "events.name",
+			expected: `{
+				"aggregations": {
+					"events": {
+						"nested": {
+							"path": "events"
+						},
+						"aggregations": {
+							"events.name": {
+								"terms": {
+									"field": "events.name",
+									"missing": " "
+								},
+								"aggregations": {
+									"_value": {
+										"value_count": {
+											"field": "events.name"
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			}`,
+			directAgg: func() (string, elastic.Aggregation) {
+				nested := elastic.NewNestedAggregation().Path("events")
+				terms := elastic.NewTermsAggregation().
+					Field("events.name").
+					Missing(" ")
+				valueCount := elastic.NewValueCountAggregation().Field("events.name")
+				terms.SubAggregation("_value", valueCount)
+				nested.SubAggregation("events.name", terms)
+				return "events", nested
+			},
+			expectedAggInfoList: []any{
+				NestedAgg{Name: "events"},
+				TermAgg{Name: "events.name"},
+				ValueAgg{Name: "_value", FuncType: "count"},
+			},
+		},
+		"scenario 2: dimension is parent field, metric is nested field": {
+			aggregates: metadata.Aggregates{
+				{
+					Name:       "count",
+					Dimensions: []string{"name"},
+					Field:      "events.name",
+				},
+			},
+			valueField: "events.name",
+			expected: `{
+				"aggregations": {
+					"name": {
+						"terms": {
+							"field": "name",
+							"missing": " "
+						},
+						"aggregations": {
+							"events": {
+								"nested": {
+									"path": "events"
+								},
+								"aggregations": {
+									"_value": {
+										"value_count": {
+											"field": "events.name"
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			}`,
+			directAgg: func() (string, elastic.Aggregation) {
+				terms := elastic.NewTermsAggregation().
+					Field("name").
+					Missing(" ")
+				nested := elastic.NewNestedAggregation().Path("events")
+				valueCount := elastic.NewValueCountAggregation().Field("events.name")
+				nested.SubAggregation("_value", valueCount)
+				terms.SubAggregation("events", nested)
+				return "name", terms
+			},
+			expectedAggInfoList: []any{
+				TermAgg{Name: "name"},
+				NestedAgg{Name: "events"},
+				ValueAgg{Name: "_value", FuncType: "count"},
+			},
+		},
+		"scenario 3: dimension is nested field, metric is parent field": {
+			aggregates: metadata.Aggregates{
+				{
+					Name:       "count",
+					Dimensions: []string{"events.name"},
+					Field:      "name",
+				},
+			},
+			valueField: "name",
+			expected: `{
+				"aggregations": {
+					"events": {
+						"nested": {
+							"path": "events"
+						},
+						"aggregations": {
+							"events.name": {
+								"terms": {
+									"field": "events.name",
+									"missing": " "
+								},
+								"aggregations": {
+									"reverse_nested_for_name": {
+										"reverse_nested": {},
+										"aggregations": {
+											"_value": {
+												"value_count": {
+													"field": "name"
+												}
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			}`,
+			directAgg: func() (string, elastic.Aggregation) {
+				nested := elastic.NewNestedAggregation().Path("events")
+				terms := elastic.NewTermsAggregation().
+					Field("events.name").
+					Missing(" ")
+				reverseNested := elastic.NewReverseNestedAggregation()
+				valueCount := elastic.NewValueCountAggregation().Field("name")
+				reverseNested.SubAggregation("_value", valueCount)
+				terms.SubAggregation("reverse_nested_for_name", reverseNested)
+				nested.SubAggregation("events.name", terms)
+				return "events", nested
+			},
+			expectedAggInfoList: []any{
+				NestedAgg{Name: "events"},
+				TermAgg{Name: "events.name"},
+				ReverseAgg{Name: "reverse_nested_for_name"},
+				ValueAgg{Name: "_value", FuncType: "count"},
+			},
+		},
+		"scenario 4: multi-level dimensions (nested -> parent), metric is parent field": {
+			aggregates: metadata.Aggregates{
+				{
+					Name:       "count",
+					Dimensions: []string{"events.name", "name"},
+					Field:      "name",
+				},
+			},
+			expected: `{
+				"aggregations": {
+					"events": {
+						"nested": {
+							"path": "events"
+						},
+						"aggregations": {
+							"events.name": {
+								"terms": {
+									"field": "events.name",
+									"missing": " ",
+									"size": 0
+								},
+								"aggregations": {
+									"reverse_nested_for_name_dim": {
+										"reverse_nested": {},
+										"aggregations": {
+											"name": {
+												"terms": {
+													"field": "name",
+													"missing": " ",
+													"size": 0
+												},
+												"aggregations": {
+													"_value": {
+														"value_count": {
+															"field": "name"
+														}
+													}
+												}
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			}`,
+			directAgg: func() (string, elastic.Aggregation) {
+				nested := elastic.NewNestedAggregation().Path("events")
+				terms := elastic.NewTermsAggregation().
+					Field("events.name").
+					Missing(" ").
+					Size(0)
+				reverseNested := elastic.NewReverseNestedAggregation()
+				nameTerms := elastic.NewTermsAggregation().
+					Field("name").
+					Missing(" ").
+					Size(0)
+				valueCount := elastic.NewValueCountAggregation().Field("name")
+				nameTerms.SubAggregation("_value", valueCount)
+				reverseNested.SubAggregation("name", nameTerms)
+				terms.SubAggregation("reverse_nested_for_name_dim", reverseNested)
+				nested.SubAggregation("events.name", terms)
+				return "events", nested
+			},
+			expectedAggInfoList: []any{
+				NestedAgg{Name: "events"},
+				TermAgg{Name: "events.name"},
+				ReverseAgg{Name: "reverse_nested_for_name_dim"},
+				TermAgg{Name: "name"},
+				ValueAgg{Name: "_value", FuncType: "count"},
+			},
+		},
+		"scenario 5: multi-level dimensions (parent -> nested), metric is parent field": {
+			aggregates: metadata.Aggregates{
+				{
+					Name:       "count",
+					Dimensions: []string{"name", "events.name"},
+					Field:      "name",
+				},
+			},
+			expected: `{
+				"aggregations": {
+					"name": {
+						"terms": {
+							"field": "name",
+							"missing": " ",
+							"size": 0
+						},
+						"aggregations": {
+							"events": {
+								"nested": {
+									"path": "events"
+								},
+								"aggregations": {
+									"events.name": {
+										"terms": {
+											"field": "events.name",
+											"missing": " ",
+											"size": 0
+										},
+										"aggregations": {
+											"reverse_nested_for_name_value": {
+												"reverse_nested": {},
+												"aggregations": {
+													"_value": {
+														"value_count": {
+															"field": "name"
+														}
+													}
+												}
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			}`,
+			directAgg: func() (string, elastic.Aggregation) {
+				terms := elastic.NewTermsAggregation().
+					Field("name").
+					Missing(" ").
+					Size(0)
+				nested := elastic.NewNestedAggregation().Path("events")
+				eventsNameTerms := elastic.NewTermsAggregation().
+					Field("events.name").
+					Missing(" ").
+					Size(0)
+				reverseNested := elastic.NewReverseNestedAggregation()
+				valueCount := elastic.NewValueCountAggregation().Field("name")
+				reverseNested.SubAggregation("_value", valueCount)
+				eventsNameTerms.SubAggregation("reverse_nested_for_name_value", reverseNested)
+				nested.SubAggregation("events.name", eventsNameTerms)
+				terms.SubAggregation("events", nested)
+				return "name", terms
+			},
+			expectedAggInfoList: []any{
+				TermAgg{Name: "name"},
+				NestedAgg{Name: "events"},
+				TermAgg{Name: "events.name"},
+				ReverseAgg{Name: "reverse_nested_for_name_value"},
+				ValueAgg{Name: "_value", FuncType: "count"},
+			},
+		},
+		"scenario 6: complex multi-level dimensions (parent -> nested -> parent), metric is parent field": {
+			aggregates: metadata.Aggregates{
+				{
+					Name:       "count",
+					Dimensions: []string{"name", "events.name", "age"},
+					Field:      "name",
+				},
+			},
+			expected: `{
+				"aggregations": {
+					"name": {
+						"terms": {
+							"field": "name",
+							"missing": " ",
+							"size": 0
+						},
+						"aggregations": {
+							"events": {
+								"nested": {
+									"path": "events"
+								},
+								"aggregations": {
+									"events.name": {
+										"terms": {
+											"field": "events.name",
+											"missing": " ",
+											"size": 0
+										},
+										"aggregations": {
+											"reverse_nested_for_age_dim": {
+												"reverse_nested": {},
+												"aggregations": {
+													"age": {
+														"terms": {
+															"field": "age",
+															"missing": " ",
+															"size": 0
+														},
+														"aggregations": {
+															"_value": {
+																"value_count": {
+																	"field": "name"
+																}
+															}
+														}
+													}
+												}
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			}`,
+			directAgg: func() (string, elastic.Aggregation) {
+				terms := elastic.NewTermsAggregation().
+					Field("name").
+					Missing(" ").
+					Size(0)
+				nested := elastic.NewNestedAggregation().Path("events")
+				eventsNameTerms := elastic.NewTermsAggregation().
+					Field("events.name").
+					Missing(" ").
+					Size(0)
+				reverseNested := elastic.NewReverseNestedAggregation()
+				ageTerms := elastic.NewTermsAggregation().
+					Field("age").
+					Missing(" ").
+					Size(0)
+				valueCount := elastic.NewValueCountAggregation().Field("name")
+				ageTerms.SubAggregation("_value", valueCount)
+				reverseNested.SubAggregation("age", ageTerms)
+				eventsNameTerms.SubAggregation("reverse_nested_for_age_dim", reverseNested)
+				nested.SubAggregation("events.name", eventsNameTerms)
+				terms.SubAggregation("events", nested)
+				return "name", terms
+			},
+			expectedAggInfoList: []any{
+				TermAgg{Name: "name"},
+				NestedAgg{Name: "events"},
+				TermAgg{Name: "events.name"},
+				ReverseAgg{Name: "reverse_nested_for_age_dim"},
+				TermAgg{Name: "age"},
+				ValueAgg{Name: "_value", FuncType: "count"},
+			},
+		},
+		"scenario 7: complex multi-level dimensions (parent -> nested -> parent), metric is nested field": {
+			aggregates: metadata.Aggregates{
+				{
+					Name:       "count",
+					Dimensions: []string{"name", "events.name", "age"},
+					Field:      "events.name",
+				},
+			},
+			expected: `{
+				"aggregations": {
+					"name": {
+						"terms": {
+							"field": "name",
+							"missing": " ",
+							"size": 0
+						},
+						"aggregations": {
+							"events": {
+								"nested": {
+									"path": "events"
+								},
+								"aggregations": {
+									"events.name": {
+										"terms": {
+											"field": "events.name",
+											"missing": " ",
+											"size": 0
+										},
+										"aggregations": {
+											"_value_in_nested_context": {
+												"value_count": {
+													"field": "events.name"
+												}
+											},
+											"reverse_nested_for_age_dim": {
+												"reverse_nested": {},
+												"aggregations": {
+													"age": {
+														"terms": {
+															"field": "age",
+															"missing": " ",
+															"size": 0
+														}
+													}
+												}
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			}`,
+			directAgg: func() (string, elastic.Aggregation) {
+				terms := elastic.NewTermsAggregation().
+					Field("name").
+					Missing(" ").
+					Size(0)
+				nested := elastic.NewNestedAggregation().Path("events")
+				eventsNameTerms := elastic.NewTermsAggregation().
+					Field("events.name").
+					Missing(" ").
+					Size(0)
+				valueCount := elastic.NewValueCountAggregation().Field("events.name")
+				reverseNested := elastic.NewReverseNestedAggregation()
+				ageTerms := elastic.NewTermsAggregation().
+					Field("age").
+					Missing(" ").
+					Size(0)
+				eventsNameTerms.SubAggregation("_value_in_nested_context", valueCount)
+				reverseNested.SubAggregation("age", ageTerms)
+				eventsNameTerms.SubAggregation("reverse_nested_for_age_dim", reverseNested)
+				nested.SubAggregation("events.name", eventsNameTerms)
+				terms.SubAggregation("events", nested)
+				return "name", terms
+			},
+			expectedAggInfoList: []any{
+				TermAgg{Name: "name"},
+				NestedAgg{Name: "events"},
+				TermAgg{Name: "events.name"},
+				ValueAgg{Name: "_value_in_nested_context", FuncType: "count"},
+				ReverseAgg{Name: "reverse_nested_for_age_dim"},
+				TermAgg{Name: "age"},
+			},
+		},
+	}
+
+	for name, c := range testCases {
+		t.Run(name, func(t *testing.T) {
+			ctx := metadata.InitHashID(context.Background())
+			fact := NewFormatFactory(ctx).WithMappings(commonMapping...)
+			fact.valueField = c.valueField
+			name, agg, err := fact.EsAgg(c.aggregates)
+			assert.NoError(t, err)
+
+			ss := elastic.NewSearchSource()
+			ss.Aggregation(name, agg)
+
+			source, err := ss.Source()
+			assert.NoError(t, err)
+			actual, err := json.Marshal(source)
+			assert.NoError(t, err)
+			assert.JSONEq(t, c.expected, string(actual))
+
+			//assert.EqualValues(t, fact.aggInfoList, c.expectedAggInfoList)
+			directName, directAgg := c.directAgg()
+			ss2 := elastic.NewSearchSource()
+			ss2.Aggregation(directName, directAgg)
+
+			directSource, err := ss2.Source()
+			assert.NoError(t, err)
+			directActual, err := json.Marshal(directSource)
+			assert.NoError(t, err)
+			assert.JSONEq(t, c.expected, string(directActual))
+		})
+	}
+}
