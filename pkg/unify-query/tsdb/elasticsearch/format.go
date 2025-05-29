@@ -158,7 +158,7 @@ type TermAgg struct {
 	Orders metadata.Orders
 }
 
-type ReverseAgg struct {
+type ReverNested struct {
 	Name string
 }
 
@@ -404,7 +404,7 @@ func (f *FormatFactory) NestedField(field string) string {
 	return ""
 }
 
-func (f *FormatFactory) nestedAgg(key string) string {
+func (f *FormatFactory) nestedAgg(key string) {
 	nf := f.NestedField(key)
 	if nf != "" {
 		f.aggInfoList = append(
@@ -413,7 +413,8 @@ func (f *FormatFactory) nestedAgg(key string) string {
 			},
 		)
 	}
-	return nf
+
+	return
 }
 
 // AggDataFormat 解析 es 的聚合计算
@@ -502,6 +503,41 @@ func (f *FormatFactory) AggDataFormat(data elastic.Aggregations, metricLabel *pr
 func (f *FormatFactory) SetData(data map[string]any) {
 	f.data = map[string]any{}
 	mapData("", data, f.data)
+}
+
+var (
+	ReverseAggName = "reverse_nested"
+)
+
+func (f *FormatFactory) reverseCheckAgg() aggInfoList {
+	nestedPathSet := set.New[string]()
+	nestedPathCheck := func(path string) bool {
+		for _, k := range nestedPathSet.ToArray() {
+			if path == k {
+				return true
+			}
+			if strings.HasPrefix(fmt.Sprintf("%s.", k), path) {
+				return true
+			}
+		}
+
+		nestedPathSet.Add(path)
+		return false
+	}
+
+	var newAggInfoList []any
+	for i := len(f.aggInfoList) - 1; i >= 0; i-- {
+		aggInfo := f.aggInfoList[i]
+		switch info := aggInfo.(type) {
+		case NestedAgg:
+			if nestedPathCheck(info.Name) {
+				continue
+			}
+		}
+
+		newAggInfoList = append([]any{aggInfo}, newAggInfoList...)
+	}
+	return newAggInfoList
 }
 
 func (f *FormatFactory) Agg() (name string, agg elastic.Aggregation, err error) {
@@ -600,6 +636,14 @@ func (f *FormatFactory) Agg() (name string, agg elastic.Aggregation, err error) 
 				err = fmt.Errorf("valueagg aggregation is not support this type %s, info: %+v", info.FuncType, info)
 				return
 			}
+		case ReverNested:
+			curName := info.Name
+			curAgg := elastic.NewReverseNestedAggregation()
+			if agg != nil {
+				curAgg = curAgg.SubAggregation(name, agg)
+			}
+			agg = curAgg
+			name = curName
 		case TimeAgg:
 			curName := info.Name
 
@@ -650,14 +694,6 @@ func (f *FormatFactory) Agg() (name string, agg elastic.Aggregation, err error) 
 
 			agg = curAgg
 			name = curName
-		case ReverseAgg:
-			curName := info.Name
-			curAgg := elastic.NewReverseNestedAggregation()
-			if agg != nil {
-				curAgg = curAgg.SubAggregation(name, agg)
-			}
-			agg = curAgg
-			name = curName
 		default:
 			err = fmt.Errorf("aggInfoList aggregation is not support this type %T, info: %+v", info, info)
 			return
@@ -684,110 +720,12 @@ func (f *FormatFactory) HighLight(queryString string, maxAnalyzedOffset int) *el
 	return hl
 }
 
-type filterMetadata struct {
-	nestedSet     *set.Set[string]
-	isLastNested  bool
-	isNeedReverse bool
-}
-
-func (f *FormatFactory) removeIdxAggInfo(idx int) {
-	if idx < 0 || idx >= len(f.aggInfoList) {
-		return
-	}
-
-	f.aggInfoList = append(f.aggInfoList[:idx], f.aggInfoList[idx+1:]...)
-}
-
-func (f *FormatFactory) appendIdxAggInfo(idx int, aggInfo any) {
-	if idx < 0 || idx > len(f.aggInfoList) {
-		return
-	}
-
-	f.aggInfoList = append(f.aggInfoList[:idx], append([]any{aggInfo}, f.aggInfoList[idx:]...)...)
-}
-
-func (f *FormatFactory) reverseFilterAgg() {
-	metadata := filterMetadata{
-		nestedSet:     set.New[string](),
-		isLastNested:  false,
-		isNeedReverse: false,
-	}
-	for idx := len(f.aggInfoList) - 1; idx >= 0; idx-- {
-		if metadata.isLastNested {
-			//f.appendIdxAggInfo(idx, ReverseAgg{Name: "reverse_nested"})
-			metadata.isLastNested = false
-		}
-		aggInfo := f.aggInfoList[idx]
-		switch info := aggInfo.(type) {
-		case NestedAgg:
-			if metadata.nestedSet.Existed(info.Name) {
-				f.removeIdxAggInfo(idx)
-			} else {
-				metadata.nestedSet.Add(info.Name)
-				metadata.isLastNested = true
-			}
-
-		}
-		if metadata.isNeedReverse {
-			f.appendIdxAggInfo(idx+1, ReverseAgg{Name: "reverse_nested"})
-			metadata.isNeedReverse = false
-		}
-	}
-}
-
-func (f *FormatFactory) isNestedField(name string) bool {
-	if _, ok := f.mapping[name]; ok {
-		return f.mapping[name] == Nested
-	}
-	return false
-}
-
-func (f *FormatFactory) isNestedCtx(name string) bool {
-	if _, ok := f.mapping[name]; ok {
-		return f.mapping[name] == Nested
-	}
-
-	return false
-}
-
-func (f *FormatFactory) reverseAgg() {
-	f.aggInfoList = append(
-		f.aggInfoList, ReverseAgg{
-			Name: "reverse_nested",
-		},
-	)
-}
-
-// parent: event (nested)
-// child: event.eventId (child) need return true
-func isChildField(parent, child string) bool {
-	if parent == "" || child == "" {
-		return false
-	}
-
-	parent = strings.TrimSuffix(parent, ESStep)
-	child = strings.TrimPrefix(child, ESStep)
-
-	if !strings.HasPrefix(child, parent) {
-		return false
-	}
-
-	if len(child) == len(parent) {
-		return false
-	}
-
-	if child[len(parent)] != '.' {
-		return false
-	}
-
-	return true
-}
-
 func (f *FormatFactory) EsAgg(aggregates metadata.Aggregates) (string, elastic.Aggregation, error) {
 	if len(aggregates) == 0 {
 		err := errors.New("aggregate_method_list is empty")
 		return "", nil, err
 	}
+
 	for _, am := range aggregates {
 		switch am.Name {
 		case DateHistogram:
@@ -795,7 +733,6 @@ func (f *FormatFactory) EsAgg(aggregates metadata.Aggregates) (string, elastic.A
 		case Max, Min, Avg, Sum, Count, Cardinality, Percentiles:
 			f.valueAgg(FieldValue, am.Name, am.Args...)
 			f.nestedAgg(f.valueField)
-			f.nestedAgg(am.Field)
 
 			if am.Window > 0 && !am.Without {
 				// 增加时间函数
@@ -809,21 +746,16 @@ func (f *FormatFactory) EsAgg(aggregates metadata.Aggregates) (string, elastic.A
 				if f.decode != nil {
 					dim = f.decode(dim)
 				}
-				//if !f.isNestedField(dim) {
-				//	f.reverseAgg()
-				//}
+
 				f.termAgg(dim, idx == 0)
-				//nestedPath := f.nestedAgg(dim)
-				//if isChildField(nestedPath, dim) {
-				//	f.appendIdxAggInfo(idx-1, ReverseAgg{Name: "reverse_nested"})
-				//}
+				f.nestedAgg(dim)
 			}
 		default:
 			err := fmt.Errorf("esAgg aggregation is not support with: %+v", am)
 			return "", nil, err
 		}
 	}
-	f.reverseFilterAgg()
+	f.reverseCheckAgg()
 	return f.Agg()
 }
 
