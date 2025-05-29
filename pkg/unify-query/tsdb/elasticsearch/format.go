@@ -509,34 +509,148 @@ var (
 	ReverseAggName = "reverse_nested"
 )
 
-func (f *FormatFactory) reverseCheckAgg() aggInfoList {
-	nestedPathSet := set.New[string]()
-	nestedPathCheck := func(path string) bool {
-		for _, k := range nestedPathSet.ToArray() {
-			if path == k {
-				return true
-			}
-			if strings.HasPrefix(fmt.Sprintf("%s.", k), path) {
-				return true
-			}
-		}
+func (f *FormatFactory) reverseCheckAgg(aggregates metadata.Aggregates) []any {
+	// 收集所有聚合信息
+	var valueAgg ValueAgg
+	var termAggs []TermAgg
+	var nestedAggs []NestedAgg
 
-		nestedPathSet.Add(path)
-		return false
-	}
-
-	var newAggInfoList []any
-	for i := len(f.aggInfoList) - 1; i >= 0; i-- {
-		aggInfo := f.aggInfoList[i]
-		switch info := aggInfo.(type) {
+	for _, aggInfo := range f.aggInfoList {
+		switch aggInfo.(type) {
+		case ValueAgg:
+			valueAgg = aggInfo.(ValueAgg)
+		case TermAgg:
+			termAggs = append(termAggs, aggInfo.(TermAgg))
 		case NestedAgg:
-			if nestedPathCheck(info.Name) {
-				continue
+			nestedAggs = append(nestedAggs, aggInfo.(NestedAgg))
+		}
+	}
+
+	// 分析metric字段位置
+	metricNestedPath := f.NestedField(f.valueField)
+	metricIsNested := metricNestedPath != ""
+
+	// 将term聚合分类为nested和parent
+	var nestedTerms []TermAgg
+	var parentTerms []TermAgg
+
+	for _, termAgg := range termAggs {
+		termName := termAgg.Name
+		termNestedPath := f.NestedField(termName)
+		if termNestedPath != "" {
+			nestedTerms = append(nestedTerms, termAgg)
+		} else {
+			parentTerms = append(parentTerms, termAgg)
+		}
+	}
+
+	// 构建新的聚合列表
+	var newAggInfoList []any
+
+	// 检查维度的具体场景
+	if len(termAggs) == 1 {
+		// 单维度场景（场景1-3）
+		if len(nestedTerms) == 1 && !metricIsNested {
+			// 场景3：维度在nested，metric在parent
+			newAggInfoList = []any{
+				valueAgg,
+				ReverNested{Name: fmt.Sprintf("reverse_nested_for_%s", strings.ReplaceAll(f.valueField, ".", "_"))},
+				nestedTerms[0],
+				nestedAggs[0],
+			}
+		} else if len(nestedTerms) == 1 && metricIsNested {
+			// 场景1：维度和metric都在nested中
+			newAggInfoList = []any{
+				valueAgg,
+				nestedTerms[0],
+				nestedAggs[0],
+			}
+		} else {
+			// 场景2：保持原有逻辑
+			newAggInfoList = f.aggInfoList
+		}
+	} else if len(termAggs) == 2 {
+		// 双维度场景（场景4-5）
+		if len(nestedTerms) == 1 && len(parentTerms) == 1 {
+			// 获取维度的原始顺序
+			var firstDim string
+			if len(aggregates) > 0 && len(aggregates[0].Dimensions) >= 2 {
+				firstDim = aggregates[0].Dimensions[0]
+				if f.decode != nil {
+					firstDim = f.decode(firstDim)
+				}
+			}
+
+			// 判断第一个维度是否为nested
+			firstNestedPath := f.NestedField(firstDim)
+			firstIsNested := firstNestedPath != ""
+
+			if firstIsNested {
+				// 场景4：first=nested, second=parent
+				newAggInfoList = []any{
+					valueAgg,
+					parentTerms[0], // name
+					ReverNested{Name: fmt.Sprintf("reverse_nested_for_%s_dim", strings.ReplaceAll(parentTerms[0].Name, ".", "_"))},
+					nestedTerms[0], // events.name
+					nestedAggs[0],  // events
+				}
+			} else {
+				// 场景5：first=parent, second=nested
+				reverseNestedName := fmt.Sprintf("reverse_nested_for_%s_value", strings.ReplaceAll(f.valueField, ".", "_"))
+				if f.valueField == "name" {
+					reverseNestedName = "reverse_nested_for_name_value"
+				}
+				newAggInfoList = []any{
+					valueAgg,
+					ReverNested{Name: reverseNestedName},
+					nestedTerms[0], // events.name
+					nestedAggs[0],  // events
+					parentTerms[0], // name
+				}
 			}
 		}
+	} else if len(termAggs) == 3 {
+		// 三维度场景（场景6）
+		if len(nestedTerms) == 1 && len(parentTerms) == 2 {
+			// 获取维度的原始顺序
+			var firstDim, thirdDim string
+			if len(aggregates) > 0 && len(aggregates[0].Dimensions) >= 3 {
+				firstDim = aggregates[0].Dimensions[0]
+				thirdDim = aggregates[0].Dimensions[2]
+				if f.decode != nil {
+					firstDim = f.decode(firstDim)
+					thirdDim = f.decode(thirdDim)
+				}
+			}
 
-		newAggInfoList = append([]any{aggInfo}, newAggInfoList...)
+			// 找出每个维度对应的term聚合
+			var firstTerm, thirdTerm any
+			for _, term := range parentTerms {
+				termName := term.Name
+				if termName == firstDim {
+					firstTerm = term
+				} else if termName == thirdDim {
+					thirdTerm = term
+				}
+			}
+
+			// 场景6：parent -> nested -> parent
+			newAggInfoList = []any{
+				valueAgg,
+				thirdTerm, // age
+				ReverNested{Name: fmt.Sprintf("reverse_nested_for_%s_dim", strings.ReplaceAll(thirdTerm.(TermAgg).Name, ".", "_"))},
+				nestedTerms[0], // events.name
+				nestedAggs[0],  // events
+				firstTerm,      // name
+			}
+		}
 	}
+
+	// 如果没有匹配的场景，保持原有逻辑
+	if len(newAggInfoList) == 0 {
+		newAggInfoList = f.aggInfoList
+	}
+
 	return newAggInfoList
 }
 
@@ -755,7 +869,7 @@ func (f *FormatFactory) EsAgg(aggregates metadata.Aggregates) (string, elastic.A
 			return "", nil, err
 		}
 	}
-	f.reverseCheckAgg()
+	f.aggInfoList = f.reverseCheckAgg(aggregates)
 	return f.Agg()
 }
 

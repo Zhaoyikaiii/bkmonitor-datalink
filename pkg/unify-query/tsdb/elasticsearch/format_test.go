@@ -1051,6 +1051,7 @@ func TestFormatFactory_AggWithMapping(t *testing.T) {
 					Field:      "name",
 				},
 			},
+			valueField: "name",
 			expected: `{
 				"aggregations": {
 					"events": {
@@ -1120,6 +1121,7 @@ func TestFormatFactory_AggWithMapping(t *testing.T) {
 					Field:      "name",
 				},
 			},
+			valueField: "name",
 			expected: `{
 				"aggregations": {
 					"name": {
@@ -1189,6 +1191,7 @@ func TestFormatFactory_AggWithMapping(t *testing.T) {
 					Field:      "name",
 				},
 			},
+			valueField: "name",
 			expected: `{
 				"aggregations": {
 					"name": {
@@ -1386,28 +1389,19 @@ func TestFormatFactory_AggWithMapping(t *testing.T) {
 			assert.NoError(t, err)
 			assert.JSONEq(t, c.expected, string(customActual))
 
-			//assert.EqualValues(t, fact.aggInfoList, c.expectedAggInfoList)
-			// ------------------------------------------------------
-
-			//ctx := metadata.InitHashID(context.Background())
-			//fact := NewFormatFactory(ctx).WithMappings(commonMapping...)
-			//fact.valueField = c.valueField
-			////name, agg, err := fact.EsAgg(c.aggregates)
-			////assert.NoError(t, err)
-			//fact.valueField = "events.name"
-			//
-			//ss := elastic.NewSearchSource()
-			////ss.Aggregation(name, agg)
-			//
-			//source, err := ss.Source()
-			//assert.NoError(t, err)
-			//actual, err := json.Marshal(source)
-			//assert.NoError(t, err)
-			////assert.JSONEq(t, c.expected, string(actual))
-			//t.Logf(string(actual))
-			//
-			////assert.EqualValues(t, fact.aggInfoList, c.expectedAggInfoList)
-
+			// generate dsl by using format factory with aggregates
+			fact := NewFormatFactory(ctx).WithMappings(commonMapping...)
+			fact.valueField = c.valueField
+			factName, factAgg, err := fact.EsAgg(c.aggregates)
+			assert.NoError(t, err)
+			fact.valueField = c.valueField
+			factS := elastic.NewSearchSource()
+			factS.Aggregation(factName, factAgg)
+			factSource, err := factS.Source()
+			assert.NoError(t, err)
+			factActual, err := json.Marshal(factSource)
+			assert.NoError(t, err)
+			assert.JSONEq(t, c.expected, string(factActual))
 		})
 	}
 }
