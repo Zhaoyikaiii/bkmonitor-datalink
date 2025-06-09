@@ -225,9 +225,11 @@ func (i *Instance) getMappingsWithCache(ctx context.Context, conn Connect, alias
 	span.Set("cache-key", cacheKey)
 
 	if fieldTypesCache != nil && fieldTypesCache.HasTableCache(ctx, tableID) {
+		span.Set("cache-hit", "true")
 		return []map[string]any{}, nil
 	}
 
+	span.Set("cache-hit", "false")
 	mappings, err := i.getMappings(ctx, conn, aliases)
 	if err != nil {
 		return nil, err

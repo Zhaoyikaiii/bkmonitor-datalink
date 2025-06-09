@@ -328,7 +328,7 @@ func (f *FormatFactory) WithOrders(orders metadata.Orders) *FormatFactory {
 // WithMappings 合并 mapping，后面的合并前面的
 func (f *FormatFactory) WithMappings(tableID string, mappings ...map[string]any) *FormatFactory {
 	f.tableID = tableID
-	if len(mappings) > 0 {
+	if len(mappings) > 0 && !fieldTypesCache.HasTableCache(f.ctx, tableID) {
 		fieldTypesCache.SetFieldTypesFromMappings(f.ctx, tableID, mappings)
 	}
 	return f

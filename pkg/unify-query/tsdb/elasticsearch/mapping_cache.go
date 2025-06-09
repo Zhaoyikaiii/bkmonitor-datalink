@@ -61,7 +61,7 @@ func (m *MappingCache) GetFieldType(ctx context.Context, tableID string, field s
 	var err error
 	ctx, span := trace.NewSpan(ctx, "mapping-cache-get-field-type")
 	defer span.End(&err)
-
+	span.Set("field", field)
 	mapping, found := m.fieldTypesCache.Get(tableID)
 	if !found {
 		span.Set("cache_hit", "false")
