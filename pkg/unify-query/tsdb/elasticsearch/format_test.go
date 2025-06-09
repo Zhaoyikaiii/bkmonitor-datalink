@@ -1215,6 +1215,11 @@ func TestFactory_Agg(t *testing.T) {
 }
 
 func TestFormatFactory_AggregateCases(t *testing.T) {
+	err := InitFieldTypesCache()
+	if err != nil {
+		t.Fatalf("Failed to initialize field types cache: %v", err)
+	}
+
 	commonMapping := []map[string]any{
 		{
 			"properties": map[string]any{
