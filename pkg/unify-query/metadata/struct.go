@@ -16,6 +16,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/TencentBlueKing/bkmonitor-datalink/pkg/unify-query/internal/function"
 	"github.com/VictoriaMetrics/metricsql"
 	"github.com/prometheus/prometheus/model/labels"
 )
@@ -386,6 +387,23 @@ func (qRef QueryReference) Range(name string, fn func(qry *Query)) {
 				}
 
 				fn(query)
+			}
+		}
+	}
+}
+
+func (qRef QueryReference) Each(fn func(refName string, qm *Query)) {
+	for refName, references := range qRef {
+		for _, reference := range references {
+			if reference == nil {
+				continue
+			}
+			for _, qm := range reference.QueryList {
+				if qm == nil {
+					continue
+				}
+
+				fn(refName, qm)
 			}
 		}
 	}

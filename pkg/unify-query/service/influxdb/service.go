@@ -324,7 +324,7 @@ func (s *Service) reloadSpaceTsDbRouter(ctx context.Context) error {
 		for {
 			select {
 			case <-ctx.Done():
-				log.Warnf(ctx, "[SpaceTSDB Router] Loop exit")
+				log.Warnf(ctx, "[SpaceTSDB Router] Each exit")
 				return
 				// 订阅 redis
 			case <-ticker.C:
