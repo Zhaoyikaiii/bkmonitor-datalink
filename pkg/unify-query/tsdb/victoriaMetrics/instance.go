@@ -128,9 +128,64 @@ func (i *Instance) Check(ctx context.Context, q string, start, end time.Time, st
 	return output.String()
 }
 
-// QuerySeriesSet 给 PromEngine 提供查询接口
 func (i *Instance) QuerySeriesSet(ctx context.Context, query *metadata.Query, start, end time.Time) storage.SeriesSet {
-	return storage.EmptySeriesSet()
+	var err error
+	ctx, span := trace.NewSpan(ctx, "victoria-metrics-query-series-set")
+	defer span.End(&err)
+
+	span.Set("query-series-set-start", start)
+	span.Set("query-series-set-end", end)
+	span.Set("query-storage-name", query.StorageName)
+
+	if start.UnixMilli() > end.UnixMilli() || start.UnixMilli() == 0 {
+		return nextVMSeriesSetWithErr(fmt.Errorf("range time is error, start: %s, end: %s", start, end))
+	}
+
+	if query.VmRt == "" {
+		return nextVMSeriesSetWithErr(fmt.Errorf("vm result table is empty"))
+	}
+
+	//promQL, err :=  query.ToQueryTs().ToPromExpr(ctx, nil)
+	//if err != nil {
+	//	return nextVMSeriesSetWithErr(fmt.Errorf("query ts to prom expr error: %s", err))
+	//}
+	//
+	//statement := promQL.String()
+	//span.Set("query-promql", statement)
+	//
+	//var sl []storage.Series
+	//
+	//// query Range
+	//if len(query.Aggregates) > 0 {
+	//	step := i.calculateStep(start, end)
+	//	span.Set("query-step", step)
+	//
+	//	mt, _, err := i.DirectQueryRange(ctx, statement, start, end, step)
+	//	if err != nil {
+	//		return nextVMSeriesSetWithErr(metadata.Sprintf(
+	//			metadata.MsgQueryVictoriaMetrics,
+	//			"VM范围查询失败",
+	//		).Error(ctx, err))
+	//	}
+	//
+	//	sl = i.seriesSet(mt)
+	//	span.Set("series-count", len(sl))
+	//
+	//} else {
+	//	// query Direct - 即时查询
+	//	v, err := i.DirectQuery(ctx, statement, end)
+	//	if err != nil {
+	//		return nextVMSeriesSetWithErr(metadata.Sprintf(
+	//			metadata.MsgQueryVictoriaMetrics,
+	//			"VM即时查询失败",
+	//		).Error(ctx, err))
+	//	}
+	//
+	//	sl = i.v2Series(v)
+	//	span.Set("series-count", len(sl))
+	//}
+
+	return newVMSeriesSet(sl)
 }
 
 func (i *Instance) vectorFormat(ctx context.Context, resp *VmResponse, span *trace.Span) (promql.Vector, error) {
