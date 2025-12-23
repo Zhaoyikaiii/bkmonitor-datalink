@@ -6,34 +6,30 @@ Mock BKOP Business 2 Traffic to SurrealDB with Metrics
 This script generates mock resource association data for BKOP Business 2,
 including static relations and dynamic traffic with metrics (flow_total, flow_seconds, flow_error).
 
-This script is idempotent - it can be run multiple times without causing data conflicts.
-It uses UPSERT with MERGE to ensure that created_at timestamps are preserved across runs.
+Key Features:
+    - Uses SurrealDB RELATION type tables for proper graph traversal
+    - Uses document-defined ID format for nodes and relations
+    - Supports both native SurrealDB and BKBase backends
+    - Idempotent: can be run multiple times without data conflicts
 
-Storage Backends:
-    - native: Direct connection to SurrealDB via HTTP REST API
-    - bkbase: Access SurrealDB through BKBase unified query API
+ID Format (per documentation):
+    - Node ID: {resource_type}:{key1}={value1},{key2}={value2},...
+    - Static Relation ID: {res1}_with_{res2}:{res1_kv}|{res2_kv} (res1 < res2 alphabetically)
+    - Dynamic Relation ID: {src}_to_{dst}:{src_kv}|{dst_kv}
 
 Usage:
-    # Use native SurrealDB (default) - both formats work
-    python 001.mock_bkop_business_traffic.py --backend native
-    python 001.mock_bkop_business_traffic.py --backend=native
+    # Initialize schema (first time or to reset)
+    python 001.mock_bkop_business_traffic.py --backend native --init-schema
     
-    # Use BKBase SurrealDB
-    python 001.mock_bkop_business_traffic.py --backend bkbase
-    python 001.mock_bkop_business_traffic.py --backend=bkbase
+    # Use native SurrealDB (default)
+    python 001.mock_bkop_business_traffic.py --backend native
     
     # Enable debug logging
     python 001.mock_bkop_business_traffic.py --backend=native --debug
 
 Configuration:
     Connection settings are managed in config.yaml
-    Mock data configurations are hardcoded in the script.
-    
-    To customize:
-    1. Edit config.yaml for SurrealDB/BKBase connection details
-    2. Run script with: --backend=native or --backend=bkbase
 """
-
 
 import abc
 import argparse
@@ -48,8 +44,12 @@ from typing import Dict, List, Any, Optional, Tuple
 
 import requests
 
+# Disable SSL warnings for self-signed certificates
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
 # ============================================================================
-# Logging Configuration (Early initialization)
+# Logging Configuration
 # ============================================================================
 
 logging.basicConfig(
@@ -59,19 +59,19 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+
 # ============================================================================
-# Configuration Loading - Parse Backend from Command Line
+# Configuration Loading
 # ============================================================================
-# Parse backend from command line to determine which config to load
+
 def _parse_backend_from_args() -> str:
-    """Parse --backend argument from command line (supports both formats)"""
+    """Parse --backend argument from command line"""
     for i, arg in enumerate(sys.argv):
-        # Support both --backend native and --backend=native formats
         if arg == '--backend' and i + 1 < len(sys.argv):
             return sys.argv[i + 1]
         elif arg.startswith('--backend='):
             return arg.split('=', 1)[1]
-    return 'native'  # Default
+    return 'native'
 
 
 def _load_yaml_config(filename: str) -> Dict[str, Any]:
@@ -87,34 +87,28 @@ def _load_yaml_config(filename: str) -> Dict[str, Any]:
     try:
         with open(filename, 'r', encoding='utf-8') as f:
             content = yaml.safe_load(f)
-            logger.debug(f"✓ Loaded configuration from: {filename}")
             return content if content is not None else {}
     except Exception as e:
         logger.warning(f"Failed to load {filename}: {e}")
         return {}
 
 
-# Parse backend early
-_storage_backend = _parse_backend_from_args()
-logger.debug(f"Using storage backend: {_storage_backend}")
-
-# Load YAML configuration
+# Load configuration
 _config_file = os.path.join(os.path.dirname(__file__), 'config.yaml')
 _config = _load_yaml_config(_config_file) if os.path.exists(_config_file) else {}
+
 
 # ============================================================================
 # Configuration Constants
 # ============================================================================
 
 class StorageBackend(Enum):
-    """Storage backend enumeration"""
     NATIVE = "native"
     BKBASE = "bkbase"
 
 
 class SurrealDBConfig:
-    """Native SurrealDB connection configuration"""
-    URL = _config.get('surreal_db', {}).get('url', 'https://localhost:8000')
+    URL = _config.get('surreal_db', {}).get('url', 'http://localhost:8000')
     USERNAME = _config.get('surreal_db', {}).get('username', 'root')
     PASSWORD = _config.get('surreal_db', {}).get('password', 'root')
     NAMESPACE = _config.get('surreal_db', {}).get('namespace', 'test')
@@ -122,47 +116,33 @@ class SurrealDBConfig:
 
 
 class BKBaseConfig:
-    """BKBase API configuration"""
     API_URL = _config.get('bkbase', {}).get('api_url', '')
     USERNAME = _config.get('bkbase', {}).get('username', '')
     APP_CODE = _config.get('bkbase', {}).get('app_code', '')
     APP_SECRET = _config.get('bkbase', {}).get('app_secret', '')
     RESULT_TABLE_ID = _config.get('bkbase', {}).get('result_table_id', '')
-    AUTH_METHOD = "user"
-    PREFER_STORAGE = "surrealdb"
 
 
 class MockConfig:
-    """Mock data generation configuration for BKOP Business 2"""
-    # Business specific
+    """Mock data generation configuration"""
     BIZ_ID = "2"
     BIZ_NAME = "bkop"
     CLUSTER_ID = "BCS-K8S-00002"
     NAMESPACE = "bkop"
-    
-    # Result table ID for metrics
     RESULT_TABLE_ID = "2_bkmonitor_bkop_2"
     
-    # Service list
     SERVICE_LIST = ["api", "web", "worker"]
-    
-    # Number of resources to generate
     NUM_PODS = 10
     NUM_DEPLOYMENTS = 3
     NUM_NODES = 3
     
-    # Traffic generation
     POD_TO_POD_TRAFFIC_PROBABILITY = 0.4
     
-    # Metric value ranges
     FLOW_TOTAL_RANGE = (10, 1000)
     FLOW_SECONDS_RANGE = (0.01, 2.0)
     FLOW_ERROR_RATE_RANGE = (0.0, 0.1)
     
-    # 默认回转时间
     DEFAULT_TIME_BACK_HOURS = 1
-    
-    # Time range for mock data
     START_TIME = datetime.now().replace(tzinfo=None) - timedelta(hours=DEFAULT_TIME_BACK_HOURS)
     END_TIME = datetime.now().replace(tzinfo=None)
     METRIC_TIME_POINTS = 12
@@ -173,8 +153,6 @@ class MockConfig:
 # ============================================================================
 
 class ResourceType(Enum):
-    """Resource type enumeration"""
-    # Kubernetes resources
     POD = "pod"
     NODE = "node"
     SERVICE = "service"
@@ -182,161 +160,260 @@ class ResourceType(Enum):
     REPLICASET = "replicaset"
     NAMESPACE = "namespace"
     CLUSTER = "cluster"
-
-    # CMDB resources
     BIZ = "biz"
-
-    # Metric
     METRIC = "metric"
 
 
 class RelationType(Enum):
-    """Relation type enumeration"""
-    # Static relations
+    # Static relations (bidirectional)
     NODE_WITH_POD = "node_with_pod"
     POD_WITH_SERVICE = "pod_with_service"
     DEPLOYMENT_WITH_REPLICASET = "deployment_with_replicaset"
     POD_WITH_REPLICASET = "pod_with_replicaset"
-
-    # Dynamic relations
+    # Dynamic relations (directional)
     POD_TO_POD = "pod_to_pod"
-
     # Metric relations
     RELATION_HAS_METRIC = "relation_has_metric"
 
 
 class MetricType(Enum):
-    """Metric type enumeration"""
     COUNTER = "counter"
     GAUGE = "gauge"
     HISTOGRAM = "histogram"
 
 
 # ============================================================================
-# Resource Index Fields Definition
+# Resource Index Fields Definition (per documentation section 2)
 # ============================================================================
 
-class ResourceIndexFields:
-    """Resource index fields definition"""
-
-    FIELDS = {
-        ResourceType.POD: ["bcs_cluster_id", "namespace", "pod"],
-        ResourceType.NODE: ["bcs_cluster_id", "node"],
-        ResourceType.SERVICE: ["bcs_cluster_id", "namespace", "service"],
-        ResourceType.DEPLOYMENT: ["bcs_cluster_id", "namespace", "deployment"],
-        ResourceType.REPLICASET: ["bcs_cluster_id", "namespace", "replicaset"],
-        ResourceType.NAMESPACE: ["bcs_cluster_id", "namespace"],
-        ResourceType.CLUSTER: ["bcs_cluster_id"],
-        ResourceType.BIZ: ["bk_biz_id"],
-        ResourceType.METRIC: ["metric_name"],
-    }
-
-    @classmethod
-    def get_fields(cls, resource_type: ResourceType) -> List[str]:
-        """Get index fields for resource type"""
-        return cls.FIELDS.get(resource_type, [])
+RESOURCE_INDEX_FIELDS = {
+    ResourceType.POD: ["bcs_cluster_id", "namespace", "pod"],
+    ResourceType.NODE: ["bcs_cluster_id", "node"],
+    ResourceType.SERVICE: ["bcs_cluster_id", "namespace", "service"],
+    ResourceType.DEPLOYMENT: ["bcs_cluster_id", "deployment", "namespace"],  # sorted alphabetically
+    ResourceType.REPLICASET: ["bcs_cluster_id", "namespace", "replicaset"],
+    ResourceType.NAMESPACE: ["bcs_cluster_id", "namespace"],
+    ResourceType.CLUSTER: ["bcs_cluster_id"],
+    ResourceType.BIZ: ["bk_biz_id"],
+    ResourceType.METRIC: ["metric_name"],
+}
 
 
 # ============================================================================
-# ID Generation Utilities
+# ID Generation Utilities (per documentation section 4)
 # ============================================================================
 
 class IDGenerator:
-    """ID generator following documentation rules"""
+    """ID generator following documentation section 4 rules"""
 
     @staticmethod
     def generate_node_id(resource_type: ResourceType, data: Dict[str, Any]) -> str:
-        """Generate node ID"""
-        index_fields = ResourceIndexFields.get_fields(resource_type)
+        """
+        Generate node ID per section 4.1
+        Format: {resource_type}:{key1}={value1},{key2}={value2},...
+        Keys are sorted alphabetically
+        """
+        index_fields = RESOURCE_INDEX_FIELDS.get(resource_type, [])
         sorted_keys = sorted(index_fields)
         pairs = [f"{key}={data.get(key, '')}" for key in sorted_keys]
         return f"{resource_type.value}:{','.join(pairs)}"
 
     @staticmethod
-    def generate_directional_relation_id(
+    def generate_kv_string(resource_type: ResourceType, data: Dict[str, Any]) -> str:
+        """Generate key=value string for a resource (keys sorted)"""
+        index_fields = RESOURCE_INDEX_FIELDS.get(resource_type, [])
+        sorted_keys = sorted(index_fields)
+        pairs = [f"{key}={data.get(key, '')}" for key in sorted_keys]
+        return ','.join(pairs)
+
+    @staticmethod
+    def generate_static_relation_id(
+            relation_type: RelationType,
+            type1: ResourceType,
+            data1: Dict[str, Any],
+            type2: ResourceType,
+            data2: Dict[str, Any]
+    ) -> str:
+        """
+        Generate static (bidirectional) relation ID per section 4.2.1
+        Format: {res1}_with_{res2}:{res1_kv}|{res2_kv}
+        Where res1 < res2 alphabetically
+        """
+        kv1 = IDGenerator.generate_kv_string(type1, data1)
+        kv2 = IDGenerator.generate_kv_string(type2, data2)
+        
+        # Ensure res1 < res2 alphabetically
+        if type1.value < type2.value:
+            return f"{relation_type.value}:{kv1}|{kv2}"
+        else:
+            return f"{relation_type.value}:{kv2}|{kv1}"
+
+    @staticmethod
+    def generate_dynamic_relation_id(
             relation_type: RelationType,
             source_type: ResourceType,
             source_data: Dict[str, Any],
             target_type: ResourceType,
             target_data: Dict[str, Any]
     ) -> str:
-        """Generate directional relation ID"""
-        source_fields = ResourceIndexFields.get_fields(source_type)
-        target_fields = ResourceIndexFields.get_fields(target_type)
-
-        sorted_source_keys = sorted(source_fields)
-        sorted_target_keys = sorted(target_fields)
-
-        source_pairs = [f"{key}={source_data.get(key, '')}" for key in sorted_source_keys]
-        target_pairs = [f"{key}={target_data.get(key, '')}" for key in sorted_target_keys]
-
-        source_part = ','.join(source_pairs)
-        target_part = ','.join(target_pairs)
-
-        return f"{relation_type.value}:{source_part}|{target_part}"
+        """
+        Generate dynamic (directional) relation ID per section 4.2.2
+        Format: {src}_to_{dst}:{src_kv}|{dst_kv}
+        """
+        source_kv = IDGenerator.generate_kv_string(source_type, source_data)
+        target_kv = IDGenerator.generate_kv_string(target_type, target_data)
+        return f"{relation_type.value}:{source_kv}|{target_kv}"
 
 
 # ============================================================================
-# Storage Client Abstract Interface
+# Schema Definition (per documentation section 6)
 # ============================================================================
 
-class StorageClient(abc.ABC):
-    """Abstract storage client interface"""
+SCHEMA_SQL = """
+-- ============================================
+-- Drop existing tables (for clean reset)
+-- ============================================
+REMOVE TABLE IF EXISTS pod;
+REMOVE TABLE IF EXISTS node;
+REMOVE TABLE IF EXISTS service;
+REMOVE TABLE IF EXISTS deployment;
+REMOVE TABLE IF EXISTS replicaset;
+REMOVE TABLE IF EXISTS namespace;
+REMOVE TABLE IF EXISTS cluster;
+REMOVE TABLE IF EXISTS biz;
+REMOVE TABLE IF EXISTS metric;
 
-    @abc.abstractmethod
-    def execute_sql(self, sql: str) -> List[Dict[str, Any]]:
-        """Execute SQL query and return results"""
-        pass
+REMOVE TABLE IF EXISTS node_with_pod;
+REMOVE TABLE IF EXISTS pod_with_service;
+REMOVE TABLE IF EXISTS deployment_with_replicaset;
+REMOVE TABLE IF EXISTS pod_with_replicaset;
+REMOVE TABLE IF EXISTS pod_to_pod;
+REMOVE TABLE IF EXISTS relation_has_metric;
 
-    @abc.abstractmethod
-    def format_datetime(self, dt: datetime) -> str:
-        """Format datetime for storage backend"""
-        pass
+-- ============================================
+-- Node Tables (per documentation section 2)
+-- ============================================
 
-    @abc.abstractmethod
-    def batch_upsert_nodes(
-            self,
-            resource_type: ResourceType,
-            nodes: List[Dict[str, Any]],
-            created_at: datetime,
-            updated_at: datetime
-    ) -> Dict[str, Any]:
-        """Batch upsert nodes"""
-        pass
+-- Pod node table
+DEFINE TABLE pod SCHEMAFULL;
+DEFINE FIELD bcs_cluster_id ON pod TYPE string;
+DEFINE FIELD namespace ON pod TYPE string;
+DEFINE FIELD pod ON pod TYPE string;
+DEFINE FIELD created_at ON pod TYPE datetime;
+DEFINE FIELD updated_at ON pod TYPE datetime;
+DEFINE INDEX idx_pod_key ON pod FIELDS bcs_cluster_id, namespace, pod UNIQUE;
 
-    @abc.abstractmethod
-    def upsert_node(
-            self,
-            resource_type: ResourceType,
-            data: Dict[str, Any],
-            created_at: datetime,
-            updated_at: datetime
-    ) -> Dict[str, Any]:
-        """Upsert a single node"""
-        pass
+-- Node node table
+DEFINE TABLE node SCHEMAFULL;
+DEFINE FIELD bcs_cluster_id ON node TYPE string;
+DEFINE FIELD node ON node TYPE string;
+DEFINE FIELD created_at ON node TYPE datetime;
+DEFINE FIELD updated_at ON node TYPE datetime;
+DEFINE INDEX idx_node_key ON node FIELDS bcs_cluster_id, node UNIQUE;
 
-    @abc.abstractmethod
-    def upsert_relation(
-            self,
-            relation_type: RelationType,
-            from_resource_type: ResourceType,
-            from_data: Dict[str, Any],
-            to_resource_type: ResourceType,
-            to_data: Dict[str, Any],
-            created_at: datetime,
-            updated_at: datetime,
-            extra_fields: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
-        """Upsert a relation"""
-        pass
+-- Service node table
+DEFINE TABLE service SCHEMAFULL;
+DEFINE FIELD bcs_cluster_id ON service TYPE string;
+DEFINE FIELD namespace ON service TYPE string;
+DEFINE FIELD service ON service TYPE string;
+DEFINE FIELD created_at ON service TYPE datetime;
+DEFINE FIELD updated_at ON service TYPE datetime;
+DEFINE INDEX idx_service_key ON service FIELDS bcs_cluster_id, namespace, service UNIQUE;
+
+-- Deployment node table
+DEFINE TABLE deployment SCHEMAFULL;
+DEFINE FIELD bcs_cluster_id ON deployment TYPE string;
+DEFINE FIELD namespace ON deployment TYPE string;
+DEFINE FIELD deployment ON deployment TYPE string;
+DEFINE FIELD created_at ON deployment TYPE datetime;
+DEFINE FIELD updated_at ON deployment TYPE datetime;
+DEFINE INDEX idx_deployment_key ON deployment FIELDS bcs_cluster_id, namespace, deployment UNIQUE;
+
+-- ReplicaSet node table
+DEFINE TABLE replicaset SCHEMAFULL;
+DEFINE FIELD bcs_cluster_id ON replicaset TYPE string;
+DEFINE FIELD namespace ON replicaset TYPE string;
+DEFINE FIELD replicaset ON replicaset TYPE string;
+DEFINE FIELD created_at ON replicaset TYPE datetime;
+DEFINE FIELD updated_at ON replicaset TYPE datetime;
+DEFINE INDEX idx_replicaset_key ON replicaset FIELDS bcs_cluster_id, namespace, replicaset UNIQUE;
+
+-- Namespace node table
+DEFINE TABLE namespace SCHEMAFULL;
+DEFINE FIELD bcs_cluster_id ON namespace TYPE string;
+DEFINE FIELD namespace ON namespace TYPE string;
+DEFINE FIELD created_at ON namespace TYPE datetime;
+DEFINE FIELD updated_at ON namespace TYPE datetime;
+DEFINE INDEX idx_namespace_key ON namespace FIELDS bcs_cluster_id, namespace UNIQUE;
+
+-- Cluster node table
+DEFINE TABLE cluster SCHEMAFULL;
+DEFINE FIELD bcs_cluster_id ON cluster TYPE string;
+DEFINE FIELD created_at ON cluster TYPE datetime;
+DEFINE FIELD updated_at ON cluster TYPE datetime;
+DEFINE INDEX idx_cluster_key ON cluster FIELDS bcs_cluster_id UNIQUE;
+
+-- Biz node table
+DEFINE TABLE biz SCHEMAFULL;
+DEFINE FIELD bk_biz_id ON biz TYPE string;
+DEFINE FIELD created_at ON biz TYPE datetime;
+DEFINE FIELD updated_at ON biz TYPE datetime;
+DEFINE INDEX idx_biz_key ON biz FIELDS bk_biz_id UNIQUE;
+
+-- Metric node table
+DEFINE TABLE metric SCHEMAFULL;
+DEFINE FIELD metric_name ON metric TYPE string;
+DEFINE FIELD metric_type ON metric TYPE string;
+DEFINE FIELD unit ON metric TYPE string;
+DEFINE FIELD description ON metric TYPE string;
+DEFINE FIELD created_at ON metric TYPE datetime;
+DEFINE FIELD updated_at ON metric TYPE datetime;
+DEFINE INDEX idx_metric_key ON metric FIELDS metric_name UNIQUE;
+
+-- ============================================
+-- Relation Tables (TYPE RELATION for graph traversal)
+-- Per documentation section 6.2
+-- ============================================
+
+-- Static relation: node <-> pod (bidirectional)
+DEFINE TABLE node_with_pod SCHEMAFULL TYPE RELATION IN node OUT pod;
+DEFINE FIELD created_at ON node_with_pod TYPE datetime;
+DEFINE FIELD updated_at ON node_with_pod TYPE datetime;
+
+-- Static relation: pod <-> service (bidirectional)
+DEFINE TABLE pod_with_service SCHEMAFULL TYPE RELATION IN pod OUT service;
+DEFINE FIELD created_at ON pod_with_service TYPE datetime;
+DEFINE FIELD updated_at ON pod_with_service TYPE datetime;
+
+-- Static relation: deployment <-> replicaset (bidirectional)
+DEFINE TABLE deployment_with_replicaset SCHEMAFULL TYPE RELATION IN deployment OUT replicaset;
+DEFINE FIELD created_at ON deployment_with_replicaset TYPE datetime;
+DEFINE FIELD updated_at ON deployment_with_replicaset TYPE datetime;
+
+-- Static relation: pod <-> replicaset (bidirectional)
+DEFINE TABLE pod_with_replicaset SCHEMAFULL TYPE RELATION IN pod OUT replicaset;
+DEFINE FIELD created_at ON pod_with_replicaset TYPE datetime;
+DEFINE FIELD updated_at ON pod_with_replicaset TYPE datetime;
+
+-- Dynamic relation: pod -> pod (directional)
+DEFINE TABLE pod_to_pod SCHEMAFULL TYPE RELATION IN pod OUT pod;
+DEFINE FIELD created_at ON pod_to_pod TYPE datetime;
+DEFINE FIELD updated_at ON pod_to_pod TYPE datetime;
+
+-- Metric relation: relation -> metric
+DEFINE TABLE relation_has_metric SCHEMAFULL TYPE RELATION IN pod_to_pod OUT metric;
+DEFINE FIELD result_table_id ON relation_has_metric TYPE string;
+DEFINE FIELD created_at ON relation_has_metric TYPE datetime;
+DEFINE FIELD updated_at ON relation_has_metric TYPE datetime;
+"""
 
 
 # ============================================================================
-# SurrealDB Client with Batch Support
+# Storage Client
 # ============================================================================
 
-class SurrealDBClient(StorageClient):
-    """SurrealDB HTTP REST API client with batch insert support"""
+class SurrealDBClient:
+    """SurrealDB HTTP REST API client"""
 
     def __init__(
             self,
@@ -352,14 +429,11 @@ class SurrealDBClient(StorageClient):
         self.namespace = namespace
         self.database = database
         self.session = requests.Session()
-        # 本地环境使用自签名证书，通过 HTTPS 访问时关闭证书校验
-        # 如果后续在生产环境使用，请改为提供可信 CA 或设置 verify=True
         self.session.verify = False
         logger.info(f"SurrealDB client initialized: {url}/{namespace}/{database}")
 
     def execute_sql(self, sql: str) -> List[Dict[str, Any]]:
         """Execute SQL query via HTTP REST API"""
-        # Prepend USE statement
         full_sql = f"USE NS {self.namespace} DB {self.database}; {sql}"
 
         response = self.session.post(
@@ -377,7 +451,7 @@ class SurrealDBClient(StorageClient):
 
         results = response.json()
 
-        # Check for SQL errors (skip the first result which is the USE statement)
+        # Check for SQL errors (skip USE statement result)
         for i, result in enumerate(results):
             if result.get('status') == 'ERR':
                 error_detail = result.get('detail') or result.get('result', 'Unknown error')
@@ -389,6 +463,53 @@ class SurrealDBClient(StorageClient):
         """Format datetime for SurrealDB"""
         return dt.strftime('%Y-%m-%dT%H:%M:%SZ')
 
+    def init_schema(self):
+        """Initialize database schema"""
+        logger.info("Initializing database schema...")
+        
+        # Execute schema SQL line by line to handle errors better
+        statements = [s.strip() for s in SCHEMA_SQL.split(';') if s.strip()]
+        
+        for stmt in statements:
+            if not stmt or stmt.startswith('--'):
+                continue
+            try:
+                self.execute_sql(stmt + ';')
+            except Exception as e:
+                logger.warning(f"Schema statement warning: {e}")
+        
+        logger.info("✓ Database schema initialized")
+
+    def upsert_node(
+            self,
+            resource_type: ResourceType,
+            data: Dict[str, Any],
+            created_at: datetime,
+            updated_at: datetime
+    ) -> Dict[str, Any]:
+        """Upsert a node using document-defined ID format"""
+        node_id = IDGenerator.generate_node_id(resource_type, data)
+        
+        # Build SET clause
+        set_parts = []
+        for key, value in data.items():
+            if isinstance(value, (int, float)):
+                set_parts.append(f"{key} = {value}")
+            else:
+                set_parts.append(f"{key} = '{value}'")
+        
+        # Add timestamps with idempotent logic
+        set_parts.append(f"created_at = created_at OR type::datetime('{self.format_datetime(created_at)}')")
+        set_parts.append(f"updated_at = type::datetime('{self.format_datetime(updated_at)}')")
+        
+        set_clause = ', '.join(set_parts)
+        
+        # Use record ID in backticks to handle special characters
+        sql = f"UPSERT {resource_type.value}:`{node_id}` SET {set_clause};"
+        
+        result = self.execute_sql(sql)
+        return result[0].get('result', []) if result else []
+
     def batch_upsert_nodes(
             self,
             resource_type: ResourceType,
@@ -396,18 +517,16 @@ class SurrealDBClient(StorageClient):
             created_at: datetime,
             updated_at: datetime
     ) -> Dict[str, Any]:
-        """Batch upsert nodes ensuring idempotency (protects created_at)"""
+        """Batch upsert nodes"""
         if not nodes:
             return {}
 
         logger.debug(f"Batch upserting {len(nodes)} {resource_type.value} nodes")
 
-        # Build batch upsert SQL
-        upsert_statements = []
+        statements = []
         for data in nodes:
             node_id = IDGenerator.generate_node_id(resource_type, data)
             
-            # Build SET clause with all fields + timestamp logic
             set_parts = []
             for key, value in data.items():
                 if isinstance(value, (int, float)):
@@ -415,284 +534,72 @@ class SurrealDBClient(StorageClient):
                 else:
                     set_parts.append(f"{key} = '{value}'")
             
-            # Add timestamp fields with idempotent logic
             set_parts.append(f"created_at = created_at OR type::datetime('{self.format_datetime(created_at)}')")
             set_parts.append(f"updated_at = type::datetime('{self.format_datetime(updated_at)}')")
             
-            set_clause = ',\n                '.join(set_parts)
-            
-            upsert_statements.append(f"""
-            UPSERT {resource_type.value}:`{node_id}` SET
-                {set_clause};
-            """)
+            set_clause = ', '.join(set_parts)
+            statements.append(f"UPSERT {resource_type.value}:`{node_id}` SET {set_clause};")
 
-        # Execute in transaction
-        sql = "BEGIN TRANSACTION;\n" + "\n".join(upsert_statements) + "\nCOMMIT TRANSACTION;"
+        sql = "BEGIN TRANSACTION; " + " ".join(statements) + " COMMIT TRANSACTION;"
         results = self.execute_sql(sql)
         logger.info(f"✓ Batch upserted {len(nodes)} {resource_type.value} nodes")
         return results
 
-    def upsert_node(
+    def upsert_static_relation(
             self,
-            resource_type: ResourceType,
-            data: Dict[str, Any],
+            relation_type: RelationType,
+            from_type: ResourceType,
+            from_data: Dict[str, Any],
+            to_type: ResourceType,
+            to_data: Dict[str, Any],
             created_at: datetime,
             updated_at: datetime
     ) -> Dict[str, Any]:
-        """Upsert a single node ensuring idempotency (protects created_at)"""
-        node_id = IDGenerator.generate_node_id(resource_type, data)
-        
-        # Build SET clause with all fields + timestamp logic
-        set_parts = []
-        for key, value in data.items():
-            if isinstance(value, (int, float)):
-                set_parts.append(f"{key} = {value}")
-            else:
-                set_parts.append(f"{key} = '{value}'")
-        
-        # Add timestamp fields with idempotent logic
-        set_parts.append(f"created_at = created_at OR type::datetime('{self.format_datetime(created_at)}')")
-        set_parts.append(f"updated_at = type::datetime('{self.format_datetime(updated_at)}')")
-        
-        set_clause = ',\n            '.join(set_parts)
-        
-        sql = f"""
-        UPSERT {resource_type.value}:`{node_id}` SET
-            {set_clause};
         """
-
-        result = self.execute_sql(sql)
-        return result[0].get('result', [])
-
-    def upsert_relation(
-            self,
-            relation_type: RelationType,
-            from_resource_type: ResourceType,
-            from_data: Dict[str, Any],
-            to_resource_type: ResourceType,
-            to_data: Dict[str, Any],
-            created_at: datetime,
-            updated_at: datetime,
-            extra_fields: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
-        """Upsert a relation with idempotency (protects created_at)"""
-        from_id = IDGenerator.generate_node_id(from_resource_type, from_data)
-        to_id = IDGenerator.generate_node_id(to_resource_type, to_data)
-
-        # Build extra fields
-        extra_parts = []
-        if extra_fields:
-            for key, value in extra_fields.items():
-                if isinstance(value, (int, float)):
-                    extra_parts.append(f"{key} = {value}")
-                else:
-                    extra_parts.append(f"{key} = '{value}'")
-        
-        extra_str = ',\n            ' + ',\n            '.join(extra_parts) if extra_parts else ''
-
-        # Use OR to protect created_at from being overwritten
-        sql = f"""
-        RELATE {from_resource_type.value}:`{from_id}`->{relation_type.value}->{to_resource_type.value}:`{to_id}` SET
-            created_at = created_at OR type::datetime('{self.format_datetime(created_at)}'),
-            updated_at = type::datetime('{self.format_datetime(updated_at)}'){extra_str};
+        Upsert a static (bidirectional) relation using RELATE with document-defined ID
         """
-
-        result = self.execute_sql(sql)
-        return result[0].get('result', [])
-
-
-# ============================================================================
-# BKBase SurrealDB Client
-# ============================================================================
-
-class BKBaseClient(StorageClient):
-    """BKBase API client for SurrealDB access"""
-
-    def __init__(
-            self,
-            api_url: str = BKBaseConfig.API_URL,
-            username: str = BKBaseConfig.USERNAME,
-            app_code: str = BKBaseConfig.APP_CODE,
-            app_secret: str = BKBaseConfig.APP_SECRET,
-            result_table_id: str = BKBaseConfig.RESULT_TABLE_ID,
-            auth_method: str = BKBaseConfig.AUTH_METHOD,
-            prefer_storage: str = BKBaseConfig.PREFER_STORAGE
-    ):
-        # Validate required configuration
-        if not api_url:
-            raise ValueError("BKBase api_url is required in config.yaml")
-        if not app_secret:
-            raise ValueError("BKBase app_secret is required in config.yaml")
-        if not result_table_id:
-            raise ValueError("BKBase result_table_id is required in config.yaml")
-
-        self.api_url = api_url
-        self.username = username
-        self.app_code = app_code
-        self.app_secret = app_secret
-        self.result_table_id = result_table_id
-        self.auth_method = auth_method
-        self.prefer_storage = prefer_storage
-        self.session = requests.Session()
-        logger.info(f"BKBase client initialized: {api_url}")
-        logger.info(f"  Result Table ID: {result_table_id}")
-        logger.info(f"  Prefer Storage: {prefer_storage}")
-
-    def execute_sql(self, sql: str) -> List[Dict[str, Any]]:
-        """Execute SQL query via BKBase API"""
-        # Build BKBase request payload
-        payload = {
-            "sql": json.dumps({
-                "dsl": sql,
-                "result_table_id": self.result_table_id
-            }),
-            "bkdata_authentication_method": self.auth_method,
-            "prefer_storage": self.prefer_storage,
-            "bk_username": self.username,
-            "bk_app_code": self.app_code,
-            "bk_app_secret": self.app_secret
-        }
-
-        logger.debug(f"Executing BKBase query: {sql[:100]}...")
-
-        response = self.session.post(
-            self.api_url,
-            headers={'Content-Type': 'application/json'},
-            json=payload,
-            timeout=60
+        from_id = IDGenerator.generate_node_id(from_type, from_data)
+        to_id = IDGenerator.generate_node_id(to_type, to_data)
+        relation_id = IDGenerator.generate_static_relation_id(
+            relation_type, from_type, from_data, to_type, to_data
         )
 
-        if response.status_code != 200:
-            raise Exception(f"BKBase API error {response.status_code}: {response.text}")
-
-        result = response.json()
-
-        # Check BKBase API response
-        if not result.get('result', False):
-            error_msg = result.get('message') or result.get('errors') or 'Unknown error'
-            raise Exception(f"BKBase query failed: {error_msg}")
-
-        # Extract data from BKBase response
-        data = result.get('data', {})
-        records = data.get('list', [])
-
-        # Convert to SurrealDB-like result format
-        return [{'result': records}]
-
-    def format_datetime(self, dt: datetime) -> str:
-        """Format datetime for SurrealDB"""
-        return dt.strftime('%Y-%m-%dT%H:%M:%SZ')
-
-    def batch_upsert_nodes(
-            self,
-            resource_type: ResourceType,
-            nodes: List[Dict[str, Any]],
-            created_at: datetime,
-            updated_at: datetime
-    ) -> Dict[str, Any]:
-        """Batch upsert nodes via BKBase"""
-        if not nodes:
-            return {}
-
-        logger.debug(f"Batch upserting {len(nodes)} {resource_type.value} nodes via BKBase")
-
-        # Build batch upsert SQL
-        upsert_statements = []
-        for data in nodes:
-            node_id = IDGenerator.generate_node_id(resource_type, data)
-            
-            # Build SET clause with all fields + timestamp logic
-            set_parts = []
-            for key, value in data.items():
-                if isinstance(value, (int, float)):
-                    set_parts.append(f"{key} = {value}")
-                else:
-                    set_parts.append(f"{key} = '{value}'")
-            
-            # Add timestamp fields with idempotent logic
-            set_parts.append(f"created_at = created_at OR type::datetime('{self.format_datetime(created_at)}')")
-            set_parts.append(f"updated_at = type::datetime('{self.format_datetime(updated_at)}')")
-            
-            set_clause = ',\n                '.join(set_parts)
-            
-            upsert_statements.append(f"""
-            UPSERT {resource_type.value}:`{node_id}` SET
-                {set_clause};
-            """)
-
-        # Execute in transaction
-        sql = "BEGIN TRANSACTION;\n" + "\n".join(upsert_statements) + "\nCOMMIT TRANSACTION;"
-        results = self.execute_sql(sql)
-        logger.info(f"✓ Batch upserted {len(nodes)} {resource_type.value} nodes via BKBase")
-        return results
-
-    def upsert_node(
-            self,
-            resource_type: ResourceType,
-            data: Dict[str, Any],
-            created_at: datetime,
-            updated_at: datetime
-    ) -> Dict[str, Any]:
-        """Upsert a single node via BKBase"""
-        node_id = IDGenerator.generate_node_id(resource_type, data)
-        
-        # Build SET clause with all fields + timestamp logic
-        set_parts = []
-        for key, value in data.items():
-            if isinstance(value, (int, float)):
-                set_parts.append(f"{key} = {value}")
-            else:
-                set_parts.append(f"{key} = '{value}'")
-        
-        # Add timestamp fields with idempotent logic
-        set_parts.append(f"created_at = created_at OR type::datetime('{self.format_datetime(created_at)}')")
-        set_parts.append(f"updated_at = type::datetime('{self.format_datetime(updated_at)}')")
-        
-        set_clause = ',\n            '.join(set_parts)
-        
         sql = f"""
-        UPSERT {resource_type.value}:`{node_id}` SET
-            {set_clause};
+        RELATE {from_type.value}:`{from_id}`->{relation_type.value}:`{relation_id}`->{to_type.value}:`{to_id}` SET
+            created_at = created_at OR type::datetime('{self.format_datetime(created_at)}'),
+            updated_at = type::datetime('{self.format_datetime(updated_at)}');
         """
 
         result = self.execute_sql(sql)
-        return result[0].get('result', [])
+        return result[0].get('result', []) if result else []
 
-    def upsert_relation(
+    def upsert_dynamic_relation(
             self,
             relation_type: RelationType,
-            from_resource_type: ResourceType,
-            from_data: Dict[str, Any],
-            to_resource_type: ResourceType,
-            to_data: Dict[str, Any],
+            source_type: ResourceType,
+            source_data: Dict[str, Any],
+            target_type: ResourceType,
+            target_data: Dict[str, Any],
             created_at: datetime,
-            updated_at: datetime,
-            extra_fields: Optional[Dict[str, Any]] = None
+            updated_at: datetime
     ) -> Dict[str, Any]:
-        """Upsert a relation via BKBase"""
-        from_id = IDGenerator.generate_node_id(from_resource_type, from_data)
-        to_id = IDGenerator.generate_node_id(to_resource_type, to_data)
+        """
+        Upsert a dynamic (directional) relation using RELATE with document-defined ID
+        """
+        source_id = IDGenerator.generate_node_id(source_type, source_data)
+        target_id = IDGenerator.generate_node_id(target_type, target_data)
+        relation_id = IDGenerator.generate_dynamic_relation_id(
+            relation_type, source_type, source_data, target_type, target_data
+        )
 
-        # Build extra fields
-        extra_parts = []
-        if extra_fields:
-            for key, value in extra_fields.items():
-                if isinstance(value, (int, float)):
-                    extra_parts.append(f"{key} = {value}")
-                else:
-                    extra_parts.append(f"{key} = '{value}'")
-        
-        extra_str = ',\n            ' + ',\n            '.join(extra_parts) if extra_parts else ''
-
-        # Use OR to protect created_at from being overwritten
         sql = f"""
-        RELATE {from_resource_type.value}:`{from_id}`->{relation_type.value}->{to_resource_type.value}:`{to_id}` SET
+        RELATE {source_type.value}:`{source_id}`->{relation_type.value}:`{relation_id}`->{target_type.value}:`{target_id}` SET
             created_at = created_at OR type::datetime('{self.format_datetime(created_at)}'),
-            updated_at = type::datetime('{self.format_datetime(updated_at)}'){extra_str};
+            updated_at = type::datetime('{self.format_datetime(updated_at)}');
         """
 
         result = self.execute_sql(sql)
-        return result[0].get('result', [])
+        return result[0].get('result', []) if result else []
 
 
 # ============================================================================
@@ -702,11 +609,11 @@ class BKBaseClient(StorageClient):
 class MockGenerator:
     """Generate mock data"""
 
-    def __init__(self, client: StorageClient):
+    def __init__(self, client: SurrealDBClient):
         self.client = client
         self.resources: Dict[ResourceType, List[Dict[str, Any]]] = {}
         self.current_time = MockConfig.END_TIME
-        self.traffic_relations: List[Tuple[Dict, Dict]] = []  # Store (source_pod, target_pod) pairs
+        self.traffic_relations: List[Tuple[Dict, Dict, str]] = []  # (source, target, relation_id)
 
     def random_time_in_range(self) -> datetime:
         """Generate random time within configured range"""
@@ -716,88 +623,40 @@ class MockGenerator:
 
     def create_biz(self):
         """Create business node"""
-        logger.info("Creating...")
-
         data = {"bk_biz_id": MockConfig.BIZ_ID}
-        created_at = self.random_time_in_range()
-        updated_at = self.current_time
-
-        self.client.upsert_node(
-            ResourceType.BIZ,
-            data,
-            created_at,
-            updated_at
-        )
-
+        self.client.upsert_node(ResourceType.BIZ, data, self.random_time_in_range(), self.current_time)
         self.resources[ResourceType.BIZ] = [data]
         logger.info(f"✓ Created biz: {MockConfig.BIZ_NAME} (id={MockConfig.BIZ_ID})")
 
     def create_cluster(self):
         """Create cluster node"""
-        logger.info("Creating cluster...")
-
         data = {"bcs_cluster_id": MockConfig.CLUSTER_ID}
-        created_at = self.random_time_in_range()
-        updated_at = self.current_time
-
-        self.client.upsert_node(
-            ResourceType.CLUSTER,
-            data,
-            created_at,
-            updated_at
-        )
-
+        self.client.upsert_node(ResourceType.CLUSTER, data, self.random_time_in_range(), self.current_time)
         self.resources[ResourceType.CLUSTER] = [data]
         logger.info(f"✓ Created cluster: {MockConfig.CLUSTER_ID}")
 
     def create_namespace(self):
         """Create namespace node"""
-        logger.info("Creating namespace...")
-
-        data = {
-            "bcs_cluster_id": MockConfig.CLUSTER_ID,
-            "namespace": MockConfig.NAMESPACE
-        }
-        created_at = self.random_time_in_range()
-        updated_at = self.current_time
-
-        self.client.upsert_node(
-            ResourceType.NAMESPACE,
-            data,
-            created_at,
-            updated_at
-        )
-
+        data = {"bcs_cluster_id": MockConfig.CLUSTER_ID, "namespace": MockConfig.NAMESPACE}
+        self.client.upsert_node(ResourceType.NAMESPACE, data, self.random_time_in_range(), self.current_time)
         self.resources[ResourceType.NAMESPACE] = [data]
         logger.info(f"✓ Created namespace: {MockConfig.NAMESPACE}")
 
     def create_nodes(self):
-        """Create node resources (batch)"""
+        """Create node resources"""
         logger.info(f"Creating {MockConfig.NUM_NODES} nodes...")
-
         nodes = []
         for i in range(MockConfig.NUM_NODES):
             nodes.append({
                 "bcs_cluster_id": MockConfig.CLUSTER_ID,
                 "node": f"{MockConfig.BIZ_NAME}-node-{i}"
             })
-
-        created_at = self.random_time_in_range()
-        updated_at = self.current_time
-
-        self.client.batch_upsert_nodes(
-            ResourceType.NODE,
-            nodes,
-            created_at,
-            updated_at
-        )
-
+        self.client.batch_upsert_nodes(ResourceType.NODE, nodes, self.random_time_in_range(), self.current_time)
         self.resources[ResourceType.NODE] = nodes
 
     def create_pods(self):
-        """Create pod resources (batch)"""
+        """Create pod resources"""
         logger.info(f"Creating {MockConfig.NUM_PODS} pods...")
-
         pods = []
         for i in range(MockConfig.NUM_PODS):
             pods.append({
@@ -805,23 +664,12 @@ class MockGenerator:
                 "namespace": MockConfig.NAMESPACE,
                 "pod": f"{MockConfig.BIZ_NAME}-pod-{i:03d}"
             })
-
-        created_at = self.random_time_in_range()
-        updated_at = self.current_time
-
-        self.client.batch_upsert_nodes(
-            ResourceType.POD,
-            pods,
-            created_at,
-            updated_at
-        )
-
+        self.client.batch_upsert_nodes(ResourceType.POD, pods, self.random_time_in_range(), self.current_time)
         self.resources[ResourceType.POD] = pods
 
     def create_services(self):
-        """Create service resources (batch)"""
+        """Create service resources"""
         logger.info(f"Creating {len(MockConfig.SERVICE_LIST)} services...")
-
         services = []
         for svc_name in MockConfig.SERVICE_LIST:
             services.append({
@@ -829,429 +677,198 @@ class MockGenerator:
                 "namespace": MockConfig.NAMESPACE,
                 "service": f"{MockConfig.BIZ_NAME}-{svc_name}"
             })
-
-        created_at = self.random_time_in_range()
-        updated_at = self.current_time
-
-        self.client.batch_upsert_nodes(
-            ResourceType.SERVICE,
-            services,
-            created_at,
-            updated_at
-        )
-
+        self.client.batch_upsert_nodes(ResourceType.SERVICE, services, self.random_time_in_range(), self.current_time)
         self.resources[ResourceType.SERVICE] = services
 
     def create_deployments(self):
-        """Create deployment resources (batch)"""
+        """Create deployment resources"""
         logger.info(f"Creating {MockConfig.NUM_DEPLOYMENTS} deployments...")
-
         deployments = []
-        deployment_names = MockConfig.SERVICE_LIST
         for i in range(MockConfig.NUM_DEPLOYMENTS):
             deployments.append({
                 "bcs_cluster_id": MockConfig.CLUSTER_ID,
                 "namespace": MockConfig.NAMESPACE,
-                "deployment": f"{MockConfig.BIZ_NAME}-{deployment_names[i]}-deploy"
+                "deployment": f"{MockConfig.BIZ_NAME}-{MockConfig.SERVICE_LIST[i]}-deploy"
             })
-
-        created_at = self.random_time_in_range()
-        updated_at = self.current_time
-
-        self.client.batch_upsert_nodes(
-            ResourceType.DEPLOYMENT,
-            deployments,
-            created_at,
-            updated_at
-        )
-
+        self.client.batch_upsert_nodes(ResourceType.DEPLOYMENT, deployments, self.random_time_in_range(), self.current_time)
         self.resources[ResourceType.DEPLOYMENT] = deployments
 
     def create_static_relations(self):
         """Create static relations"""
         logger.info("Creating static relations...")
         
-        # 1. Biz and Cluster relations (CMDB layer)
-        self._create_biz_cluster_relations()
+        # Deployment -> ReplicaSet -> Pod chain
+        self._create_deployment_chain()
         
-        # 2. Deployment -> ReplicaSet -> Pod chain
-        self._create_deployment_chain_relations()
+        # Node with Pod
+        self._create_node_with_pod()
         
-        # 3. Node with Pod
-        self._create_node_with_pod_relations()
-        
-        # 4. Pod with Service
-        self._create_pod_with_service_relations()
+        # Pod with Service
+        self._create_pod_with_service()
 
-    def _create_node_with_pod_relations(self):
-        """Create node_with_pod relations"""
-        logger.info("Creating node_with_pod relations...")
-
-        nodes = self.resources.get(ResourceType.NODE, [])
-        pods = self.resources.get(ResourceType.POD, [])
-
-        count = 0
-        for i, pod in enumerate(pods):
-            # Assign pod to node (round-robin)
-            node = nodes[i % len(nodes)]
-
-            created_at = self.random_time_in_range()
-            updated_at = self.current_time
-
-            self.client.upsert_relation(
-                RelationType.NODE_WITH_POD,
-                ResourceType.NODE,
-                node,
-                ResourceType.POD,
-                pod,
-                created_at,
-                updated_at
-            )
-            count += 1
-
-        logger.info(f"✓ Created {count} node_with_pod relations")
-
-    def _create_pod_with_service_relations(self):
-        """Create pod_with_service relations"""
-        logger.info("Creating pod_with_service relations...")
-
-        services = self.resources.get(ResourceType.SERVICE, [])
-        pods = self.resources.get(ResourceType.POD, [])
-
-        count = 0
-        # Assign pods to services evenly
-        pods_per_service = len(pods) // len(services)
-
-        for i, service in enumerate(services):
-            start_idx = i * pods_per_service
-            end_idx = start_idx + pods_per_service if i < len(services) - 1 else len(pods)
-
-            for pod in pods[start_idx:end_idx]:
-                created_at = self.random_time_in_range()
-                updated_at = self.current_time
-
-                self.client.upsert_relation(
-                    RelationType.POD_WITH_SERVICE,
-                    ResourceType.POD,
-                    pod,
-                    ResourceType.SERVICE,
-                    service,
-                    created_at,
-                    updated_at
-                )
-                count += 1
-
-        logger.info(f"✓ Created {count} pod_with_service relations")
-    
-    def _create_biz_cluster_relations(self):
-        """Create biz to cluster relations (CMDB layer)"""
-        logger.info("Creating biz-cluster relations...")
-        
-        biz = self.resources.get(ResourceType.BIZ, [])
-        cluster = self.resources.get(ResourceType.CLUSTER, [])
-        
-        if not biz or not cluster:
-            logger.warning("  ⚠ Skipped: biz or cluster not found")
-            return
-        
-        # NOTE: biz_with_cluster is not in the standard relation types
-        # But we can use CMDB relations if needed
-        # For now, we just log the association
-        logger.info(f"  ℹ Business {biz[0]['bk_biz_id']} associated with cluster {cluster[0]['bcs_cluster_id']}")
-        logger.info(f"  ℹ This association is implicit through namespace and resource tags")
-    
-    def _create_deployment_chain_relations(self):
-        """
-        Create Deployment -> ReplicaSet -> Pod chain
-        
-        This completes the static relation chain:
-        Deployment -> ReplicaSet -> Pod -> Service
-        """
-        logger.info("Creating deployment chain relations...")
+    def _create_deployment_chain(self):
+        """Create Deployment -> ReplicaSet -> Pod chain"""
+        logger.info("  Creating deployment chain relations...")
         
         deployments = self.resources.get(ResourceType.DEPLOYMENT, [])
         pods = self.resources.get(ResourceType.POD, [])
         
         if not deployments:
-            logger.warning("  ⚠ No deployments found, skipping deployment chain")
             return
         
         replicasets = []
-        deployment_rs_count = 0
-        pod_rs_count = 0
-        
-        # Assign pods to deployments evenly
         pods_per_deployment = len(pods) // len(deployments)
         
         for i, deploy in enumerate(deployments):
-            # 1. Create a ReplicaSet for this Deployment
+            # Create ReplicaSet
             rs_data = {
                 "bcs_cluster_id": deploy["bcs_cluster_id"],
                 "namespace": deploy["namespace"],
                 "replicaset": f"{deploy['deployment']}-rs-001"
             }
-            
-            created_at = self.random_time_in_range()
-            updated_at = self.current_time
-            
-            self.client.upsert_node(
-                ResourceType.REPLICASET,
-                rs_data,
-                created_at,
-                updated_at
-            )
+            self.client.upsert_node(ResourceType.REPLICASET, rs_data, self.random_time_in_range(), self.current_time)
             replicasets.append(rs_data)
             
-            # 2. Create DEPLOYMENT_WITH_REPLICASET relation
-            self.client.upsert_relation(
+            # Deployment -> ReplicaSet
+            self.client.upsert_static_relation(
                 RelationType.DEPLOYMENT_WITH_REPLICASET,
-                ResourceType.DEPLOYMENT,
-                deploy,
-                ResourceType.REPLICASET,
-                rs_data,
-                created_at,
-                updated_at
+                ResourceType.DEPLOYMENT, deploy,
+                ResourceType.REPLICASET, rs_data,
+                self.random_time_in_range(), self.current_time
             )
-            deployment_rs_count += 1
             
-            # 3. Assign pods to this ReplicaSet
+            # Pod -> ReplicaSet
             start_idx = i * pods_per_deployment
             end_idx = start_idx + pods_per_deployment if i < len(deployments) - 1 else len(pods)
-            assigned_pods = pods[start_idx:end_idx]
-            
-            for pod in assigned_pods:
-                created_at = self.random_time_in_range()
-                updated_at = self.current_time
-                
-                self.client.upsert_relation(
+            for pod in pods[start_idx:end_idx]:
+                self.client.upsert_static_relation(
                     RelationType.POD_WITH_REPLICASET,
-                    ResourceType.POD,
-                    pod,
-                    ResourceType.REPLICASET,
-                    rs_data,
-                    created_at,
-                    updated_at
+                    ResourceType.POD, pod,
+                    ResourceType.REPLICASET, rs_data,
+                    self.random_time_in_range(), self.current_time
                 )
-                pod_rs_count += 1
         
-        # Store replicasets for later use
         self.resources[ResourceType.REPLICASET] = replicasets
-        
-        logger.info(f"  ✓ Created {len(replicasets)} replicasets")
-        logger.info(f"  ✓ Created {deployment_rs_count} deployment_with_replicaset relations")
-        logger.info(f"  ✓ Created {pod_rs_count} pod_with_replicaset relations")
+        logger.info(f"  ✓ Created {len(replicasets)} replicasets and relations")
 
+    def _create_node_with_pod(self):
+        """Create node_with_pod relations"""
+        nodes = self.resources.get(ResourceType.NODE, [])
+        pods = self.resources.get(ResourceType.POD, [])
+        
+        count = 0
+        for i, pod in enumerate(pods):
+            node = nodes[i % len(nodes)]
+            self.client.upsert_static_relation(
+                RelationType.NODE_WITH_POD,
+                ResourceType.NODE, node,
+                ResourceType.POD, pod,
+                self.random_time_in_range(), self.current_time
+            )
+            count += 1
+        logger.info(f"  ✓ Created {count} node_with_pod relations")
+
+    def _create_pod_with_service(self):
+        """Create pod_with_service relations"""
+        services = self.resources.get(ResourceType.SERVICE, [])
+        pods = self.resources.get(ResourceType.POD, [])
+        
+        count = 0
+        pods_per_service = len(pods) // len(services)
+        
+        for i, service in enumerate(services):
+            start_idx = i * pods_per_service
+            end_idx = start_idx + pods_per_service if i < len(services) - 1 else len(pods)
+            
+            for pod in pods[start_idx:end_idx]:
+                self.client.upsert_static_relation(
+                    RelationType.POD_WITH_SERVICE,
+                    ResourceType.POD, pod,
+                    ResourceType.SERVICE, service,
+                    self.random_time_in_range(), self.current_time
+                )
+                count += 1
+        logger.info(f"  ✓ Created {count} pod_with_service relations")
 
     def create_dynamic_relations(self):
         """Create dynamic pod_to_pod traffic relations"""
         logger.info("Creating pod_to_pod traffic relations...")
-
+        
         pods = self.resources.get(ResourceType.POD, [])
-
+        
         count = 0
         for source_pod in pods:
             if random.random() < MockConfig.POD_TO_POD_TRAFFIC_PROBABILITY:
-                # Select random target pod (different from source)
                 target_candidates = [p for p in pods if p != source_pod]
                 if target_candidates:
                     target_pod = random.choice(target_candidates)
-
-                    created_at = self.random_time_in_range()
-                    updated_at = self.current_time
-
-                    self.client.upsert_relation(
+                    
+                    self.client.upsert_dynamic_relation(
                         RelationType.POD_TO_POD,
-                        ResourceType.POD,
-                        source_pod,
-                        ResourceType.POD,
-                        target_pod,
-                        created_at,
-                        updated_at
+                        ResourceType.POD, source_pod,
+                        ResourceType.POD, target_pod,
+                        self.random_time_in_range(), self.current_time
                     )
-
-                    # Store for metric generation
-                    self.traffic_relations.append((source_pod, target_pod))
+                    
+                    relation_id = IDGenerator.generate_dynamic_relation_id(
+                        RelationType.POD_TO_POD,
+                        ResourceType.POD, source_pod,
+                        ResourceType.POD, target_pod
+                    )
+                    self.traffic_relations.append((source_pod, target_pod, relation_id))
                     count += 1
-
+        
         logger.info(f"✓ Created {count} pod_to_pod traffic relations")
 
     def create_metrics_metadata(self):
-        """Create metric nodes following documentation 7.2.2"""
+        """Create metric nodes"""
         logger.info("Creating metric metadata...")
-
+        
         metrics = [
-            {
-                "metric_name": "pod_to_pod_flow_total",
-                "metric_type": MetricType.COUNTER.value,
-                "unit": "count",
-                "description": "Pod到Pod的流量访问量"
-            },
-            {
-                "metric_name": "pod_to_pod_flow_seconds",
-                "metric_type": MetricType.GAUGE.value,
-                "unit": "seconds",
-                "description": "Pod到Pod的流量访问耗时"
-            },
-            {
-                "metric_name": "pod_to_pod_flow_error",
-                "metric_type": MetricType.COUNTER.value,
-                "unit": "count",
-                "description": "Pod到Pod的流量错误数"
-            }
+            {"metric_name": "pod_to_pod_flow_total", "metric_type": "counter", "unit": "count", "description": "Pod到Pod的流量访问量"},
+            {"metric_name": "pod_to_pod_flow_seconds", "metric_type": "gauge", "unit": "seconds", "description": "Pod到Pod的流量访问耗时"},
+            {"metric_name": "pod_to_pod_flow_error", "metric_type": "counter", "unit": "count", "description": "Pod到Pod的流量错误数"},
         ]
-
-        created_at = self.random_time_in_range()
-        updated_at = self.current_time
-
+        
         for metric_data in metrics:
-            self.client.upsert_node(
-                ResourceType.METRIC,
-                metric_data,
-                created_at,
-                updated_at
-            )
-
-        logger.info(f"✓ Created {len(metrics)} metric definitions")
+            self.client.upsert_node(ResourceType.METRIC, metric_data, self.random_time_in_range(), self.current_time)
+        
         self.resources[ResourceType.METRIC] = metrics
+        logger.info(f"✓ Created {len(metrics)} metric definitions")
 
     def create_relation_has_metric(self):
-        """Create relation_has_metric following documentation 7.2.2"""
+        """Create relation_has_metric associations"""
         logger.info("Creating relation_has_metric associations...")
-
+        
         metrics = self.resources.get(ResourceType.METRIC, [])
-
-        # Query all pod_to_pod relations
-        result = self.client.execute_sql("SELECT id FROM pod_to_pod;")
-        pod_to_pod_relations = result[0].get('result', [])
-
+        
         count = 0
-        for relation in pod_to_pod_relations:
-            relation_id = relation['id']
-
+        for source_pod, target_pod, relation_id in self.traffic_relations:
             for metric_data in metrics:
                 metric_id = IDGenerator.generate_node_id(ResourceType.METRIC, metric_data)
-
-                # Create relation_has_metric with result_table_id
+                result_table_id = f"{MockConfig.RESULT_TABLE_ID}_{metric_data['metric_name']}"
+                
                 sql = f"""
                 RELATE pod_to_pod:`{relation_id}`->relation_has_metric->metric:`{metric_id}` SET
-                    result_table_id = '{MockConfig.RESULT_TABLE_ID}_{metric_data["metric_name"]}',
+                    result_table_id = '{result_table_id}',
                     created_at = type::datetime('{self.client.format_datetime(self.current_time)}'),
                     updated_at = type::datetime('{self.client.format_datetime(self.current_time)}');
                 """
-
-                self.client.execute_sql(sql)
-                count += 1
-
+                
+                try:
+                    self.client.execute_sql(sql)
+                    count += 1
+                except Exception as e:
+                    logger.warning(f"  ⚠ Failed to create relation_has_metric: {e}")
+        
         logger.info(f"✓ Created {count} relation_has_metric associations")
 
-    def generate_metric_values(self):
-        """Generate metric time series values (simulated VictoriaMetrics data)"""
-        logger.info("Generating metric time series values...")
-        logger.info(f"📊 NOTE: In production, these would be written to VictoriaMetrics")
-        logger.info(f"    Result Table ID: {MockConfig.RESULT_TABLE_ID}_*")
-
-        time_points = []
-        delta = (MockConfig.END_TIME - MockConfig.START_TIME) / MockConfig.METRIC_TIME_POINTS
-        for i in range(MockConfig.METRIC_TIME_POINTS):
-            time_points.append(MockConfig.START_TIME + delta * i)
-
-        metric_samples = []
-
-        for source_pod, target_pod in self.traffic_relations:
-            # Generate labels
-            labels = {
-                "source_bcs_cluster_id": source_pod["bcs_cluster_id"],
-                "source_namespace": source_pod["namespace"],
-                "source_pod": source_pod["pod"],
-                "target_bcs_cluster_id": target_pod["bcs_cluster_id"],
-                "target_namespace": target_pod["namespace"],
-                "target_pod": target_pod["pod"]
-            }
-
-            # Generate flow_total (累计请求数)
-            flow_total_values = []
-            cumulative_total = 0
-            for ts in time_points:
-                increment = random.randint(*MockConfig.FLOW_TOTAL_RANGE)
-                cumulative_total += increment
-                flow_total_values.append({
-                    "timestamp": int(ts.timestamp() * 1000),
-                    "value": cumulative_total
-                })
-
-            metric_samples.append({
-                "metric": "pod_to_pod_flow_total",
-                "result_table_id": f"{MockConfig.RESULT_TABLE_ID}_pod_to_pod_flow_total",
-                "labels": labels,
-                "values": flow_total_values
-            })
-
-            # Generate flow_seconds (请求耗时)
-            flow_seconds_values = []
-            for ts in time_points:
-                latency = random.uniform(*MockConfig.FLOW_SECONDS_RANGE)
-                flow_seconds_values.append({
-                    "timestamp": int(ts.timestamp() * 1000),
-                    "value": round(latency, 3)
-                })
-
-            metric_samples.append({
-                "metric": "pod_to_pod_flow_seconds",
-                "result_table_id": f"{MockConfig.RESULT_TABLE_ID}_pod_to_pod_flow_seconds",
-                "labels": labels,
-                "values": flow_seconds_values
-            })
-
-            # Generate flow_error (错误数)
-            flow_error_values = []
-            cumulative_errors = 0
-            for ts, total_sample in zip(time_points, flow_total_values):
-                error_rate = random.uniform(*MockConfig.FLOW_ERROR_RATE_RANGE)
-                errors = int(total_sample["value"] * error_rate)
-                cumulative_errors = errors
-                flow_error_values.append({
-                    "timestamp": int(ts.timestamp() * 1000),
-                    "value": cumulative_errors
-                })
-
-            metric_samples.append({
-                "metric": "pod_to_pod_flow_error",
-                "result_table_id": f"{MockConfig.RESULT_TABLE_ID}_pod_to_pod_flow_error",
-                "labels": labels,
-                "values": flow_error_values
-            })
-
-        # Print sample metric data
-        logger.info(f"✓ Generated {len(metric_samples)} metric time series")
-        logger.info("\n" + "=" * 70)
-        logger.info("Sample Metric Data (VictoriaMetrics format):")
-        logger.info("=" * 70)
-        if metric_samples:
-            sample = metric_samples[0]
-            logger.info(f"\nMetric: {sample['metric']}")
-            logger.info(f"Result Table ID: {sample['result_table_id']}")
-            logger.info(f"Labels: {json.dumps(sample['labels'], indent=2)}")
-            logger.info(f"Sample Values (first 3 of {len(sample['values'])}):")
-            for value in sample['values'][:3]:
-                ts = datetime.fromtimestamp(value['timestamp'] / 1000)
-                logger.info(f"  {ts.strftime('%Y-%m-%d %H:%M:%S')}: {value['value']}")
-        logger.info("=" * 70 + "\n")
-
-        # Save to work directory
-        output_file = "./metric_samples.json"
-        with open(output_file, 'w') as f:
-            json.dump(metric_samples, f, indent=2)
-        logger.info(f"✓ Metric samples saved to: {output_file}")
-
-        return metric_samples
-
     def generate_all(self):
-        """Generate all mock data for BKOP Business 2"""
+        """Generate all mock data"""
         logger.info("\n" + "=" * 70)
         logger.info("Starting BKOP Business 2 Mock Data Generation")
         logger.info("=" * 70 + "\n")
-
-        # Create resources
+        
         self.create_biz()
         self.create_cluster()
         self.create_namespace()
@@ -1259,31 +876,25 @@ class MockGenerator:
         self.create_pods()
         self.create_services()
         self.create_deployments()
-
-        # Create relations
+        
         self.create_static_relations()
         self.create_dynamic_relations()
-
-        # Create metrics metadata and associations
+        
         self.create_metrics_metadata()
         self.create_relation_has_metric()
-
-        # Generate metric time series values (for VictoriaMetrics)
-        self.generate_metric_values()
-
+        
         logger.info("\n" + "=" * 70)
-        logger.info("BKOP Business 2 Mock Data Generation Completed!")
+        logger.info("Mock Data Generation Completed!")
         logger.info("=" * 70)
-        self.print_summary()
+        self._print_summary()
 
-    def print_summary(self):
+    def _print_summary(self):
         """Print generation summary"""
         logger.info("\n📊 Summary:")
         logger.info("-" * 70)
         logger.info(f"  Business ID: {MockConfig.BIZ_ID} ({MockConfig.BIZ_NAME})")
         logger.info(f"  Cluster: {MockConfig.CLUSTER_ID}")
         logger.info(f"  Namespace: {MockConfig.NAMESPACE}")
-        logger.info(f"  Result Table ID: {MockConfig.RESULT_TABLE_ID}")
         logger.info("-" * 70)
         for resource_type, items in self.resources.items():
             logger.info(f"  {resource_type.value:20s}: {len(items):5d} items")
@@ -1295,127 +906,52 @@ class MockGenerator:
 # Main Function
 # ============================================================================
 
-def create_storage_client(backend: StorageBackend) -> StorageClient:
-    """Factory function to create storage client based on backend type"""
-    if backend == StorageBackend.NATIVE:
-        logger.info("Creating Native SurrealDB client...")
-        return SurrealDBClient()
-    elif backend == StorageBackend.BKBASE:
-        logger.info("Creating BKBase SurrealDB client...")
-        return BKBaseClient()
-    else:
-        raise ValueError(f"Unsupported storage backend: {backend}")
-
-
 def main():
-    """Main function"""
-    # Parse command line arguments
-    parser = argparse.ArgumentParser(
-        description='Mock BKOP Business 2 Traffic to SurrealDB',
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-Examples:
-  # Use native SurrealDB
-  python %(prog)s --backend native
-  
-  # Use BKBase SurrealDB
-  python %(prog)s --backend bkbase
-  
-Configuration:
-  Edit config.yaml to customize connection settings for your environment
-        """
-    )
-    parser.add_argument(
-        '--backend',
-        type=str,
-        default='native',
-        choices=['native', 'bkbase'],
-        help='Storage backend to use (default: native)'
-    )
-    parser.add_argument(
-        '--debug',
-        action='store_true',
-        help='Enable debug logging'
-    )
+    parser = argparse.ArgumentParser(description='Mock BKOP Business 2 Traffic to SurrealDB')
+    parser.add_argument('--backend', type=str, default='native', choices=['native', 'bkbase'])
+    parser.add_argument('--init-schema', action='store_true', help='Initialize database schema (drops existing tables)')
+    parser.add_argument('--debug', action='store_true', help='Enable debug logging')
     
     args = parser.parse_args()
     
-    # Set logging level
     if args.debug:
         logging.getLogger().setLevel(logging.DEBUG)
-    
-    # Parse backend
-    backend = StorageBackend(args.backend)
     
     logger.info("=" * 70)
     logger.info(" Mock BKOP Business 2 Traffic to SurrealDB")
     logger.info("=" * 70)
     logger.info(f"\nConfiguration:")
-    logger.info(f"  Storage Backend: {backend.value}")
-    
-    if backend == StorageBackend.NATIVE:
-        logger.info(f"  SurrealDB URL: {SurrealDBConfig.URL}")
-        logger.info(f"  Namespace: {SurrealDBConfig.NAMESPACE}")
-        logger.info(f"  Database: {SurrealDBConfig.DATABASE}")
-    elif backend == StorageBackend.BKBASE:
-        logger.info(f"  BKBase API URL: {BKBaseConfig.API_URL}")
-        logger.info(f"  Result Table ID: {BKBaseConfig.RESULT_TABLE_ID}")
-        logger.info(f"  Prefer Storage: {BKBaseConfig.PREFER_STORAGE}")
-    
-    logger.info(f"  Business ID: {MockConfig.BIZ_ID}")
-    logger.info(f"  Business Name: {MockConfig.BIZ_NAME}")
-    logger.info(f"  Cluster ID: {MockConfig.CLUSTER_ID}")
-    logger.info(f"  Namespace: {MockConfig.NAMESPACE}")
-    logger.info(f"  Time Range: {MockConfig.START_TIME} to {MockConfig.END_TIME}")
-    logger.info(f"  Mode: Idempotent (supports multiple runs without data conflicts)")
+    logger.info(f"  Storage Backend: {args.backend}")
+    logger.info(f"  SurrealDB URL: {SurrealDBConfig.URL}")
+    logger.info(f"  Namespace: {SurrealDBConfig.NAMESPACE}")
+    logger.info(f"  Database: {SurrealDBConfig.DATABASE}")
+    logger.info(f"  Init Schema: {args.init_schema}")
     logger.info("")
 
     try:
-        # Create client
-        client = create_storage_client(backend)
-
+        client = SurrealDBClient()
+        
         # Test connection
-        logger.info(f"Testing {backend.value} connection...")
+        logger.info("Testing connection...")
+        client.execute_sql("INFO FOR DB;")
+        logger.info("✓ Connection successful!\n")
         
-        if backend == StorageBackend.NATIVE:
-            result = client.execute_sql("INFO FOR DB;")
-        else:
-            # For BKBase, just try a simple query
-            result = client.execute_sql("SELECT * FROM pod LIMIT 1;")
+        # Initialize schema if requested
+        if args.init_schema:
+            client.init_schema()
         
-        logger.info("Connection successful!\n")
-
-        # Create generator
-        generator = MockGenerator(client)
-
         # Generate data
+        generator = MockGenerator(client)
         generator.generate_all()
+        
+        logger.info("\n✓ Done!")
+        return 0
 
-        logger.info("\ndone ~")
-
-    except ValueError as e:
-        logger.error(f"\n❌ Configuration Error: {e}")
-        logger.error("\n💡 Troubleshooting:")
-        logger.error("  - Check config.yaml for connection settings")
-        logger.error("  - Verify the storage backend is configured correctly")
-        return 1
     except Exception as e:
         logger.error(f"\n❌ Error: {e}")
-        logger.error("\n💡 Troubleshooting:")
-        
-        if backend == StorageBackend.NATIVE:
-            logger.error("  - Check if SurrealDB is running")
-            logger.error("  - Verify SurrealDB connection settings in config.yaml")
-        else:
-            logger.error("  - Check BKBase API URL and credentials in config.yaml")
-            logger.error("  - Verify all required BKBase settings are configured")
-            logger.error("  - Check network connectivity to BKBase API")
-        
         import traceback
         traceback.print_exc()
         return 1
-
-    return 0
 
 
 if __name__ == "__main__":
