@@ -14,25 +14,26 @@ Storage Backends:
     - bkbase: Access SurrealDB through BKBase unified query API
 
 Usage:
-    # Use native SurrealDB (default)
+    # Use native SurrealDB (default) - both formats work
     python 001.mock_bkop_business_traffic.py --backend native
+    python 001.mock_bkop_business_traffic.py --backend=native
     
     # Use BKBase SurrealDB
     python 001.mock_bkop_business_traffic.py --backend bkbase
+    python 001.mock_bkop_business_traffic.py --backend=bkbase
     
     # Enable debug logging
-    python 001.mock_bkop_business_traffic.py --backend native --debug
+    python 001.mock_bkop_business_traffic.py --backend=native --debug
 
 Configuration:
-    All configuration is managed through environment variables.
-    Copy .env.example to .env and customize for your environment.
+    Connection settings are managed in config.yaml
+    Mock data configurations are hardcoded in the script.
     
-    Required for native backend:
-        SURREAL_URL, SURREAL_USER, SURREAL_PASS, SURREAL_NS, SURREAL_DB
-    
-    Required for bkbase backend:
-        BKBASE_API_URL, BKBASE_APP_CODE, BKBASE_APP_SECRET, BKBASE_RESULT_TABLE_ID
+    To customize:
+    1. Edit config.yaml for SurrealDB/BKBase connection details
+    2. Run script with: --backend=native or --backend=bkbase
 """
+
 
 import abc
 import argparse
@@ -40,6 +41,7 @@ import json
 import logging
 import os
 import random
+import sys
 from datetime import datetime, timedelta
 from enum import Enum
 from typing import Dict, List, Any, Optional, Tuple
@@ -58,70 +60,50 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # ============================================================================
-# Smart Configuration Loading with Priority
+# Configuration Loading - Parse Backend from Command Line
 # ============================================================================
-# Configuration priority (highest to lowest):
-# 1. Environment variables (for config values)
-# 2. .env.{backend}.local (local development, not in git)
-# 3. .env.{backend}       (backend defaults)
-# 4. .env                 (base defaults)
-#
-# Strategy: Load in reverse priority order, so higher priority overrides lower
-try:
-    from dotenv import load_dotenv
-    import os as _os
-    import sys as _sys
-    
-    # Determine backend: Command line > Environment > Default
-    storage_backend = None
-    
-    # 1. Check command line arguments first (highest priority for backend selection)
-    for i, arg in enumerate(_sys.argv):
-        if arg == '--backend' and i + 1 < len(_sys.argv):
-            storage_backend = _sys.argv[i + 1]
-            break
-    
-    # 2. If not in command line, check environment variable
-    if not storage_backend:
-        storage_backend = _os.getenv('STORAGE_BACKEND')
-    
-    # 3. Default to native if still not set
-    if not storage_backend:
-        storage_backend = 'native'
-    
-    logger.debug(f"Loading configurations for backend: {storage_backend}")
-    
-    # Load configurations with proper priority handling
-    # Lower priority files are loaded first with override=False
-    # Higher priority files are loaded later with override=True
-    
-    # Priority 4 (lowest): Base defaults - never override
-    if _os.path.exists('.env'):
-        load_dotenv('.env', override=False)
-        logger.debug("✓ Loaded: .env (base defaults)")
-    
-    # Priority 3: Backend-specific defaults - can override base
-    backend_env = f'.env.{storage_backend}'
-    if _os.path.exists(backend_env):
-        load_dotenv(backend_env, override=True)
-        logger.debug(f"✓ Loaded: {backend_env} (backend defaults)")
-    
-    # Priority 2 (highest in files): Local development overrides - overrides everything from files
-    backend_local_env = f'.env.{storage_backend}.local'
-    if _os.path.exists(backend_local_env):
-        load_dotenv(backend_local_env, override=True)
-        logger.debug(f"✓ Loaded: {backend_local_env} (local overrides)")
-    
-    # Priority 1 (highest overall): Environment variables were set before script started
-    # They are not affected by load_dotenv at all
-        
-except ImportError:
-    logger.debug("python-dotenv not installed, using environment variables only")
-    pass  # dotenv is optional
+# Parse backend from command line to determine which config to load
+def _parse_backend_from_args() -> str:
+    """Parse --backend argument from command line (supports both formats)"""
+    for i, arg in enumerate(sys.argv):
+        # Support both --backend native and --backend=native formats
+        if arg == '--backend' and i + 1 < len(sys.argv):
+            return sys.argv[i + 1]
+        elif arg.startswith('--backend='):
+            return arg.split('=', 1)[1]
+    return 'native'  # Default
 
 
+def _load_yaml_config(filename: str) -> Dict[str, Any]:
+    """Load YAML configuration file"""
+    try:
+        import yaml
+    except ImportError:
+        raise ImportError("PyYAML is required. Install with: pip install pyyaml")
+    
+    if not os.path.exists(filename):
+        return {}
+    
+    try:
+        with open(filename, 'r', encoding='utf-8') as f:
+            content = yaml.safe_load(f)
+            logger.debug(f"✓ Loaded configuration from: {filename}")
+            return content if content is not None else {}
+    except Exception as e:
+        logger.warning(f"Failed to load {filename}: {e}")
+        return {}
+
+
+# Parse backend early
+_storage_backend = _parse_backend_from_args()
+logger.debug(f"Using storage backend: {_storage_backend}")
+
+# Load YAML configuration
+_config_file = os.path.join(os.path.dirname(__file__), 'config.yaml')
+_config = _load_yaml_config(_config_file) if os.path.exists(_config_file) else {}
+
 # ============================================================================
-# Configuration
+# Configuration Constants
 # ============================================================================
 
 class StorageBackend(Enum):
@@ -132,67 +114,58 @@ class StorageBackend(Enum):
 
 class SurrealDBConfig:
     """Native SurrealDB connection configuration"""
-    URL = os.getenv("SURREAL_URL", "http://localhost:8000")
-    USERNAME = os.getenv("SURREAL_USER", "root")
-    PASSWORD = os.getenv("SURREAL_PASS", "root")
-    NAMESPACE = os.getenv("SURREAL_NS", "test")
-    DATABASE = os.getenv("SURREAL_DB", "test")
+    URL = _config.get('surreal_db', {}).get('url', 'https://localhost:8000')
+    USERNAME = _config.get('surreal_db', {}).get('username', 'root')
+    PASSWORD = _config.get('surreal_db', {}).get('password', 'root')
+    NAMESPACE = _config.get('surreal_db', {}).get('namespace', 'test')
+    DATABASE = _config.get('surreal_db', {}).get('database', 'test')
 
 
 class BKBaseConfig:
-    """BKBase API configuration (no default values for security)"""
-    API_URL = os.getenv("BKBASE_API_URL", "")
-    USERNAME = os.getenv("BKBASE_USERNAME", "")
-    APP_CODE = os.getenv("BKBASE_APP_CODE", "")
-    APP_SECRET = os.getenv("BKBASE_APP_SECRET", "")
-    RESULT_TABLE_ID = os.getenv("BKBASE_RESULT_TABLE_ID", "")
-    AUTH_METHOD = os.getenv("BKBASE_AUTH_METHOD", "user")
-    PREFER_STORAGE = os.getenv("BKBASE_PREFER_STORAGE", "surrealdb")
+    """BKBase API configuration"""
+    API_URL = _config.get('bkbase', {}).get('api_url', '')
+    USERNAME = _config.get('bkbase', {}).get('username', '')
+    APP_CODE = _config.get('bkbase', {}).get('app_code', '')
+    APP_SECRET = _config.get('bkbase', {}).get('app_secret', '')
+    RESULT_TABLE_ID = _config.get('bkbase', {}).get('result_table_id', '')
+    AUTH_METHOD = "user"
+    PREFER_STORAGE = "surrealdb"
 
 
 class MockConfig:
     """Mock data generation configuration for BKOP Business 2"""
-
     # Business specific
-    BIZ_ID = os.getenv("BIZ_ID", "2")
-    BIZ_NAME = os.getenv("BIZ_NAME", "bkop")
-    CLUSTER_ID = os.getenv("CLUSTER_ID", "BCS-K8S-00002")
-    NAMESPACE = os.getenv("NAMESPACE", "bkop")
-
-    # Result table ID for metrics (业务2的结果表)
-    RESULT_TABLE_ID = os.getenv("RESULT_TABLE_ID", "2_bkmonitor_bkop_2")
-
+    BIZ_ID = "2"
+    BIZ_NAME = "bkop"
+    CLUSTER_ID = "BCS-K8S-00002"
+    NAMESPACE = "bkop"
+    
+    # Result table ID for metrics
+    RESULT_TABLE_ID = "2_bkmonitor_bkop_2"
+    
+    # Service list
     SERVICE_LIST = ["api", "web", "worker"]
-
+    
     # Number of resources to generate
-    NUM_PODS = int(os.getenv("NUM_PODS", "10"))
-    NUM_DEPLOYMENTS = int(os.getenv("NUM_DEPLOYMENTS", "3"))
-    NUM_NODES = int(os.getenv("NUM_NODES", "3"))
-
+    NUM_PODS = 10
+    NUM_DEPLOYMENTS = 3
+    NUM_NODES = 3
+    
     # Traffic generation
-    POD_TO_POD_TRAFFIC_PROBABILITY = float(os.getenv("POD_TO_POD_TRAFFIC_PROBABILITY", "0.4"))
-
+    POD_TO_POD_TRAFFIC_PROBABILITY = 0.4
+    
     # Metric value ranges
-    FLOW_TOTAL_RANGE = (
-        int(os.getenv("FLOW_TOTAL_MIN", "10")),
-        int(os.getenv("FLOW_TOTAL_MAX", "1000"))
-    )
-    FLOW_SECONDS_RANGE = (
-        float(os.getenv("FLOW_SECONDS_MIN", "0.01")),
-        float(os.getenv("FLOW_SECONDS_MAX", "2.0"))
-    )
-    FLOW_ERROR_RATE_RANGE = (
-        float(os.getenv("FLOW_ERROR_RATE_MIN", "0.0")),
-        float(os.getenv("FLOW_ERROR_RATE_MAX", "0.1"))
-    )
-
+    FLOW_TOTAL_RANGE = (10, 1000)
+    FLOW_SECONDS_RANGE = (0.01, 2.0)
+    FLOW_ERROR_RATE_RANGE = (0.0, 0.1)
+    
     # 默认回转时间
-    DEFAULT_TIME_BACK_HOURS = int(os.getenv("DEFAULT_TIME_BACK_HOURS", "1"))
-
+    DEFAULT_TIME_BACK_HOURS = 1
+    
     # Time range for mock data
     START_TIME = datetime.now().replace(tzinfo=None) - timedelta(hours=DEFAULT_TIME_BACK_HOURS)
     END_TIME = datetime.now().replace(tzinfo=None)
-    METRIC_TIME_POINTS = int(os.getenv("METRIC_TIME_POINTS", "12"))
+    METRIC_TIME_POINTS = 12
 
 
 # ============================================================================
@@ -379,6 +352,9 @@ class SurrealDBClient(StorageClient):
         self.namespace = namespace
         self.database = database
         self.session = requests.Session()
+        # 本地环境使用自签名证书，通过 HTTPS 访问时关闭证书校验
+        # 如果后续在生产环境使用，请改为提供可信 CA 或设置 verify=True
+        self.session.verify = False
         logger.info(f"SurrealDB client initialized: {url}/{namespace}/{database}")
 
     def execute_sql(self, sql: str) -> List[Dict[str, Any]]:
@@ -544,11 +520,11 @@ class BKBaseClient(StorageClient):
     ):
         # Validate required configuration
         if not api_url:
-            raise ValueError("BKBASE_API_URL is required for BKBase backend")
+            raise ValueError("BKBase api_url is required in config.yaml")
         if not app_secret:
-            raise ValueError("BKBASE_APP_SECRET is required for BKBase backend")
+            raise ValueError("BKBase app_secret is required in config.yaml")
         if not result_table_id:
-            raise ValueError("BKBASE_RESULT_TABLE_ID is required for BKBase backend")
+            raise ValueError("BKBase result_table_id is required in config.yaml")
 
         self.api_url = api_url
         self.username = username
@@ -1345,14 +1321,14 @@ Examples:
   # Use BKBase SurrealDB
   python %(prog)s --backend bkbase
   
-Environment Variables:
-  See .env.example for all available configuration options
+Configuration:
+  Edit config.yaml to customize connection settings for your environment
         """
     )
     parser.add_argument(
         '--backend',
         type=str,
-        default=os.getenv('STORAGE_BACKEND', 'native'),
+        default='native',
         choices=['native', 'bkbase'],
         help='Storage backend to use (default: native)'
     )
@@ -1420,8 +1396,8 @@ Environment Variables:
     except ValueError as e:
         logger.error(f"\n❌ Configuration Error: {e}")
         logger.error("\n💡 Troubleshooting:")
-        logger.error("  - Check your .env file or environment variables")
-        logger.error("  - See .env.example for required configuration")
+        logger.error("  - Check config.yaml for connection settings")
+        logger.error("  - Verify the storage backend is configured correctly")
         return 1
     except Exception as e:
         logger.error(f"\n❌ Error: {e}")
@@ -1429,10 +1405,10 @@ Environment Variables:
         
         if backend == StorageBackend.NATIVE:
             logger.error("  - Check if SurrealDB is running")
-            logger.error("  - Verify database connection settings in environment variables")
+            logger.error("  - Verify SurrealDB connection settings in config.yaml")
         else:
-            logger.error("  - Check BKBase API URL and credentials")
-            logger.error("  - Verify BKBASE_APP_SECRET is set correctly")
+            logger.error("  - Check BKBase API URL and credentials in config.yaml")
+            logger.error("  - Verify all required BKBase settings are configured")
             logger.error("  - Check network connectivity to BKBase API")
         
         import traceback

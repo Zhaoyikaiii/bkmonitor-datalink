@@ -1,0 +1,19 @@
+# ============================================================================
+# Mock BKOP Business 2 Configuration
+# ============================================================================
+# Connection configurations for different storage backends
+# Edit this file to change connection details for your environment
+
+surreal_db:
+  url: "http://9.134.9.112:8000"
+  username: "root"
+  password: "gXZio8YhegwJnNKN"
+  namespace: "test_20251223"
+  database: "test_20251223"
+
+bkbase:
+  api_url: ""
+  username: ""
+  app_code: ""
+  app_secret: ""
+  result_table_id: ""
