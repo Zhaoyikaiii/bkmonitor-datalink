@@ -154,10 +154,15 @@ class MockConfig:
     POD_TO_SYSTEM_TRAFFIC_PROBABILITY = 0.3
     SERVICE_TO_SERVICE_TRAFFIC_PROBABILITY = 0.5
     
-    # Time
+    # Time (use UTC to match SurrealDB's time::now())
     DEFAULT_TIME_BACK_HOURS = 1
-    START_TIME = datetime.now().replace(tzinfo=None) - timedelta(hours=DEFAULT_TIME_BACK_HOURS)
-    END_TIME = datetime.now().replace(tzinfo=None)
+    START_TIME = datetime.utcnow().replace(tzinfo=None) - timedelta(hours=DEFAULT_TIME_BACK_HOURS)
+    END_TIME = datetime.utcnow().replace(tzinfo=None)
+    
+    # Liveness Detection
+    # TTL for is_alive computed field (resources not updated within TTL are considered dead)
+    # Format: SurrealDB duration string (e.g., "2m", "120s", "1h")
+    RESOURCE_TTL = _config.get('mock', {}).get('resource_ttl', '2m')
 
 
 # ============================================================================
@@ -324,13 +329,16 @@ class IDGenerator:
     def generate_node_id(resource_type: ResourceType, data: Dict[str, Any]) -> str:
         """
         Generate node ID per section 4.1
-        Format: {resource_type}:{key1}={value1},{key2}={value2},...
+        Format: {key1}={value1},{key2}={value2},...
         Keys are sorted alphabetically
+        
+        Note: This returns only the key-value part, without the table name prefix.
+        The table name is added when constructing the SQL statement.
         """
         index_fields = RESOURCE_INDEX_FIELDS.get(resource_type, [])
         sorted_keys = sorted(index_fields)
         pairs = [f"{key}={data.get(key, '')}" for key in sorted_keys]
-        return f"{resource_type.value}:{','.join(pairs)}"
+        return ','.join(pairs)
 
     @staticmethod
     def generate_kv_string(resource_type: ResourceType, data: Dict[str, Any]) -> str:
@@ -350,17 +358,19 @@ class IDGenerator:
     ) -> str:
         """
         Generate static (bidirectional) relation ID per section 4.2.1
-        Format: {res1}_with_{res2}:{res1_kv}|{res2_kv}
+        Format: {res1_kv}|{res2_kv}
         Where res1 < res2 alphabetically
+        
+        Note: Returns only the key-value part, without the relation type prefix.
         """
         kv1 = IDGenerator.generate_kv_string(type1, data1)
         kv2 = IDGenerator.generate_kv_string(type2, data2)
         
         # Ensure res1 < res2 alphabetically
         if type1.value < type2.value:
-            return f"{relation_type.value}:{kv1}|{kv2}"
+            return f"{kv1}|{kv2}"
         else:
-            return f"{relation_type.value}:{kv2}|{kv1}"
+            return f"{kv2}|{kv1}"
 
     @staticmethod
     def generate_dynamic_relation_id(
@@ -372,450 +382,53 @@ class IDGenerator:
     ) -> str:
         """
         Generate dynamic (directional) relation ID per section 4.2.2
-        Format: {src}_to_{dst}:{src_kv}|{dst_kv}
+        Format: {src_kv}|{dst_kv}
+        
+        Note: Returns only the key-value part, without the relation type prefix.
         """
         source_kv = IDGenerator.generate_kv_string(source_type, source_data)
         target_kv = IDGenerator.generate_kv_string(target_type, target_data)
-        return f"{relation_type.value}:{source_kv}|{target_kv}"
+        return f"{source_kv}|{target_kv}"
 
 
 # ============================================================================
-# Schema Definition (per documentation section 6)
+# Schema Definition
 # ============================================================================
 
-def generate_schema_sql() -> str:
-    """Generate complete schema SQL for all resource and relation types"""
+# Schema file path (relative to this script)
+SCHEMA_FILE = os.path.join(os.path.dirname(__file__), 'schema.sql')
+
+
+def load_schema_sql(ttl: str = None) -> str:
+    """Load schema SQL from external file and replace TTL placeholder.
     
-    # Node table definitions
-    node_tables = """
--- ============================================
--- Drop existing tables (for clean reset)
--- ============================================
-
--- Drop all node tables
-REMOVE TABLE IF EXISTS pod;
-REMOVE TABLE IF EXISTS node;
-REMOVE TABLE IF EXISTS container;
-REMOVE TABLE IF EXISTS deployment;
-REMOVE TABLE IF EXISTS replicaset;
-REMOVE TABLE IF EXISTS statefulset;
-REMOVE TABLE IF EXISTS daemonset;
-REMOVE TABLE IF EXISTS job;
-REMOVE TABLE IF EXISTS service;
-REMOVE TABLE IF EXISTS ingress;
-REMOVE TABLE IF EXISTS cluster;
-REMOVE TABLE IF EXISTS namespace;
-REMOVE TABLE IF EXISTS system;
-REMOVE TABLE IF EXISTS k8s_address;
-REMOVE TABLE IF EXISTS domain;
-REMOVE TABLE IF EXISTS apm_service;
-REMOVE TABLE IF EXISTS apm_service_instance;
-REMOVE TABLE IF EXISTS datasource;
-REMOVE TABLE IF EXISTS bklogconfig;
-REMOVE TABLE IF EXISTS biz;
-REMOVE TABLE IF EXISTS set;
-REMOVE TABLE IF EXISTS module;
-REMOVE TABLE IF EXISTS host;
-REMOVE TABLE IF EXISTS app_version;
-REMOVE TABLE IF EXISTS git_commit;
-REMOVE TABLE IF EXISTS environment;
-REMOVE TABLE IF EXISTS metric;
-
--- Drop all relation tables
-REMOVE TABLE IF EXISTS node_with_system;
-REMOVE TABLE IF EXISTS node_with_pod;
-REMOVE TABLE IF EXISTS job_with_pod;
-REMOVE TABLE IF EXISTS pod_with_replicaset;
-REMOVE TABLE IF EXISTS pod_with_statefulset;
-REMOVE TABLE IF EXISTS daemonset_with_pod;
-REMOVE TABLE IF EXISTS deployment_with_replicaset;
-REMOVE TABLE IF EXISTS pod_with_service;
-REMOVE TABLE IF EXISTS ingress_with_service;
-REMOVE TABLE IF EXISTS k8s_address_with_service;
-REMOVE TABLE IF EXISTS domain_with_service;
-REMOVE TABLE IF EXISTS apm_service_instance_with_pod;
-REMOVE TABLE IF EXISTS apm_service_instance_with_system;
-REMOVE TABLE IF EXISTS apm_service_with_apm_service_instance;
-REMOVE TABLE IF EXISTS container_with_pod;
-REMOVE TABLE IF EXISTS datasource_with_pod;
-REMOVE TABLE IF EXISTS datasource_with_node;
-REMOVE TABLE IF EXISTS bklogconfig_with_datasource;
-REMOVE TABLE IF EXISTS biz_with_set;
-REMOVE TABLE IF EXISTS module_with_set;
-REMOVE TABLE IF EXISTS host_with_module;
-REMOVE TABLE IF EXISTS host_with_system;
-REMOVE TABLE IF EXISTS app_version_with_container;
-REMOVE TABLE IF EXISTS app_version_with_system;
-REMOVE TABLE IF EXISTS container_with_environment;
-REMOVE TABLE IF EXISTS environment_with_system;
-REMOVE TABLE IF EXISTS app_version_with_git_commit;
-REMOVE TABLE IF EXISTS pod_to_pod;
-REMOVE TABLE IF EXISTS pod_to_system;
-REMOVE TABLE IF EXISTS system_to_pod;
-REMOVE TABLE IF EXISTS system_to_system;
-REMOVE TABLE IF EXISTS service_to_service;
-REMOVE TABLE IF EXISTS node_has_metric;
-REMOVE TABLE IF EXISTS relation_has_metric;
-
--- ============================================
--- Node Tables (per documentation section 2)
--- ============================================
-
--- Kubernetes Resources
-DEFINE TABLE pod SCHEMAFULL;
-DEFINE FIELD bcs_cluster_id ON pod TYPE string;
-DEFINE FIELD namespace ON pod TYPE string;
-DEFINE FIELD pod ON pod TYPE string;
-DEFINE FIELD created_at ON pod TYPE datetime;
-DEFINE FIELD updated_at ON pod TYPE datetime;
-DEFINE INDEX idx_pod_key ON pod FIELDS bcs_cluster_id, namespace, pod UNIQUE;
-
-DEFINE TABLE node SCHEMAFULL;
-DEFINE FIELD bcs_cluster_id ON node TYPE string;
-DEFINE FIELD node ON node TYPE string;
-DEFINE FIELD created_at ON node TYPE datetime;
-DEFINE FIELD updated_at ON node TYPE datetime;
-DEFINE INDEX idx_node_key ON node FIELDS bcs_cluster_id, node UNIQUE;
-
-DEFINE TABLE container SCHEMAFULL;
-DEFINE FIELD bcs_cluster_id ON container TYPE string;
-DEFINE FIELD namespace ON container TYPE string;
-DEFINE FIELD pod ON container TYPE string;
-DEFINE FIELD container ON container TYPE string;
-DEFINE FIELD created_at ON container TYPE datetime;
-DEFINE FIELD updated_at ON container TYPE datetime;
-DEFINE INDEX idx_container_key ON container FIELDS bcs_cluster_id, namespace, pod, container UNIQUE;
-
-DEFINE TABLE deployment SCHEMAFULL;
-DEFINE FIELD bcs_cluster_id ON deployment TYPE string;
-DEFINE FIELD namespace ON deployment TYPE string;
-DEFINE FIELD deployment ON deployment TYPE string;
-DEFINE FIELD created_at ON deployment TYPE datetime;
-DEFINE FIELD updated_at ON deployment TYPE datetime;
-DEFINE INDEX idx_deployment_key ON deployment FIELDS bcs_cluster_id, namespace, deployment UNIQUE;
-
-DEFINE TABLE replicaset SCHEMAFULL;
-DEFINE FIELD bcs_cluster_id ON replicaset TYPE string;
-DEFINE FIELD namespace ON replicaset TYPE string;
-DEFINE FIELD replicaset ON replicaset TYPE string;
-DEFINE FIELD created_at ON replicaset TYPE datetime;
-DEFINE FIELD updated_at ON replicaset TYPE datetime;
-DEFINE INDEX idx_replicaset_key ON replicaset FIELDS bcs_cluster_id, namespace, replicaset UNIQUE;
-
-DEFINE TABLE statefulset SCHEMAFULL;
-DEFINE FIELD bcs_cluster_id ON statefulset TYPE string;
-DEFINE FIELD namespace ON statefulset TYPE string;
-DEFINE FIELD statefulset ON statefulset TYPE string;
-DEFINE FIELD created_at ON statefulset TYPE datetime;
-DEFINE FIELD updated_at ON statefulset TYPE datetime;
-DEFINE INDEX idx_statefulset_key ON statefulset FIELDS bcs_cluster_id, namespace, statefulset UNIQUE;
-
-DEFINE TABLE daemonset SCHEMAFULL;
-DEFINE FIELD bcs_cluster_id ON daemonset TYPE string;
-DEFINE FIELD namespace ON daemonset TYPE string;
-DEFINE FIELD daemonset ON daemonset TYPE string;
-DEFINE FIELD created_at ON daemonset TYPE datetime;
-DEFINE FIELD updated_at ON daemonset TYPE datetime;
-DEFINE INDEX idx_daemonset_key ON daemonset FIELDS bcs_cluster_id, namespace, daemonset UNIQUE;
-
-DEFINE TABLE job SCHEMAFULL;
-DEFINE FIELD bcs_cluster_id ON job TYPE string;
-DEFINE FIELD namespace ON job TYPE string;
-DEFINE FIELD job ON job TYPE string;
-DEFINE FIELD created_at ON job TYPE datetime;
-DEFINE FIELD updated_at ON job TYPE datetime;
-DEFINE INDEX idx_job_key ON job FIELDS bcs_cluster_id, namespace, job UNIQUE;
-
-DEFINE TABLE service SCHEMAFULL;
-DEFINE FIELD bcs_cluster_id ON service TYPE string;
-DEFINE FIELD namespace ON service TYPE string;
-DEFINE FIELD service ON service TYPE string;
-DEFINE FIELD created_at ON service TYPE datetime;
-DEFINE FIELD updated_at ON service TYPE datetime;
-DEFINE INDEX idx_service_key ON service FIELDS bcs_cluster_id, namespace, service UNIQUE;
-
-DEFINE TABLE ingress SCHEMAFULL;
-DEFINE FIELD bcs_cluster_id ON ingress TYPE string;
-DEFINE FIELD namespace ON ingress TYPE string;
-DEFINE FIELD ingress ON ingress TYPE string;
-DEFINE FIELD created_at ON ingress TYPE datetime;
-DEFINE FIELD updated_at ON ingress TYPE datetime;
-DEFINE INDEX idx_ingress_key ON ingress FIELDS bcs_cluster_id, namespace, ingress UNIQUE;
-
-DEFINE TABLE cluster SCHEMAFULL;
-DEFINE FIELD bcs_cluster_id ON cluster TYPE string;
-DEFINE FIELD created_at ON cluster TYPE datetime;
-DEFINE FIELD updated_at ON cluster TYPE datetime;
-DEFINE INDEX idx_cluster_key ON cluster FIELDS bcs_cluster_id UNIQUE;
-
-DEFINE TABLE namespace SCHEMAFULL;
-DEFINE FIELD bcs_cluster_id ON namespace TYPE string;
-DEFINE FIELD namespace ON namespace TYPE string;
-DEFINE FIELD created_at ON namespace TYPE datetime;
-DEFINE FIELD updated_at ON namespace TYPE datetime;
-DEFINE INDEX idx_namespace_key ON namespace FIELDS bcs_cluster_id, namespace UNIQUE;
-
--- Network Resources
-DEFINE TABLE system SCHEMAFULL;
-DEFINE FIELD bk_cloud_id ON system TYPE string;
-DEFINE FIELD bk_target_ip ON system TYPE string;
-DEFINE FIELD created_at ON system TYPE datetime;
-DEFINE FIELD updated_at ON system TYPE datetime;
-DEFINE INDEX idx_system_key ON system FIELDS bk_cloud_id, bk_target_ip UNIQUE;
-
-DEFINE TABLE k8s_address SCHEMAFULL;
-DEFINE FIELD bcs_cluster_id ON k8s_address TYPE string;
-DEFINE FIELD address ON k8s_address TYPE string;
-DEFINE FIELD created_at ON k8s_address TYPE datetime;
-DEFINE FIELD updated_at ON k8s_address TYPE datetime;
-DEFINE INDEX idx_k8s_address_key ON k8s_address FIELDS bcs_cluster_id, address UNIQUE;
-
-DEFINE TABLE domain SCHEMAFULL;
-DEFINE FIELD bcs_cluster_id ON domain TYPE string;
-DEFINE FIELD domain ON domain TYPE string;
-DEFINE FIELD created_at ON domain TYPE datetime;
-DEFINE FIELD updated_at ON domain TYPE datetime;
-DEFINE INDEX idx_domain_key ON domain FIELDS bcs_cluster_id, domain UNIQUE;
-
--- APM Resources
-DEFINE TABLE apm_service SCHEMAFULL;
-DEFINE FIELD apm_application_name ON apm_service TYPE string;
-DEFINE FIELD apm_service_name ON apm_service TYPE string;
-DEFINE FIELD created_at ON apm_service TYPE datetime;
-DEFINE FIELD updated_at ON apm_service TYPE datetime;
-DEFINE INDEX idx_apm_service_key ON apm_service FIELDS apm_application_name, apm_service_name UNIQUE;
-
-DEFINE TABLE apm_service_instance SCHEMAFULL;
-DEFINE FIELD apm_application_name ON apm_service_instance TYPE string;
-DEFINE FIELD apm_service_name ON apm_service_instance TYPE string;
-DEFINE FIELD apm_service_instance_name ON apm_service_instance TYPE string;
-DEFINE FIELD created_at ON apm_service_instance TYPE datetime;
-DEFINE FIELD updated_at ON apm_service_instance TYPE datetime;
-DEFINE INDEX idx_apm_service_instance_key ON apm_service_instance FIELDS apm_application_name, apm_service_name, apm_service_instance_name UNIQUE;
-
--- Data Source Resources
-DEFINE TABLE datasource SCHEMAFULL;
-DEFINE FIELD bk_data_id ON datasource TYPE string;
-DEFINE FIELD created_at ON datasource TYPE datetime;
-DEFINE FIELD updated_at ON datasource TYPE datetime;
-DEFINE INDEX idx_datasource_key ON datasource FIELDS bk_data_id UNIQUE;
-
-DEFINE TABLE bklogconfig SCHEMAFULL;
-DEFINE FIELD bklogconfig_namespace ON bklogconfig TYPE string;
-DEFINE FIELD bklogconfig_name ON bklogconfig TYPE string;
-DEFINE FIELD created_at ON bklogconfig TYPE datetime;
-DEFINE FIELD updated_at ON bklogconfig TYPE datetime;
-DEFINE INDEX idx_bklogconfig_key ON bklogconfig FIELDS bklogconfig_namespace, bklogconfig_name UNIQUE;
-
--- CMDB Resources
-DEFINE TABLE biz SCHEMAFULL;
-DEFINE FIELD bk_biz_id ON biz TYPE string;
-DEFINE FIELD created_at ON biz TYPE datetime;
-DEFINE FIELD updated_at ON biz TYPE datetime;
-DEFINE INDEX idx_biz_key ON biz FIELDS bk_biz_id UNIQUE;
-
-DEFINE TABLE set SCHEMAFULL;
-DEFINE FIELD bk_set_id ON set TYPE string;
-DEFINE FIELD created_at ON set TYPE datetime;
-DEFINE FIELD updated_at ON set TYPE datetime;
-DEFINE INDEX idx_set_key ON set FIELDS bk_set_id UNIQUE;
-
-DEFINE TABLE module SCHEMAFULL;
-DEFINE FIELD bk_module_id ON module TYPE string;
-DEFINE FIELD created_at ON module TYPE datetime;
-DEFINE FIELD updated_at ON module TYPE datetime;
-DEFINE INDEX idx_module_key ON module FIELDS bk_module_id UNIQUE;
-
-DEFINE TABLE host SCHEMAFULL;
-DEFINE FIELD bk_host_id ON host TYPE string;
-DEFINE FIELD created_at ON host TYPE datetime;
-DEFINE FIELD updated_at ON host TYPE datetime;
-DEFINE INDEX idx_host_key ON host FIELDS bk_host_id UNIQUE;
-
--- App Version Resources
-DEFINE TABLE app_version SCHEMAFULL;
-DEFINE FIELD app_name ON app_version TYPE string;
-DEFINE FIELD version ON app_version TYPE string;
-DEFINE FIELD created_at ON app_version TYPE datetime;
-DEFINE FIELD updated_at ON app_version TYPE datetime;
-DEFINE INDEX idx_app_version_key ON app_version FIELDS app_name, version UNIQUE;
-
-DEFINE TABLE git_commit SCHEMAFULL;
-DEFINE FIELD git_repo ON git_commit TYPE string;
-DEFINE FIELD commit_id ON git_commit TYPE string;
-DEFINE FIELD created_at ON git_commit TYPE datetime;
-DEFINE FIELD updated_at ON git_commit TYPE datetime;
-DEFINE INDEX idx_git_commit_key ON git_commit FIELDS git_repo, commit_id UNIQUE;
-
-DEFINE TABLE environment SCHEMAFULL;
-DEFINE FIELD environment ON environment TYPE string;
-DEFINE FIELD created_at ON environment TYPE datetime;
-DEFINE FIELD updated_at ON environment TYPE datetime;
-DEFINE INDEX idx_environment_key ON environment FIELDS environment UNIQUE;
-
--- Metric
-DEFINE TABLE metric SCHEMAFULL;
-DEFINE FIELD metric_name ON metric TYPE string;
-DEFINE FIELD metric_type ON metric TYPE string;
-DEFINE FIELD unit ON metric TYPE string;
-DEFINE FIELD description ON metric TYPE string;
-DEFINE FIELD created_at ON metric TYPE datetime;
-DEFINE FIELD updated_at ON metric TYPE datetime;
-DEFINE INDEX idx_metric_key ON metric FIELDS metric_name UNIQUE;
-
--- ============================================
--- Relation Tables (TYPE RELATION for graph traversal)
--- Per documentation section 3
--- ============================================
-
--- Kubernetes Static Relations (Section 3.2)
-DEFINE TABLE node_with_system SCHEMAFULL TYPE RELATION IN node OUT system;
-DEFINE FIELD created_at ON node_with_system TYPE datetime;
-DEFINE FIELD updated_at ON node_with_system TYPE datetime;
-
-DEFINE TABLE node_with_pod SCHEMAFULL TYPE RELATION IN node OUT pod;
-DEFINE FIELD created_at ON node_with_pod TYPE datetime;
-DEFINE FIELD updated_at ON node_with_pod TYPE datetime;
-
-DEFINE TABLE job_with_pod SCHEMAFULL TYPE RELATION IN job OUT pod;
-DEFINE FIELD created_at ON job_with_pod TYPE datetime;
-DEFINE FIELD updated_at ON job_with_pod TYPE datetime;
-
-DEFINE TABLE pod_with_replicaset SCHEMAFULL TYPE RELATION IN pod OUT replicaset;
-DEFINE FIELD created_at ON pod_with_replicaset TYPE datetime;
-DEFINE FIELD updated_at ON pod_with_replicaset TYPE datetime;
-
-DEFINE TABLE pod_with_statefulset SCHEMAFULL TYPE RELATION IN pod OUT statefulset;
-DEFINE FIELD created_at ON pod_with_statefulset TYPE datetime;
-DEFINE FIELD updated_at ON pod_with_statefulset TYPE datetime;
-
-DEFINE TABLE daemonset_with_pod SCHEMAFULL TYPE RELATION IN daemonset OUT pod;
-DEFINE FIELD created_at ON daemonset_with_pod TYPE datetime;
-DEFINE FIELD updated_at ON daemonset_with_pod TYPE datetime;
-
-DEFINE TABLE deployment_with_replicaset SCHEMAFULL TYPE RELATION IN deployment OUT replicaset;
-DEFINE FIELD created_at ON deployment_with_replicaset TYPE datetime;
-DEFINE FIELD updated_at ON deployment_with_replicaset TYPE datetime;
-
-DEFINE TABLE pod_with_service SCHEMAFULL TYPE RELATION IN pod OUT service;
-DEFINE FIELD created_at ON pod_with_service TYPE datetime;
-DEFINE FIELD updated_at ON pod_with_service TYPE datetime;
-
-DEFINE TABLE ingress_with_service SCHEMAFULL TYPE RELATION IN ingress OUT service;
-DEFINE FIELD created_at ON ingress_with_service TYPE datetime;
-DEFINE FIELD updated_at ON ingress_with_service TYPE datetime;
-
--- Network Static Relations (Section 3.3)
-DEFINE TABLE k8s_address_with_service SCHEMAFULL TYPE RELATION IN k8s_address OUT service;
-DEFINE FIELD created_at ON k8s_address_with_service TYPE datetime;
-DEFINE FIELD updated_at ON k8s_address_with_service TYPE datetime;
-
-DEFINE TABLE domain_with_service SCHEMAFULL TYPE RELATION IN domain OUT service;
-DEFINE FIELD created_at ON domain_with_service TYPE datetime;
-DEFINE FIELD updated_at ON domain_with_service TYPE datetime;
-
--- APM Static Relations (Section 3.4)
-DEFINE TABLE apm_service_instance_with_pod SCHEMAFULL TYPE RELATION IN apm_service_instance OUT pod;
-DEFINE FIELD created_at ON apm_service_instance_with_pod TYPE datetime;
-DEFINE FIELD updated_at ON apm_service_instance_with_pod TYPE datetime;
-
-DEFINE TABLE apm_service_instance_with_system SCHEMAFULL TYPE RELATION IN apm_service_instance OUT system;
-DEFINE FIELD created_at ON apm_service_instance_with_system TYPE datetime;
-DEFINE FIELD updated_at ON apm_service_instance_with_system TYPE datetime;
-
-DEFINE TABLE apm_service_with_apm_service_instance SCHEMAFULL TYPE RELATION IN apm_service OUT apm_service_instance;
-DEFINE FIELD created_at ON apm_service_with_apm_service_instance TYPE datetime;
-DEFINE FIELD updated_at ON apm_service_with_apm_service_instance TYPE datetime;
-
--- Container Static Relations (Section 3.5)
-DEFINE TABLE container_with_pod SCHEMAFULL TYPE RELATION IN container OUT pod;
-DEFINE FIELD created_at ON container_with_pod TYPE datetime;
-DEFINE FIELD updated_at ON container_with_pod TYPE datetime;
-
--- Data Source Static Relations (Section 3.6)
-DEFINE TABLE datasource_with_pod SCHEMAFULL TYPE RELATION IN datasource OUT pod;
-DEFINE FIELD created_at ON datasource_with_pod TYPE datetime;
-DEFINE FIELD updated_at ON datasource_with_pod TYPE datetime;
-
-DEFINE TABLE datasource_with_node SCHEMAFULL TYPE RELATION IN datasource OUT node;
-DEFINE FIELD created_at ON datasource_with_node TYPE datetime;
-DEFINE FIELD updated_at ON datasource_with_node TYPE datetime;
-
-DEFINE TABLE bklogconfig_with_datasource SCHEMAFULL TYPE RELATION IN bklogconfig OUT datasource;
-DEFINE FIELD created_at ON bklogconfig_with_datasource TYPE datetime;
-DEFINE FIELD updated_at ON bklogconfig_with_datasource TYPE datetime;
-
--- CMDB Static Relations (Section 3.7)
-DEFINE TABLE biz_with_set SCHEMAFULL TYPE RELATION IN biz OUT set;
-DEFINE FIELD created_at ON biz_with_set TYPE datetime;
-DEFINE FIELD updated_at ON biz_with_set TYPE datetime;
-
-DEFINE TABLE module_with_set SCHEMAFULL TYPE RELATION IN module OUT set;
-DEFINE FIELD created_at ON module_with_set TYPE datetime;
-DEFINE FIELD updated_at ON module_with_set TYPE datetime;
-
-DEFINE TABLE host_with_module SCHEMAFULL TYPE RELATION IN host OUT module;
-DEFINE FIELD created_at ON host_with_module TYPE datetime;
-DEFINE FIELD updated_at ON host_with_module TYPE datetime;
-
-DEFINE TABLE host_with_system SCHEMAFULL TYPE RELATION IN host OUT system;
-DEFINE FIELD created_at ON host_with_system TYPE datetime;
-DEFINE FIELD updated_at ON host_with_system TYPE datetime;
-
--- App Version Static Relations (Section 3.8)
-DEFINE TABLE app_version_with_container SCHEMAFULL TYPE RELATION IN app_version OUT container;
-DEFINE FIELD created_at ON app_version_with_container TYPE datetime;
-DEFINE FIELD updated_at ON app_version_with_container TYPE datetime;
-
-DEFINE TABLE app_version_with_system SCHEMAFULL TYPE RELATION IN app_version OUT system;
-DEFINE FIELD created_at ON app_version_with_system TYPE datetime;
-DEFINE FIELD updated_at ON app_version_with_system TYPE datetime;
-
-DEFINE TABLE container_with_environment SCHEMAFULL TYPE RELATION IN container OUT environment;
-DEFINE FIELD created_at ON container_with_environment TYPE datetime;
-DEFINE FIELD updated_at ON container_with_environment TYPE datetime;
-
-DEFINE TABLE environment_with_system SCHEMAFULL TYPE RELATION IN environment OUT system;
-DEFINE FIELD created_at ON environment_with_system TYPE datetime;
-DEFINE FIELD updated_at ON environment_with_system TYPE datetime;
-
-DEFINE TABLE app_version_with_git_commit SCHEMAFULL TYPE RELATION IN app_version OUT git_commit;
-DEFINE FIELD created_at ON app_version_with_git_commit TYPE datetime;
-DEFINE FIELD updated_at ON app_version_with_git_commit TYPE datetime;
-
--- Dynamic Relations (Section 3.9)
-DEFINE TABLE pod_to_pod SCHEMAFULL TYPE RELATION IN pod OUT pod;
-DEFINE FIELD created_at ON pod_to_pod TYPE datetime;
-DEFINE FIELD updated_at ON pod_to_pod TYPE datetime;
-
-DEFINE TABLE pod_to_system SCHEMAFULL TYPE RELATION IN pod OUT system;
-DEFINE FIELD created_at ON pod_to_system TYPE datetime;
-DEFINE FIELD updated_at ON pod_to_system TYPE datetime;
-
-DEFINE TABLE system_to_pod SCHEMAFULL TYPE RELATION IN system OUT pod;
-DEFINE FIELD created_at ON system_to_pod TYPE datetime;
-DEFINE FIELD updated_at ON system_to_pod TYPE datetime;
-
-DEFINE TABLE system_to_system SCHEMAFULL TYPE RELATION IN system OUT system;
-DEFINE FIELD created_at ON system_to_system TYPE datetime;
-DEFINE FIELD updated_at ON system_to_system TYPE datetime;
-
-DEFINE TABLE service_to_service SCHEMAFULL TYPE RELATION IN service OUT service;
-DEFINE FIELD created_at ON service_to_service TYPE datetime;
-DEFINE FIELD updated_at ON service_to_service TYPE datetime;
-
--- Metric Relations (Section 7)
-DEFINE TABLE node_has_metric SCHEMAFULL TYPE RELATION IN pod OUT metric;
-DEFINE FIELD result_table_id ON node_has_metric TYPE string;
-DEFINE FIELD created_at ON node_has_metric TYPE datetime;
-DEFINE FIELD updated_at ON node_has_metric TYPE datetime;
-
-DEFINE TABLE relation_has_metric SCHEMAFULL TYPE RELATION IN pod_to_pod OUT metric;
-DEFINE FIELD result_table_id ON relation_has_metric TYPE string;
-DEFINE FIELD created_at ON relation_has_metric TYPE datetime;
-DEFINE FIELD updated_at ON relation_has_metric TYPE datetime;
-"""
-    return node_tables
+    The schema is defined in schema.sql file with {ttl} placeholder.
+    This function loads the file and replaces {ttl} with the configured value.
+    
+    Args:
+        ttl: TTL duration for is_alive computed field (e.g., "2m", "120s", "1h")
+             If None, uses MockConfig.RESOURCE_TTL
+    
+    Returns:
+        Schema SQL with TTL placeholder replaced
+    
+    Raises:
+        FileNotFoundError: If schema.sql file is not found
+    """
+    if ttl is None:
+        ttl = MockConfig.RESOURCE_TTL
+    
+    if not os.path.exists(SCHEMA_FILE):
+        raise FileNotFoundError(f"Schema file not found: {SCHEMA_FILE}")
+    
+    with open(SCHEMA_FILE, 'r', encoding='utf-8') as f:
+        schema_sql = f.read()
+    
+    # Replace {ttl} placeholder with actual TTL value
+    schema_sql = schema_sql.replace('{ttl}', ttl)
+    
+    logger.info(f"Loaded schema from {SCHEMA_FILE} with TTL={ttl}")
+    return schema_sql
 
 
 # ============================================================================
@@ -870,25 +483,37 @@ class SurrealDBClient:
         return results[1:] if len(results) > 1 else results
 
     def format_datetime(self, dt: datetime) -> str:
-        """Format datetime for SurrealDB"""
+        """Format datetime for SurrealDB in UTC.
+        
+        SurrealDB's time::now() returns UTC time, so we must store UTC timestamps
+        for is_alive comparison to work correctly.
+        """
+        # If dt is naive (no timezone), assume it's already UTC
+        # If dt has timezone info, convert to UTC first
+        if dt.tzinfo is not None:
+            import pytz
+            dt = dt.astimezone(pytz.UTC).replace(tzinfo=None)
         return dt.strftime('%Y-%m-%dT%H:%M:%SZ')
 
-    def init_schema(self):
-        """Initialize database schema"""
+    def init_schema(self, ttl: str = None):
+        """Initialize database schema from schema.sql file.
+        
+        Args:
+            ttl: TTL duration for is_alive field (e.g., "2m", "120s")
+                 If None, uses MockConfig.RESOURCE_TTL
+        """
         logger.info("Initializing database schema...")
         
-        schema_sql = generate_schema_sql()
-        statements = [s.strip() for s in schema_sql.split(';') if s.strip()]
+        schema_sql = load_schema_sql(ttl)
         
-        for stmt in statements:
-            if not stmt or stmt.startswith('--'):
-                continue
-            try:
-                self.execute_sql(stmt + ';')
-            except Exception as e:
-                logger.warning(f"Schema statement warning: {e}")
-        
-        logger.info("Database schema initialized")
+        # Execute the entire schema SQL directly
+        # SurrealDB handles multiple statements in a single request
+        try:
+            self.execute_sql(schema_sql)
+            logger.info("Database schema initialized successfully")
+        except Exception as e:
+            logger.error(f"Failed to initialize schema: {e}")
+            raise
 
     def upsert_node(
             self,
@@ -959,17 +584,21 @@ class SurrealDBClient:
             created_at: datetime,
             updated_at: datetime
     ) -> Dict[str, Any]:
-        """Upsert a static (bidirectional) relation"""
+        """Upsert a static (bidirectional) relation using TYPE RELATION table"""
         from_id = IDGenerator.generate_node_id(from_type, from_data)
         to_id = IDGenerator.generate_node_id(to_type, to_data)
         relation_id = IDGenerator.generate_static_relation_id(
             relation_type, from_type, from_data, to_type, to_data
         )
 
+        # Use RELATE with custom ID via CONTENT
+        # Format: RELATE from->table->to CONTENT { id: custom_id, ... }
         sql = f"""
-        RELATE {from_type.value}:`{from_id}`->{relation_type.value}:`{relation_id}`->{to_type.value}:`{to_id}` SET
-            created_at = created_at OR type::datetime('{self.format_datetime(created_at)}'),
-            updated_at = type::datetime('{self.format_datetime(updated_at)}');
+        RELATE {from_type.value}:`{from_id}`->{relation_type.value}->{to_type.value}:`{to_id}` CONTENT {{
+            id: {relation_type.value}:`{relation_id}`,
+            created_at: created_at OR type::datetime('{self.format_datetime(created_at)}'),
+            updated_at: type::datetime('{self.format_datetime(updated_at)}')
+        }};
         """
 
         result = self.execute_sql(sql)
@@ -985,17 +614,20 @@ class SurrealDBClient:
             created_at: datetime,
             updated_at: datetime
     ) -> Dict[str, Any]:
-        """Upsert a dynamic (directional) relation"""
+        """Upsert a dynamic (directional) relation using TYPE RELATION table"""
         source_id = IDGenerator.generate_node_id(source_type, source_data)
         target_id = IDGenerator.generate_node_id(target_type, target_data)
         relation_id = IDGenerator.generate_dynamic_relation_id(
             relation_type, source_type, source_data, target_type, target_data
         )
 
+        # Use RELATE with custom ID via CONTENT
         sql = f"""
-        RELATE {source_type.value}:`{source_id}`->{relation_type.value}:`{relation_id}`->{target_type.value}:`{target_id}` SET
-            created_at = created_at OR type::datetime('{self.format_datetime(created_at)}'),
-            updated_at = type::datetime('{self.format_datetime(updated_at)}');
+        RELATE {source_type.value}:`{source_id}`->{relation_type.value}->{target_type.value}:`{target_id}` CONTENT {{
+            id: {relation_type.value}:`{relation_id}`,
+            created_at: created_at OR type::datetime('{self.format_datetime(created_at)}'),
+            updated_at: type::datetime('{self.format_datetime(updated_at)}')
+        }};
         """
 
         result = self.execute_sql(sql)
@@ -1012,14 +644,18 @@ class FullMockGenerator:
     def __init__(self, client: SurrealDBClient):
         self.client = client
         self.resources: Dict[ResourceType, List[Dict[str, Any]]] = {}
-        self.current_time = MockConfig.END_TIME
+        # Use current UTC time for updated_at to ensure is_alive works correctly
+        self.current_time = datetime.utcnow().replace(tzinfo=None)
         self.traffic_relations: List[Tuple[Dict, Dict, str, RelationType]] = []
 
     def random_time_in_range(self) -> datetime:
-        """Generate random time within configured range"""
-        delta = MockConfig.END_TIME - MockConfig.START_TIME
+        """Generate random UTC time within configured range (for created_at)"""
+        # Calculate range based on current UTC time
+        end_time = datetime.utcnow().replace(tzinfo=None)
+        start_time = end_time - timedelta(hours=MockConfig.DEFAULT_TIME_BACK_HOURS)
+        delta = end_time - start_time
         random_seconds = random.randint(0, int(delta.total_seconds()))
-        return MockConfig.START_TIME + timedelta(seconds=random_seconds)
+        return start_time + timedelta(seconds=random_seconds)
 
     # =========================================================================
     # CMDB Resources
@@ -1745,11 +1381,13 @@ class FullMockGenerator:
                     metric_id = IDGenerator.generate_node_id(ResourceType.METRIC, metric_data)
                     result_table_id = f"{MockConfig.RESULT_TABLE_ID}_{metric_data['metric_name']}"
                     
+                    # Use correct RELATE syntax for TYPE RELATION table
                     sql = f"""
-                    RELATE pod_to_pod:`{relation_id}`->relation_has_metric->metric:`{metric_id}` SET
-                        result_table_id = '{result_table_id}',
-                        created_at = type::datetime('{self.client.format_datetime(self.current_time)}'),
-                        updated_at = type::datetime('{self.client.format_datetime(self.current_time)}');
+                    RELATE pod_to_pod:`{relation_id}`->relation_has_metric->metric:`{metric_id}` CONTENT {{
+                        result_table_id: '{result_table_id}',
+                        created_at: type::datetime('{self.client.format_datetime(self.current_time)}'),
+                        updated_at: type::datetime('{self.client.format_datetime(self.current_time)}')
+                    }};
                     """
                     
                     try:
