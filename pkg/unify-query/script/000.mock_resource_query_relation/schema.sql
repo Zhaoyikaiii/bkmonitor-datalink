@@ -603,33 +603,6 @@ DEFINE FUNCTION fn::kv_block($dimensions: object, $created_at: int) {
     RETURN string::concat($base, ",created_at=", <string>$created_at);
 };
 
--- fn::relation_id: Generate relation ID from source and target resource info
--- Handles bidirectional relations by sorting table names alphabetically
-DEFINE FUNCTION fn::relation_id(
-    $from_table: string,
-    $from_dimensions: object,
-    $from_created_at: int,
-    $to_table: string,
-    $to_dimensions: object,
-    $to_created_at: int,
-    $relation_type: string
-) {
-    LET $from_block = fn::kv_block($from_dimensions, $from_created_at);
-    LET $to_block = fn::kv_block($to_dimensions, $to_created_at);
-
-    -- Use LET to separate nested conditions (SurrealDB nested IF limitation)
-    LET $ordered_block = IF $from_table <= $to_table THEN
-        string::concat($from_block, "|", $to_block)
-    ELSE
-        string::concat($to_block, "|", $from_block)
-    END;
-
-    RETURN IF $relation_type = "bidirectional" THEN
-        $ordered_block
-    ELSE
-        string::concat($from_block, "|", $to_block)
-    END;
-};
 
 -- ----------------------------------------------------------------------------
 -- 3.10.3 Resource Lifecycle Management
@@ -726,7 +699,8 @@ DEFINE FUNCTION fn::upsert_resource_lifecycle(
 --   $to_dimensions: Target resource dimensions
 --   $now: Current timestamp in milliseconds
 --   $tolerance: Tolerance time in milliseconds
---   $relation_type: "bidirectional" or "directional"
+--   $relation_type: "static" or "dynamic" - indicates the type of relation
+--   $bidirectional: bool - true for bidirectional relations, false for directional
 --
 -- Returns: Object with from_id, to_id, from_created_at, to_created_at for use in RELATE
 DEFINE FUNCTION fn::upsert_relation_lifecycle(
@@ -736,7 +710,8 @@ DEFINE FUNCTION fn::upsert_relation_lifecycle(
     $to_dimensions: object,
     $now: int,
     $tolerance: int,
-    $relation_type: string
+    $relation_type: string,
+    $bidirectional: bool
 ) {
     -- 1) Upsert both endpoint resources
     LET $from_rec = fn::upsert_resource_lifecycle($from_table, $from_dimensions, $now, $tolerance);
@@ -751,469 +726,376 @@ DEFINE FUNCTION fn::upsert_relation_lifecycle(
         from_table: $from_table,
         to_table: $to_table,
         relation_type: $relation_type,
+        bidirectional: $bidirectional,
         now: $now
     };
 };
 
 -- ============================================================================
--- SECTION 4: Lifecycle Events (per document section 8.2.4)
+-- SECTION 4: Relation Upsert Functions
 --
--- Event-driven lifecycle management for resources.
--- When UPDATE triggers and time gap exceeds tolerance_time (600000ms = 10min),
--- automatically create a new lifecycle record and restore the old record.
+-- These functions provide upsert capability for each relation table.
+-- Since SurrealDB functions cannot use dynamic table names in RELATE statements,
+-- we define a separate function for each relation type.
 --
--- Tolerance time: 600000 milliseconds (10 minutes)
--- This can be customized by replacing {tolerance_time_ms} placeholder.
+-- Each function:
+--   1. Checks if relation already exists between the two endpoints
+--   2. If exists: updates updated_at timestamp
+--   3. If not exists: creates new relation with RELATE statement
 -- ============================================================================
 
+-- Remove existing relation upsert functions
+REMOVE FUNCTION IF EXISTS fn::upsert_node_with_system;
+REMOVE FUNCTION IF EXISTS fn::upsert_node_with_pod;
+REMOVE FUNCTION IF EXISTS fn::upsert_job_with_pod;
+REMOVE FUNCTION IF EXISTS fn::upsert_pod_with_replicaset;
+REMOVE FUNCTION IF EXISTS fn::upsert_pod_with_statefulset;
+REMOVE FUNCTION IF EXISTS fn::upsert_daemonset_with_pod;
+REMOVE FUNCTION IF EXISTS fn::upsert_deployment_with_replicaset;
+REMOVE FUNCTION IF EXISTS fn::upsert_pod_with_service;
+REMOVE FUNCTION IF EXISTS fn::upsert_ingress_with_service;
+REMOVE FUNCTION IF EXISTS fn::upsert_k8s_address_with_service;
+REMOVE FUNCTION IF EXISTS fn::upsert_domain_with_service;
+REMOVE FUNCTION IF EXISTS fn::upsert_apm_service_instance_with_pod;
+REMOVE FUNCTION IF EXISTS fn::upsert_apm_service_instance_with_system;
+REMOVE FUNCTION IF EXISTS fn::upsert_apm_service_with_apm_service_instance;
+REMOVE FUNCTION IF EXISTS fn::upsert_container_with_pod;
+REMOVE FUNCTION IF EXISTS fn::upsert_datasource_with_pod;
+REMOVE FUNCTION IF EXISTS fn::upsert_datasource_with_node;
+REMOVE FUNCTION IF EXISTS fn::upsert_bklogconfig_with_datasource;
+REMOVE FUNCTION IF EXISTS fn::upsert_biz_with_set;
+REMOVE FUNCTION IF EXISTS fn::upsert_module_with_set;
+REMOVE FUNCTION IF EXISTS fn::upsert_host_with_module;
+REMOVE FUNCTION IF EXISTS fn::upsert_host_with_system;
+REMOVE FUNCTION IF EXISTS fn::upsert_app_version_with_container;
+REMOVE FUNCTION IF EXISTS fn::upsert_app_version_with_system;
+REMOVE FUNCTION IF EXISTS fn::upsert_container_with_environment;
+REMOVE FUNCTION IF EXISTS fn::upsert_environment_with_system;
+REMOVE FUNCTION IF EXISTS fn::upsert_app_version_with_git_commit;
+REMOVE FUNCTION IF EXISTS fn::upsert_pod_to_pod;
+REMOVE FUNCTION IF EXISTS fn::upsert_pod_to_system;
+REMOVE FUNCTION IF EXISTS fn::upsert_system_to_pod;
+REMOVE FUNCTION IF EXISTS fn::upsert_system_to_system;
+REMOVE FUNCTION IF EXISTS fn::upsert_service_to_service;
+
 -- ----------------------------------------------------------------------------
--- 4.1 Kubernetes Resource Events
+-- 4.1 Kubernetes Static Relations Upsert Functions
 -- ----------------------------------------------------------------------------
 
--- Pod lifecycle event
-DEFINE EVENT pod_lifecycle_event ON TABLE pod
-WHEN $event = "UPDATE"
-    AND ($after.updated_at - $before.updated_at) > {tolerance_time_ms}
-    AND $after.bcs_cluster_id = $before.bcs_cluster_id
-    AND $after.namespace = $before.namespace
-    AND $after.pod = $before.pod
-THEN {
-    -- Create new lifecycle record
-    CREATE pod SET
-        id = type::thing("pod", "bcs_cluster_id=" + $before.bcs_cluster_id + ",namespace=" + $before.namespace + ",pod=" + $before.pod + ",created_at=" + <string>$after.updated_at),
-        bcs_cluster_id = $before.bcs_cluster_id,
-        namespace = $before.namespace,
-        pod = $before.pod,
-        created_at = $after.updated_at,
-        updated_at = $after.updated_at;
-    -- Restore old record's updated_at
-    UPDATE $before.id SET updated_at = $before.updated_at;
+DEFINE FUNCTION fn::upsert_node_with_system($from_id: record, $to_id: record, $now: int) {
+    LET $existing = (SELECT * FROM node_with_system WHERE in = $from_id AND out = $to_id LIMIT 1)[0];
+    RETURN IF $existing != NONE THEN
+        (UPDATE $existing.id SET updated_at = $now)[0]
+    ELSE
+        (RELATE $from_id->node_with_system->$to_id CONTENT { created_at: $now, updated_at: $now })[0]
+    END;
 };
 
--- Node lifecycle event
-DEFINE EVENT node_lifecycle_event ON TABLE node
-WHEN $event = "UPDATE"
-    AND ($after.updated_at - $before.updated_at) > {tolerance_time_ms}
-    AND $after.bcs_cluster_id = $before.bcs_cluster_id
-    AND $after.node = $before.node
-THEN {
-    CREATE node SET
-        id = type::thing("node", "bcs_cluster_id=" + $before.bcs_cluster_id + ",node=" + $before.node + ",created_at=" + <string>$after.updated_at),
-        bcs_cluster_id = $before.bcs_cluster_id,
-        node = $before.node,
-        created_at = $after.updated_at,
-        updated_at = $after.updated_at;
-    UPDATE $before.id SET updated_at = $before.updated_at;
+DEFINE FUNCTION fn::upsert_node_with_pod($from_id: record, $to_id: record, $now: int) {
+    LET $existing = (SELECT * FROM node_with_pod WHERE in = $from_id AND out = $to_id LIMIT 1)[0];
+    RETURN IF $existing != NONE THEN
+        (UPDATE $existing.id SET updated_at = $now)[0]
+    ELSE
+        (RELATE $from_id->node_with_pod->$to_id CONTENT { created_at: $now, updated_at: $now })[0]
+    END;
 };
 
--- Container lifecycle event
-DEFINE EVENT container_lifecycle_event ON TABLE container
-WHEN $event = "UPDATE"
-    AND ($after.updated_at - $before.updated_at) > {tolerance_time_ms}
-    AND $after.bcs_cluster_id = $before.bcs_cluster_id
-    AND $after.namespace = $before.namespace
-    AND $after.pod = $before.pod
-    AND $after.container = $before.container
-THEN {
-    CREATE container SET
-        id = type::thing("container", "bcs_cluster_id=" + $before.bcs_cluster_id + ",container=" + $before.container + ",namespace=" + $before.namespace + ",pod=" + $before.pod + ",created_at=" + <string>$after.updated_at),
-        bcs_cluster_id = $before.bcs_cluster_id,
-        namespace = $before.namespace,
-        pod = $before.pod,
-        container = $before.container,
-        created_at = $after.updated_at,
-        updated_at = $after.updated_at;
-    UPDATE $before.id SET updated_at = $before.updated_at;
+DEFINE FUNCTION fn::upsert_job_with_pod($from_id: record, $to_id: record, $now: int) {
+    LET $existing = (SELECT * FROM job_with_pod WHERE in = $from_id AND out = $to_id LIMIT 1)[0];
+    RETURN IF $existing != NONE THEN
+        (UPDATE $existing.id SET updated_at = $now)[0]
+    ELSE
+        (RELATE $from_id->job_with_pod->$to_id CONTENT { created_at: $now, updated_at: $now })[0]
+    END;
 };
 
--- Deployment lifecycle event
-DEFINE EVENT deployment_lifecycle_event ON TABLE deployment
-WHEN $event = "UPDATE"
-    AND ($after.updated_at - $before.updated_at) > {tolerance_time_ms}
-    AND $after.bcs_cluster_id = $before.bcs_cluster_id
-    AND $after.namespace = $before.namespace
-    AND $after.deployment = $before.deployment
-THEN {
-    CREATE deployment SET
-        id = type::thing("deployment", "bcs_cluster_id=" + $before.bcs_cluster_id + ",deployment=" + $before.deployment + ",namespace=" + $before.namespace + ",created_at=" + <string>$after.updated_at),
-        bcs_cluster_id = $before.bcs_cluster_id,
-        namespace = $before.namespace,
-        deployment = $before.deployment,
-        created_at = $after.updated_at,
-        updated_at = $after.updated_at;
-    UPDATE $before.id SET updated_at = $before.updated_at;
+DEFINE FUNCTION fn::upsert_pod_with_replicaset($from_id: record, $to_id: record, $now: int) {
+    LET $existing = (SELECT * FROM pod_with_replicaset WHERE in = $from_id AND out = $to_id LIMIT 1)[0];
+    RETURN IF $existing != NONE THEN
+        (UPDATE $existing.id SET updated_at = $now)[0]
+    ELSE
+        (RELATE $from_id->pod_with_replicaset->$to_id CONTENT { created_at: $now, updated_at: $now })[0]
+    END;
 };
 
--- ReplicaSet lifecycle event
-DEFINE EVENT replicaset_lifecycle_event ON TABLE replicaset
-WHEN $event = "UPDATE"
-    AND ($after.updated_at - $before.updated_at) > {tolerance_time_ms}
-    AND $after.bcs_cluster_id = $before.bcs_cluster_id
-    AND $after.namespace = $before.namespace
-    AND $after.replicaset = $before.replicaset
-THEN {
-    CREATE replicaset SET
-        id = type::thing("replicaset", "bcs_cluster_id=" + $before.bcs_cluster_id + ",namespace=" + $before.namespace + ",replicaset=" + $before.replicaset + ",created_at=" + <string>$after.updated_at),
-        bcs_cluster_id = $before.bcs_cluster_id,
-        namespace = $before.namespace,
-        replicaset = $before.replicaset,
-        created_at = $after.updated_at,
-        updated_at = $after.updated_at;
-    UPDATE $before.id SET updated_at = $before.updated_at;
+DEFINE FUNCTION fn::upsert_pod_with_statefulset($from_id: record, $to_id: record, $now: int) {
+    LET $existing = (SELECT * FROM pod_with_statefulset WHERE in = $from_id AND out = $to_id LIMIT 1)[0];
+    RETURN IF $existing != NONE THEN
+        (UPDATE $existing.id SET updated_at = $now)[0]
+    ELSE
+        (RELATE $from_id->pod_with_statefulset->$to_id CONTENT { created_at: $now, updated_at: $now })[0]
+    END;
 };
 
--- StatefulSet lifecycle event
-DEFINE EVENT statefulset_lifecycle_event ON TABLE statefulset
-WHEN $event = "UPDATE"
-    AND ($after.updated_at - $before.updated_at) > {tolerance_time_ms}
-    AND $after.bcs_cluster_id = $before.bcs_cluster_id
-    AND $after.namespace = $before.namespace
-    AND $after.statefulset = $before.statefulset
-THEN {
-    CREATE statefulset SET
-        id = type::thing("statefulset", "bcs_cluster_id=" + $before.bcs_cluster_id + ",namespace=" + $before.namespace + ",statefulset=" + $before.statefulset + ",created_at=" + <string>$after.updated_at),
-        bcs_cluster_id = $before.bcs_cluster_id,
-        namespace = $before.namespace,
-        statefulset = $before.statefulset,
-        created_at = $after.updated_at,
-        updated_at = $after.updated_at;
-    UPDATE $before.id SET updated_at = $before.updated_at;
+DEFINE FUNCTION fn::upsert_daemonset_with_pod($from_id: record, $to_id: record, $now: int) {
+    LET $existing = (SELECT * FROM daemonset_with_pod WHERE in = $from_id AND out = $to_id LIMIT 1)[0];
+    RETURN IF $existing != NONE THEN
+        (UPDATE $existing.id SET updated_at = $now)[0]
+    ELSE
+        (RELATE $from_id->daemonset_with_pod->$to_id CONTENT { created_at: $now, updated_at: $now })[0]
+    END;
 };
 
--- DaemonSet lifecycle event
-DEFINE EVENT daemonset_lifecycle_event ON TABLE daemonset
-WHEN $event = "UPDATE"
-    AND ($after.updated_at - $before.updated_at) > {tolerance_time_ms}
-    AND $after.bcs_cluster_id = $before.bcs_cluster_id
-    AND $after.namespace = $before.namespace
-    AND $after.daemonset = $before.daemonset
-THEN {
-    CREATE daemonset SET
-        id = type::thing("daemonset", "bcs_cluster_id=" + $before.bcs_cluster_id + ",daemonset=" + $before.daemonset + ",namespace=" + $before.namespace + ",created_at=" + <string>$after.updated_at),
-        bcs_cluster_id = $before.bcs_cluster_id,
-        namespace = $before.namespace,
-        daemonset = $before.daemonset,
-        created_at = $after.updated_at,
-        updated_at = $after.updated_at;
-    UPDATE $before.id SET updated_at = $before.updated_at;
+DEFINE FUNCTION fn::upsert_deployment_with_replicaset($from_id: record, $to_id: record, $now: int) {
+    LET $existing = (SELECT * FROM deployment_with_replicaset WHERE in = $from_id AND out = $to_id LIMIT 1)[0];
+    RETURN IF $existing != NONE THEN
+        (UPDATE $existing.id SET updated_at = $now)[0]
+    ELSE
+        (RELATE $from_id->deployment_with_replicaset->$to_id CONTENT { created_at: $now, updated_at: $now })[0]
+    END;
 };
 
--- Job lifecycle event
-DEFINE EVENT job_lifecycle_event ON TABLE job
-WHEN $event = "UPDATE"
-    AND ($after.updated_at - $before.updated_at) > {tolerance_time_ms}
-    AND $after.bcs_cluster_id = $before.bcs_cluster_id
-    AND $after.namespace = $before.namespace
-    AND $after.job = $before.job
-THEN {
-    CREATE job SET
-        id = type::thing("job", "bcs_cluster_id=" + $before.bcs_cluster_id + ",job=" + $before.job + ",namespace=" + $before.namespace + ",created_at=" + <string>$after.updated_at),
-        bcs_cluster_id = $before.bcs_cluster_id,
-        namespace = $before.namespace,
-        job = $before.job,
-        created_at = $after.updated_at,
-        updated_at = $after.updated_at;
-    UPDATE $before.id SET updated_at = $before.updated_at;
+DEFINE FUNCTION fn::upsert_pod_with_service($from_id: record, $to_id: record, $now: int) {
+    LET $existing = (SELECT * FROM pod_with_service WHERE in = $from_id AND out = $to_id LIMIT 1)[0];
+    RETURN IF $existing != NONE THEN
+        (UPDATE $existing.id SET updated_at = $now)[0]
+    ELSE
+        (RELATE $from_id->pod_with_service->$to_id CONTENT { created_at: $now, updated_at: $now })[0]
+    END;
 };
 
--- Service lifecycle event
-DEFINE EVENT service_lifecycle_event ON TABLE service
-WHEN $event = "UPDATE"
-    AND ($after.updated_at - $before.updated_at) > {tolerance_time_ms}
-    AND $after.bcs_cluster_id = $before.bcs_cluster_id
-    AND $after.namespace = $before.namespace
-    AND $after.service = $before.service
-THEN {
-    CREATE service SET
-        id = type::thing("service", "bcs_cluster_id=" + $before.bcs_cluster_id + ",namespace=" + $before.namespace + ",service=" + $before.service + ",created_at=" + <string>$after.updated_at),
-        bcs_cluster_id = $before.bcs_cluster_id,
-        namespace = $before.namespace,
-        service = $before.service,
-        created_at = $after.updated_at,
-        updated_at = $after.updated_at;
-    UPDATE $before.id SET updated_at = $before.updated_at;
-};
-
--- Ingress lifecycle event
-DEFINE EVENT ingress_lifecycle_event ON TABLE ingress
-WHEN $event = "UPDATE"
-    AND ($after.updated_at - $before.updated_at) > {tolerance_time_ms}
-    AND $after.bcs_cluster_id = $before.bcs_cluster_id
-    AND $after.namespace = $before.namespace
-    AND $after.ingress = $before.ingress
-THEN {
-    CREATE ingress SET
-        id = type::thing("ingress", "bcs_cluster_id=" + $before.bcs_cluster_id + ",ingress=" + $before.ingress + ",namespace=" + $before.namespace + ",created_at=" + <string>$after.updated_at),
-        bcs_cluster_id = $before.bcs_cluster_id,
-        namespace = $before.namespace,
-        ingress = $before.ingress,
-        created_at = $after.updated_at,
-        updated_at = $after.updated_at;
-    UPDATE $before.id SET updated_at = $before.updated_at;
-};
-
--- Cluster lifecycle event
-DEFINE EVENT cluster_lifecycle_event ON TABLE cluster
-WHEN $event = "UPDATE"
-    AND ($after.updated_at - $before.updated_at) > {tolerance_time_ms}
-    AND $after.bcs_cluster_id = $before.bcs_cluster_id
-THEN {
-    CREATE cluster SET
-        id = type::thing("cluster", "bcs_cluster_id=" + $before.bcs_cluster_id + ",created_at=" + <string>$after.updated_at),
-        bcs_cluster_id = $before.bcs_cluster_id,
-        created_at = $after.updated_at,
-        updated_at = $after.updated_at;
-    UPDATE $before.id SET updated_at = $before.updated_at;
-};
-
--- Namespace lifecycle event
-DEFINE EVENT namespace_lifecycle_event ON TABLE namespace
-WHEN $event = "UPDATE"
-    AND ($after.updated_at - $before.updated_at) > {tolerance_time_ms}
-    AND $after.bcs_cluster_id = $before.bcs_cluster_id
-    AND $after.namespace = $before.namespace
-THEN {
-    CREATE namespace SET
-        id = type::thing("namespace", "bcs_cluster_id=" + $before.bcs_cluster_id + ",namespace=" + $before.namespace + ",created_at=" + <string>$after.updated_at),
-        bcs_cluster_id = $before.bcs_cluster_id,
-        namespace = $before.namespace,
-        created_at = $after.updated_at,
-        updated_at = $after.updated_at;
-    UPDATE $before.id SET updated_at = $before.updated_at;
+DEFINE FUNCTION fn::upsert_ingress_with_service($from_id: record, $to_id: record, $now: int) {
+    LET $existing = (SELECT * FROM ingress_with_service WHERE in = $from_id AND out = $to_id LIMIT 1)[0];
+    RETURN IF $existing != NONE THEN
+        (UPDATE $existing.id SET updated_at = $now)[0]
+    ELSE
+        (RELATE $from_id->ingress_with_service->$to_id CONTENT { created_at: $now, updated_at: $now })[0]
+    END;
 };
 
 -- ----------------------------------------------------------------------------
--- 4.2 Network Resource Events
+-- 4.2 Network Static Relations Upsert Functions
 -- ----------------------------------------------------------------------------
 
--- System lifecycle event
-DEFINE EVENT system_lifecycle_event ON TABLE system
-WHEN $event = "UPDATE"
-    AND ($after.updated_at - $before.updated_at) > {tolerance_time_ms}
-    AND $after.bk_cloud_id = $before.bk_cloud_id
-    AND $after.bk_target_ip = $before.bk_target_ip
-THEN {
-    CREATE system SET
-        id = type::thing("system", "bk_cloud_id=" + $before.bk_cloud_id + ",bk_target_ip=" + $before.bk_target_ip + ",created_at=" + <string>$after.updated_at),
-        bk_cloud_id = $before.bk_cloud_id,
-        bk_target_ip = $before.bk_target_ip,
-        created_at = $after.updated_at,
-        updated_at = $after.updated_at;
-    UPDATE $before.id SET updated_at = $before.updated_at;
+DEFINE FUNCTION fn::upsert_k8s_address_with_service($from_id: record, $to_id: record, $now: int) {
+    LET $existing = (SELECT * FROM k8s_address_with_service WHERE in = $from_id AND out = $to_id LIMIT 1)[0];
+    RETURN IF $existing != NONE THEN
+        (UPDATE $existing.id SET updated_at = $now)[0]
+    ELSE
+        (RELATE $from_id->k8s_address_with_service->$to_id CONTENT { created_at: $now, updated_at: $now })[0]
+    END;
 };
 
--- K8s Address lifecycle event
-DEFINE EVENT k8s_address_lifecycle_event ON TABLE k8s_address
-WHEN $event = "UPDATE"
-    AND ($after.updated_at - $before.updated_at) > {tolerance_time_ms}
-    AND $after.bcs_cluster_id = $before.bcs_cluster_id
-    AND $after.address = $before.address
-THEN {
-    CREATE k8s_address SET
-        id = type::thing("k8s_address", "address=" + $before.address + ",bcs_cluster_id=" + $before.bcs_cluster_id + ",created_at=" + <string>$after.updated_at),
-        bcs_cluster_id = $before.bcs_cluster_id,
-        address = $before.address,
-        created_at = $after.updated_at,
-        updated_at = $after.updated_at;
-    UPDATE $before.id SET updated_at = $before.updated_at;
-};
-
--- Domain lifecycle event
-DEFINE EVENT domain_lifecycle_event ON TABLE domain
-WHEN $event = "UPDATE"
-    AND ($after.updated_at - $before.updated_at) > {tolerance_time_ms}
-    AND $after.bcs_cluster_id = $before.bcs_cluster_id
-    AND $after.domain = $before.domain
-THEN {
-    CREATE domain SET
-        id = type::thing("domain", "bcs_cluster_id=" + $before.bcs_cluster_id + ",domain=" + $before.domain + ",created_at=" + <string>$after.updated_at),
-        bcs_cluster_id = $before.bcs_cluster_id,
-        domain = $before.domain,
-        created_at = $after.updated_at,
-        updated_at = $after.updated_at;
-    UPDATE $before.id SET updated_at = $before.updated_at;
+DEFINE FUNCTION fn::upsert_domain_with_service($from_id: record, $to_id: record, $now: int) {
+    LET $existing = (SELECT * FROM domain_with_service WHERE in = $from_id AND out = $to_id LIMIT 1)[0];
+    RETURN IF $existing != NONE THEN
+        (UPDATE $existing.id SET updated_at = $now)[0]
+    ELSE
+        (RELATE $from_id->domain_with_service->$to_id CONTENT { created_at: $now, updated_at: $now })[0]
+    END;
 };
 
 -- ----------------------------------------------------------------------------
--- 4.3 APM Resource Events
+-- 4.3 APM Static Relations Upsert Functions
 -- ----------------------------------------------------------------------------
 
--- APM Service lifecycle event
-DEFINE EVENT apm_service_lifecycle_event ON TABLE apm_service
-WHEN $event = "UPDATE"
-    AND ($after.updated_at - $before.updated_at) > {tolerance_time_ms}
-    AND $after.apm_application_name = $before.apm_application_name
-    AND $after.apm_service_name = $before.apm_service_name
-THEN {
-    CREATE apm_service SET
-        id = type::thing("apm_service", "apm_application_name=" + $before.apm_application_name + ",apm_service_name=" + $before.apm_service_name + ",created_at=" + <string>$after.updated_at),
-        apm_application_name = $before.apm_application_name,
-        apm_service_name = $before.apm_service_name,
-        created_at = $after.updated_at,
-        updated_at = $after.updated_at;
-    UPDATE $before.id SET updated_at = $before.updated_at;
+DEFINE FUNCTION fn::upsert_apm_service_instance_with_pod($from_id: record, $to_id: record, $now: int) {
+    LET $existing = (SELECT * FROM apm_service_instance_with_pod WHERE in = $from_id AND out = $to_id LIMIT 1)[0];
+    RETURN IF $existing != NONE THEN
+        (UPDATE $existing.id SET updated_at = $now)[0]
+    ELSE
+        (RELATE $from_id->apm_service_instance_with_pod->$to_id CONTENT { created_at: $now, updated_at: $now })[0]
+    END;
 };
 
--- APM Service Instance lifecycle event
-DEFINE EVENT apm_service_instance_lifecycle_event ON TABLE apm_service_instance
-WHEN $event = "UPDATE"
-    AND ($after.updated_at - $before.updated_at) > {tolerance_time_ms}
-    AND $after.apm_application_name = $before.apm_application_name
-    AND $after.apm_service_name = $before.apm_service_name
-    AND $after.apm_service_instance_name = $before.apm_service_instance_name
-THEN {
-    CREATE apm_service_instance SET
-        id = type::thing("apm_service_instance", "apm_application_name=" + $before.apm_application_name + ",apm_service_instance_name=" + $before.apm_service_instance_name + ",apm_service_name=" + $before.apm_service_name + ",created_at=" + <string>$after.updated_at),
-        apm_application_name = $before.apm_application_name,
-        apm_service_name = $before.apm_service_name,
-        apm_service_instance_name = $before.apm_service_instance_name,
-        created_at = $after.updated_at,
-        updated_at = $after.updated_at;
-    UPDATE $before.id SET updated_at = $before.updated_at;
+DEFINE FUNCTION fn::upsert_apm_service_instance_with_system($from_id: record, $to_id: record, $now: int) {
+    LET $existing = (SELECT * FROM apm_service_instance_with_system WHERE in = $from_id AND out = $to_id LIMIT 1)[0];
+    RETURN IF $existing != NONE THEN
+        (UPDATE $existing.id SET updated_at = $now)[0]
+    ELSE
+        (RELATE $from_id->apm_service_instance_with_system->$to_id CONTENT { created_at: $now, updated_at: $now })[0]
+    END;
+};
+
+DEFINE FUNCTION fn::upsert_apm_service_with_apm_service_instance($from_id: record, $to_id: record, $now: int) {
+    LET $existing = (SELECT * FROM apm_service_with_apm_service_instance WHERE in = $from_id AND out = $to_id LIMIT 1)[0];
+    RETURN IF $existing != NONE THEN
+        (UPDATE $existing.id SET updated_at = $now)[0]
+    ELSE
+        (RELATE $from_id->apm_service_with_apm_service_instance->$to_id CONTENT { created_at: $now, updated_at: $now })[0]
+    END;
 };
 
 -- ----------------------------------------------------------------------------
--- 4.4 Data Source Resource Events
+-- 4.4 Container Static Relations Upsert Functions
 -- ----------------------------------------------------------------------------
 
--- DataSource lifecycle event
-DEFINE EVENT datasource_lifecycle_event ON TABLE datasource
-WHEN $event = "UPDATE"
-    AND ($after.updated_at - $before.updated_at) > {tolerance_time_ms}
-    AND $after.bk_data_id = $before.bk_data_id
-THEN {
-    CREATE datasource SET
-        id = type::thing("datasource", "bk_data_id=" + $before.bk_data_id + ",created_at=" + <string>$after.updated_at),
-        bk_data_id = $before.bk_data_id,
-        created_at = $after.updated_at,
-        updated_at = $after.updated_at;
-    UPDATE $before.id SET updated_at = $before.updated_at;
-};
-
--- BKLogConfig lifecycle event
-DEFINE EVENT bklogconfig_lifecycle_event ON TABLE bklogconfig
-WHEN $event = "UPDATE"
-    AND ($after.updated_at - $before.updated_at) > {tolerance_time_ms}
-    AND $after.bklogconfig_namespace = $before.bklogconfig_namespace
-    AND $after.bklogconfig_name = $before.bklogconfig_name
-THEN {
-    CREATE bklogconfig SET
-        id = type::thing("bklogconfig", "bklogconfig_name=" + $before.bklogconfig_name + ",bklogconfig_namespace=" + $before.bklogconfig_namespace + ",created_at=" + <string>$after.updated_at),
-        bklogconfig_namespace = $before.bklogconfig_namespace,
-        bklogconfig_name = $before.bklogconfig_name,
-        created_at = $after.updated_at,
-        updated_at = $after.updated_at;
-    UPDATE $before.id SET updated_at = $before.updated_at;
+DEFINE FUNCTION fn::upsert_container_with_pod($from_id: record, $to_id: record, $now: int) {
+    LET $existing = (SELECT * FROM container_with_pod WHERE in = $from_id AND out = $to_id LIMIT 1)[0];
+    RETURN IF $existing != NONE THEN
+        (UPDATE $existing.id SET updated_at = $now)[0]
+    ELSE
+        (RELATE $from_id->container_with_pod->$to_id CONTENT { created_at: $now, updated_at: $now })[0]
+    END;
 };
 
 -- ----------------------------------------------------------------------------
--- 4.5 CMDB Resource Events
+-- 4.5 Data Source Static Relations Upsert Functions
 -- ----------------------------------------------------------------------------
 
--- Biz lifecycle event
-DEFINE EVENT biz_lifecycle_event ON TABLE biz
-WHEN $event = "UPDATE"
-    AND ($after.updated_at - $before.updated_at) > {tolerance_time_ms}
-    AND $after.bk_biz_id = $before.bk_biz_id
-THEN {
-    CREATE biz SET
-        id = type::thing("biz", "bk_biz_id=" + $before.bk_biz_id + ",created_at=" + <string>$after.updated_at),
-        bk_biz_id = $before.bk_biz_id,
-        created_at = $after.updated_at,
-        updated_at = $after.updated_at;
-    UPDATE $before.id SET updated_at = $before.updated_at;
+DEFINE FUNCTION fn::upsert_datasource_with_pod($from_id: record, $to_id: record, $now: int) {
+    LET $existing = (SELECT * FROM datasource_with_pod WHERE in = $from_id AND out = $to_id LIMIT 1)[0];
+    RETURN IF $existing != NONE THEN
+        (UPDATE $existing.id SET updated_at = $now)[0]
+    ELSE
+        (RELATE $from_id->datasource_with_pod->$to_id CONTENT { created_at: $now, updated_at: $now })[0]
+    END;
 };
 
--- Set lifecycle event
-DEFINE EVENT set_lifecycle_event ON TABLE set
-WHEN $event = "UPDATE"
-    AND ($after.updated_at - $before.updated_at) > {tolerance_time_ms}
-    AND $after.bk_set_id = $before.bk_set_id
-THEN {
-    CREATE set SET
-        id = type::thing("set", "bk_set_id=" + $before.bk_set_id + ",created_at=" + <string>$after.updated_at),
-        bk_set_id = $before.bk_set_id,
-        created_at = $after.updated_at,
-        updated_at = $after.updated_at;
-    UPDATE $before.id SET updated_at = $before.updated_at;
+DEFINE FUNCTION fn::upsert_datasource_with_node($from_id: record, $to_id: record, $now: int) {
+    LET $existing = (SELECT * FROM datasource_with_node WHERE in = $from_id AND out = $to_id LIMIT 1)[0];
+    RETURN IF $existing != NONE THEN
+        (UPDATE $existing.id SET updated_at = $now)[0]
+    ELSE
+        (RELATE $from_id->datasource_with_node->$to_id CONTENT { created_at: $now, updated_at: $now })[0]
+    END;
 };
 
--- Module lifecycle event
-DEFINE EVENT module_lifecycle_event ON TABLE module
-WHEN $event = "UPDATE"
-    AND ($after.updated_at - $before.updated_at) > {tolerance_time_ms}
-    AND $after.bk_module_id = $before.bk_module_id
-THEN {
-    CREATE module SET
-        id = type::thing("module", "bk_module_id=" + $before.bk_module_id + ",created_at=" + <string>$after.updated_at),
-        bk_module_id = $before.bk_module_id,
-        created_at = $after.updated_at,
-        updated_at = $after.updated_at;
-    UPDATE $before.id SET updated_at = $before.updated_at;
-};
-
--- Host lifecycle event
-DEFINE EVENT host_lifecycle_event ON TABLE host
-WHEN $event = "UPDATE"
-    AND ($after.updated_at - $before.updated_at) > {tolerance_time_ms}
-    AND $after.bk_host_id = $before.bk_host_id
-THEN {
-    CREATE host SET
-        id = type::thing("host", "bk_host_id=" + $before.bk_host_id + ",created_at=" + <string>$after.updated_at),
-        bk_host_id = $before.bk_host_id,
-        created_at = $after.updated_at,
-        updated_at = $after.updated_at;
-    UPDATE $before.id SET updated_at = $before.updated_at;
+DEFINE FUNCTION fn::upsert_bklogconfig_with_datasource($from_id: record, $to_id: record, $now: int) {
+    LET $existing = (SELECT * FROM bklogconfig_with_datasource WHERE in = $from_id AND out = $to_id LIMIT 1)[0];
+    RETURN IF $existing != NONE THEN
+        (UPDATE $existing.id SET updated_at = $now)[0]
+    ELSE
+        (RELATE $from_id->bklogconfig_with_datasource->$to_id CONTENT { created_at: $now, updated_at: $now })[0]
+    END;
 };
 
 -- ----------------------------------------------------------------------------
--- 4.6 App Version Resource Events
+-- 4.6 CMDB Static Relations Upsert Functions
 -- ----------------------------------------------------------------------------
 
--- App Version lifecycle event
-DEFINE EVENT app_version_lifecycle_event ON TABLE app_version
-WHEN $event = "UPDATE"
-    AND ($after.updated_at - $before.updated_at) > {tolerance_time_ms}
-    AND $after.app_name = $before.app_name
-    AND $after.version = $before.version
-THEN {
-    CREATE app_version SET
-        id = type::thing("app_version", "app_name=" + $before.app_name + ",version=" + $before.version + ",created_at=" + <string>$after.updated_at),
-        app_name = $before.app_name,
-        version = $before.version,
-        created_at = $after.updated_at,
-        updated_at = $after.updated_at;
-    UPDATE $before.id SET updated_at = $before.updated_at;
+DEFINE FUNCTION fn::upsert_biz_with_set($from_id: record, $to_id: record, $now: int) {
+    LET $existing = (SELECT * FROM biz_with_set WHERE in = $from_id AND out = $to_id LIMIT 1)[0];
+    RETURN IF $existing != NONE THEN
+        (UPDATE $existing.id SET updated_at = $now)[0]
+    ELSE
+        (RELATE $from_id->biz_with_set->$to_id CONTENT { created_at: $now, updated_at: $now })[0]
+    END;
 };
 
--- Git Commit lifecycle event
-DEFINE EVENT git_commit_lifecycle_event ON TABLE git_commit
-WHEN $event = "UPDATE"
-    AND ($after.updated_at - $before.updated_at) > {tolerance_time_ms}
-    AND $after.git_repo = $before.git_repo
-    AND $after.commit_id = $before.commit_id
-THEN {
-    CREATE git_commit SET
-        id = type::thing("git_commit", "commit_id=" + $before.commit_id + ",git_repo=" + $before.git_repo + ",created_at=" + <string>$after.updated_at),
-        git_repo = $before.git_repo,
-        commit_id = $before.commit_id,
-        created_at = $after.updated_at,
-        updated_at = $after.updated_at;
-    UPDATE $before.id SET updated_at = $before.updated_at;
+DEFINE FUNCTION fn::upsert_module_with_set($from_id: record, $to_id: record, $now: int) {
+    LET $existing = (SELECT * FROM module_with_set WHERE in = $from_id AND out = $to_id LIMIT 1)[0];
+    RETURN IF $existing != NONE THEN
+        (UPDATE $existing.id SET updated_at = $now)[0]
+    ELSE
+        (RELATE $from_id->module_with_set->$to_id CONTENT { created_at: $now, updated_at: $now })[0]
+    END;
 };
 
--- Environment lifecycle event
-DEFINE EVENT environment_lifecycle_event ON TABLE environment
-WHEN $event = "UPDATE"
-    AND ($after.updated_at - $before.updated_at) > {tolerance_time_ms}
-    AND $after.environment = $before.environment
-THEN {
-    CREATE environment SET
-        id = type::thing("environment", "environment=" + $before.environment + ",created_at=" + <string>$after.updated_at),
-        environment = $before.environment,
-        created_at = $after.updated_at,
-        updated_at = $after.updated_at;
-    UPDATE $before.id SET updated_at = $before.updated_at;
+DEFINE FUNCTION fn::upsert_host_with_module($from_id: record, $to_id: record, $now: int) {
+    LET $existing = (SELECT * FROM host_with_module WHERE in = $from_id AND out = $to_id LIMIT 1)[0];
+    RETURN IF $existing != NONE THEN
+        (UPDATE $existing.id SET updated_at = $now)[0]
+    ELSE
+        (RELATE $from_id->host_with_module->$to_id CONTENT { created_at: $now, updated_at: $now })[0]
+    END;
+};
+
+DEFINE FUNCTION fn::upsert_host_with_system($from_id: record, $to_id: record, $now: int) {
+    LET $existing = (SELECT * FROM host_with_system WHERE in = $from_id AND out = $to_id LIMIT 1)[0];
+    RETURN IF $existing != NONE THEN
+        (UPDATE $existing.id SET updated_at = $now)[0]
+    ELSE
+        (RELATE $from_id->host_with_system->$to_id CONTENT { created_at: $now, updated_at: $now })[0]
+    END;
+};
+
+-- ----------------------------------------------------------------------------
+-- 4.7 App Version Static Relations Upsert Functions
+-- ----------------------------------------------------------------------------
+
+DEFINE FUNCTION fn::upsert_app_version_with_container($from_id: record, $to_id: record, $now: int) {
+    LET $existing = (SELECT * FROM app_version_with_container WHERE in = $from_id AND out = $to_id LIMIT 1)[0];
+    RETURN IF $existing != NONE THEN
+        (UPDATE $existing.id SET updated_at = $now)[0]
+    ELSE
+        (RELATE $from_id->app_version_with_container->$to_id CONTENT { created_at: $now, updated_at: $now })[0]
+    END;
+};
+
+DEFINE FUNCTION fn::upsert_app_version_with_system($from_id: record, $to_id: record, $now: int) {
+    LET $existing = (SELECT * FROM app_version_with_system WHERE in = $from_id AND out = $to_id LIMIT 1)[0];
+    RETURN IF $existing != NONE THEN
+        (UPDATE $existing.id SET updated_at = $now)[0]
+    ELSE
+        (RELATE $from_id->app_version_with_system->$to_id CONTENT { created_at: $now, updated_at: $now })[0]
+    END;
+};
+
+DEFINE FUNCTION fn::upsert_container_with_environment($from_id: record, $to_id: record, $now: int) {
+    LET $existing = (SELECT * FROM container_with_environment WHERE in = $from_id AND out = $to_id LIMIT 1)[0];
+    RETURN IF $existing != NONE THEN
+        (UPDATE $existing.id SET updated_at = $now)[0]
+    ELSE
+        (RELATE $from_id->container_with_environment->$to_id CONTENT { created_at: $now, updated_at: $now })[0]
+    END;
+};
+
+DEFINE FUNCTION fn::upsert_environment_with_system($from_id: record, $to_id: record, $now: int) {
+    LET $existing = (SELECT * FROM environment_with_system WHERE in = $from_id AND out = $to_id LIMIT 1)[0];
+    RETURN IF $existing != NONE THEN
+        (UPDATE $existing.id SET updated_at = $now)[0]
+    ELSE
+        (RELATE $from_id->environment_with_system->$to_id CONTENT { created_at: $now, updated_at: $now })[0]
+    END;
+};
+
+DEFINE FUNCTION fn::upsert_app_version_with_git_commit($from_id: record, $to_id: record, $now: int) {
+    LET $existing = (SELECT * FROM app_version_with_git_commit WHERE in = $from_id AND out = $to_id LIMIT 1)[0];
+    RETURN IF $existing != NONE THEN
+        (UPDATE $existing.id SET updated_at = $now)[0]
+    ELSE
+        (RELATE $from_id->app_version_with_git_commit->$to_id CONTENT { created_at: $now, updated_at: $now })[0]
+    END;
+};
+
+-- ----------------------------------------------------------------------------
+-- 4.8 Dynamic Traffic Relations Upsert Functions
+-- ----------------------------------------------------------------------------
+
+DEFINE FUNCTION fn::upsert_pod_to_pod($from_id: record, $to_id: record, $now: int) {
+    LET $existing = (SELECT * FROM pod_to_pod WHERE in = $from_id AND out = $to_id LIMIT 1)[0];
+    RETURN IF $existing != NONE THEN
+        (UPDATE $existing.id SET updated_at = $now)[0]
+    ELSE
+        (RELATE $from_id->pod_to_pod->$to_id CONTENT { created_at: $now, updated_at: $now })[0]
+    END;
+};
+
+DEFINE FUNCTION fn::upsert_pod_to_system($from_id: record, $to_id: record, $now: int) {
+    LET $existing = (SELECT * FROM pod_to_system WHERE in = $from_id AND out = $to_id LIMIT 1)[0];
+    RETURN IF $existing != NONE THEN
+        (UPDATE $existing.id SET updated_at = $now)[0]
+    ELSE
+        (RELATE $from_id->pod_to_system->$to_id CONTENT { created_at: $now, updated_at: $now })[0]
+    END;
+};
+
+DEFINE FUNCTION fn::upsert_system_to_pod($from_id: record, $to_id: record, $now: int) {
+    LET $existing = (SELECT * FROM system_to_pod WHERE in = $from_id AND out = $to_id LIMIT 1)[0];
+    RETURN IF $existing != NONE THEN
+        (UPDATE $existing.id SET updated_at = $now)[0]
+    ELSE
+        (RELATE $from_id->system_to_pod->$to_id CONTENT { created_at: $now, updated_at: $now })[0]
+    END;
+};
+
+DEFINE FUNCTION fn::upsert_system_to_system($from_id: record, $to_id: record, $now: int) {
+    LET $existing = (SELECT * FROM system_to_system WHERE in = $from_id AND out = $to_id LIMIT 1)[0];
+    RETURN IF $existing != NONE THEN
+        (UPDATE $existing.id SET updated_at = $now)[0]
+    ELSE
+        (RELATE $from_id->system_to_system->$to_id CONTENT { created_at: $now, updated_at: $now })[0]
+    END;
+};
+
+DEFINE FUNCTION fn::upsert_service_to_service($from_id: record, $to_id: record, $now: int) {
+    LET $existing = (SELECT * FROM service_to_service WHERE in = $from_id AND out = $to_id LIMIT 1)[0];
+    RETURN IF $existing != NONE THEN
+        (UPDATE $existing.id SET updated_at = $now)[0]
+    ELSE
+        (RELATE $from_id->service_to_service->$to_id CONTENT { created_at: $now, updated_at: $now })[0]
+    END;
 };
 
 -- ============================================================================

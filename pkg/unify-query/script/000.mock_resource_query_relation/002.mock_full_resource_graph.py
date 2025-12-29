@@ -45,8 +45,7 @@ import argparse
 import logging
 import os
 import random
-import sys
-from datetime import datetime, timedelta
+from datetime import datetime
 from enum import Enum
 from typing import Dict, List, Any, Tuple
 
@@ -153,11 +152,6 @@ class MockConfig:
     POD_TO_POD_TRAFFIC_PROBABILITY = 0.4
     POD_TO_SYSTEM_TRAFFIC_PROBABILITY = 0.3
     SERVICE_TO_SERVICE_TRAFFIC_PROBABILITY = 0.5
-    
-    # Time (use UTC to match SurrealDB's time::now())
-    DEFAULT_TIME_BACK_HOURS = 1
-    START_TIME = datetime.utcnow().replace(tzinfo=None) - timedelta(hours=DEFAULT_TIME_BACK_HOURS)
-    END_TIME = datetime.utcnow().replace(tzinfo=None)
     
     # Lifecycle Management
     # Tolerance time for determining renewal vs restart (milliseconds)
@@ -320,129 +314,6 @@ RESOURCE_INDEX_FIELDS = {
 
 
 # ============================================================================
-# ID Generation Utilities (per documentation section 4)
-# ============================================================================
-
-class IDGenerator:
-    """ID generator following documentation section 5 rules"""
-
-    @staticmethod
-    def generate_node_id(resource_type: ResourceType, data: Dict[str, Any], created_at_ms: int) -> str:
-        """
-        Generate node ID per section 5.1
-        Format: {key1}={value1},{key2}={value2},...,created_at={timestamp}
-        Keys are sorted alphabetically, created_at is always at the end
-        
-        Args:
-            resource_type: The type of resource
-            data: Resource data dictionary containing index field values
-            created_at_ms: Created timestamp in milliseconds (Unix timestamp)
-        
-        Note: This returns only the key-value part, without the table name prefix.
-        The table name is added when constructing the SQL statement.
-        """
-        index_fields = RESOURCE_INDEX_FIELDS.get(resource_type, [])
-        sorted_keys = sorted(index_fields)
-        pairs = [f"{key}={data.get(key, '')}" for key in sorted_keys]
-        # Add created_at as the last dimension per documentation section 5.1
-        pairs.append(f"created_at={created_at_ms}")
-        return ','.join(pairs)
-
-    @staticmethod
-    def generate_kv_string(resource_type: ResourceType, data: Dict[str, Any], created_at_ms: int = None) -> str:
-        """
-        Generate key=value string for a resource (keys sorted)
-        
-        Args:
-            resource_type: The type of resource
-            data: Resource data dictionary
-            created_at_ms: Optional created timestamp in milliseconds. If provided, 
-                          it will be included as the last dimension.
-        """
-        index_fields = RESOURCE_INDEX_FIELDS.get(resource_type, [])
-        sorted_keys = sorted(index_fields)
-        pairs = [f"{key}={data.get(key, '')}" for key in sorted_keys]
-        if created_at_ms is not None:
-            pairs.append(f"created_at={created_at_ms}")
-        return ','.join(pairs)
-    
-    @staticmethod
-    def generate_query_kv_string(resource_type: ResourceType, data: Dict[str, Any]) -> str:
-        """
-        Generate key=value string for querying (without created_at)
-        Used when searching for existing records before deciding to INSERT or UPDATE
-        """
-        index_fields = RESOURCE_INDEX_FIELDS.get(resource_type, [])
-        sorted_keys = sorted(index_fields)
-        pairs = [f"{key}={data.get(key, '')}" for key in sorted_keys]
-        return ','.join(pairs)
-
-    @staticmethod
-    def generate_static_relation_id(
-            relation_type: RelationType,
-            type1: ResourceType,
-            data1: Dict[str, Any],
-            created_at1_ms: int,
-            type2: ResourceType,
-            data2: Dict[str, Any],
-            created_at2_ms: int
-    ) -> str:
-        """
-        Generate static (bidirectional) relation ID per section 5.2
-        Format: {res1_kv},created_at={ts1}|{res2_kv},created_at={ts2}
-        Where res1 < res2 alphabetically
-        
-        Args:
-            relation_type: The type of relation
-            type1: First resource type
-            data1: First resource data
-            created_at1_ms: First resource created_at timestamp in milliseconds
-            type2: Second resource type  
-            data2: Second resource data
-            created_at2_ms: Second resource created_at timestamp in milliseconds
-        
-        Note: Returns only the key-value part, without the relation type prefix.
-        """
-        kv1 = IDGenerator.generate_kv_string(type1, data1, created_at1_ms)
-        kv2 = IDGenerator.generate_kv_string(type2, data2, created_at2_ms)
-        
-        # Ensure res1 < res2 alphabetically
-        if type1.value < type2.value:
-            return f"{kv1}|{kv2}"
-        else:
-            return f"{kv2}|{kv1}"
-
-    @staticmethod
-    def generate_dynamic_relation_id(
-            relation_type: RelationType,
-            source_type: ResourceType,
-            source_data: Dict[str, Any],
-            source_created_at_ms: int,
-            target_type: ResourceType,
-            target_data: Dict[str, Any],
-            target_created_at_ms: int
-    ) -> str:
-        """
-        Generate dynamic (directional) relation ID per section 5.2
-        Format: {src_kv},created_at={src_ts}|{dst_kv},created_at={dst_ts}
-        
-        Args:
-            relation_type: The type of relation
-            source_type: Source resource type
-            source_data: Source resource data
-            source_created_at_ms: Source resource created_at timestamp in milliseconds
-            target_type: Target resource type
-            target_data: Target resource data
-            target_created_at_ms: Target resource created_at timestamp in milliseconds
-        
-        Note: Returns only the key-value part, without the relation type prefix.
-        """
-        source_kv = IDGenerator.generate_kv_string(source_type, source_data, source_created_at_ms)
-        target_kv = IDGenerator.generate_kv_string(target_type, target_data, target_created_at_ms)
-        return f"{source_kv}|{target_kv}"
-
-
-# ============================================================================
 # Schema Definition
 # ============================================================================
 
@@ -574,148 +445,6 @@ class SurrealDBClient:
         """Convert milliseconds timestamp to datetime"""
         return datetime.fromtimestamp(ms / 1000.0)
     
-    def query_latest_node(
-            self,
-            resource_type: ResourceType,
-            data: Dict[str, Any]
-    ) -> Dict[str, Any]:
-        """
-        Query the latest node by index fields (without created_at).
-        Returns the node with the largest created_at, or empty dict if not found.
-        
-        Per documentation section 2.0.2: Query using index fields, order by created_at DESC, limit 1
-        """
-        index_fields = RESOURCE_INDEX_FIELDS.get(resource_type, [])
-        where_conditions = []
-        for key in index_fields:
-            value = data.get(key, '')
-            if isinstance(value, (int, float)):
-                where_conditions.append(f"{key} = {value}")
-            else:
-                where_conditions.append(f"{key} = '{value}'")
-        
-        where_clause = " AND ".join(where_conditions)
-        query_sql = f"SELECT * FROM {resource_type.value} WHERE {where_clause} ORDER BY created_at DESC LIMIT 1;"
-        
-        try:
-            result = self.execute_sql(query_sql)
-            records = result[0].get('result', []) if result else []
-            return records[0] if records else {}
-        except Exception as e:
-            logger.warning(f"Error querying latest node: {e}")
-            return {}
-    
-    def upsert_node_with_lifecycle(
-            self,
-            resource_type: ResourceType,
-            data: Dict[str, Any],
-            current_time_ms: int,
-            tolerance_time_ms: int = None
-    ) -> Tuple[str, int, str]:
-        """
-        Upsert a node with lifecycle management per documentation section 2.0.2.
-        
-        Logic:
-        1. Query existing node by index fields (without created_at)
-        2. If no existing node: INSERT new record with created_at = current_time
-        3. If existing node and within tolerance: UPDATE updated_at only
-        4. If existing node but beyond tolerance: INSERT new record (restart)
-        
-        Args:
-            resource_type: The type of resource
-            data: Resource data dictionary
-            current_time_ms: Current time in milliseconds (Unix timestamp)
-            tolerance_time_ms: Tolerance time in milliseconds. If None, uses MockConfig.TOLERANCE_TIME_MS
-        
-        Returns:
-            Tuple of (action, created_at_ms, node_id) where:
-            - action: 'insert', 'update', or 'restart'
-            - created_at_ms: The created_at timestamp used for this node
-            - node_id: The generated node ID
-        """
-        if tolerance_time_ms is None:
-            tolerance_time_ms = MockConfig.TOLERANCE_TIME_MS
-        
-        # Step 1: Query existing node
-        existing = self.query_latest_node(resource_type, data)
-        
-        if not existing:
-            # Case 1: No existing node -> INSERT
-            created_at_ms = current_time_ms
-            node_id = IDGenerator.generate_node_id(resource_type, data, created_at_ms)
-            self._insert_node(resource_type, data, node_id, created_at_ms, current_time_ms)
-            return ('insert', created_at_ms, node_id)
-        
-        # Parse existing node's timestamps
-        existing_updated_at = existing.get('updated_at')
-        existing_created_at = existing.get('created_at')
-        
-        # Convert SurrealDB datetime to milliseconds
-        if isinstance(existing_updated_at, str):
-            existing_updated_at_ms = self._parse_surreal_datetime_to_ms(existing_updated_at)
-        else:
-            existing_updated_at_ms = int(existing_updated_at) if existing_updated_at else 0
-            
-        if isinstance(existing_created_at, str):
-            existing_created_at_ms = self._parse_surreal_datetime_to_ms(existing_created_at)
-        else:
-            existing_created_at_ms = int(existing_created_at) if existing_created_at else 0
-        
-        time_gap = current_time_ms - existing_updated_at_ms
-        
-        if time_gap <= tolerance_time_ms:
-            # Case 2: Within tolerance -> UPDATE updated_at only
-            existing_id = existing.get('id')
-            self._update_node_timestamp(existing_id, current_time_ms)
-            return ('update', existing_created_at_ms, str(existing_id))
-        else:
-            # Case 3: Beyond tolerance -> INSERT new record (restart)
-            created_at_ms = current_time_ms
-            node_id = IDGenerator.generate_node_id(resource_type, data, created_at_ms)
-            self._insert_node(resource_type, data, node_id, created_at_ms, current_time_ms)
-            return ('restart', created_at_ms, node_id)
-    
-    def _parse_surreal_datetime_to_ms(self, dt_str: str) -> int:
-        """Parse SurrealDB datetime string to milliseconds"""
-        try:
-            # SurrealDB returns ISO format like "2025-12-24T10:00:00Z"
-            if dt_str.endswith('Z'):
-                dt_str = dt_str[:-1]
-            dt = datetime.fromisoformat(dt_str)
-            return int(dt.timestamp() * 1000)
-        except Exception:
-            return 0
-    
-    def _insert_node(
-            self,
-            resource_type: ResourceType,
-            data: Dict[str, Any],
-            node_id: str,
-            created_at_ms: int,
-            updated_at_ms: int
-    ):
-        """Insert a new node with the specified ID and timestamps"""
-        set_parts = []
-        for key, value in data.items():
-            if isinstance(value, (int, float)):
-                set_parts.append(f"{key} = {value}")
-            else:
-                set_parts.append(f"{key} = '{value}'")
-        
-        # Use milliseconds timestamp directly (int type in schema)
-        set_parts.append(f"created_at = {created_at_ms}")
-        set_parts.append(f"updated_at = {updated_at_ms}")
-        
-        set_clause = ', '.join(set_parts)
-        sql = f"CREATE {resource_type.value}:`{node_id}` SET {set_clause};"
-        
-        self.execute_sql(sql)
-    
-    def _update_node_timestamp(self, record_id: str, updated_at_ms: int):
-        """Update only the updated_at timestamp of an existing node"""
-        sql = f"UPDATE {record_id} SET updated_at = {updated_at_ms};"
-        self.execute_sql(sql)
-
     def call_upsert_resource_lifecycle(
         self,
         table: str,
@@ -771,13 +500,15 @@ class SurrealDBClient:
         to_dimensions: Dict[str, Any],
         now_ms: int,
         tolerance_ms: int,
-        relation_type: str  # "single" or "bidirectional"
+        relation_type: str,  # "static" or "dynamic"
+        bidirectional: bool  # True for bidirectional, False for directional
     ) -> Dict[str, Any]:
         """
-        Call fn::upsert_relation_lifecycle function and create the relation.
+        Call fn::upsert_relation_lifecycle function and upsert the relation.
         
-        The function upserts both endpoint resources and returns their IDs.
-        We then create the relation using RELATE statement in Python.
+        This method:
+        1. Calls fn::upsert_relation_lifecycle to upsert both endpoint resources
+        2. Calls fn::upsert_{relation_table} to upsert the relation itself
         
         Args:
             from_table: Source resource table name
@@ -786,7 +517,8 @@ class SurrealDBClient:
             to_dimensions: Target resource dimensions
             now_ms: Current timestamp in milliseconds
             tolerance_ms: Tolerance time in milliseconds
-            relation_type: "single" for directional, "bidirectional" for static relations
+            relation_type: "static" for static relations, "dynamic" for dynamic relations
+            bidirectional: True for bidirectional relations (static), False for directional (dynamic)
         
         Returns:
             The created/updated relation record
@@ -802,91 +534,67 @@ class SurrealDBClient:
         
         from_dim_str = format_dimensions(from_dimensions)
         to_dim_str = format_dimensions(to_dimensions)
+        bidirectional_str = "true" if bidirectional else "false"
         
-        # Step 1: Call the function to upsert resources and get their IDs
-        # Use LET + RETURN pattern to properly capture function output
+        # Step 1: Determine relation table name based on bidirectional flag
+        if bidirectional:
+            # Static relations use alphabetical ordering: {res1}_with_{res2}
+            if from_table <= to_table:
+                rel_table = f"{from_table}_with_{to_table}"
+            else:
+                rel_table = f"{to_table}_with_{from_table}"
+        else:
+            # Dynamic relations preserve direction: {src}_to_{dst}
+            rel_table = f"{from_table}_to_{to_table}"
+        
+        # Step 2: Call fn::upsert_relation_lifecycle to upsert resources and 
+        #         fn::upsert_{rel_table} to upsert the relation in one SQL statement
         sql = f"""
-        LET $result = fn::upsert_relation_lifecycle(
+        LET $resource_info = fn::upsert_relation_lifecycle(
             '{from_table}',
             {{ {from_dim_str} }},
             '{to_table}',
             {{ {to_dim_str} }},
             {now_ms},
             {tolerance_ms},
-            '{relation_type}'
+            '{relation_type}',
+            {bidirectional_str}
         );
-        RETURN $result;
+        LET $relation = fn::upsert_{rel_table}($resource_info.from_id, $resource_info.to_id, {now_ms});
+        RETURN {{ resource_info: $resource_info, relation: $relation }};
         """
         
-        result = self.execute_sql(sql)
-        resource_info = {}
-        # The result is in the second statement (RETURN)
-        if result and len(result) >= 2:
-            return_result = result[1].get('result')
-            if isinstance(return_result, dict):
-                resource_info = return_result
-            elif isinstance(return_result, list) and return_result:
-                resource_info = return_result[0] if isinstance(return_result[0], dict) else {}
-        
-        if not resource_info or 'from_id' not in resource_info:
-            logger.warning(f"Failed to get resource info for relation: {from_table} -> {to_table}")
-            return {}
-        
-        # Step 2: Determine relation table name
-        if relation_type == "bidirectional":
-            if from_table <= to_table:
-                rel_table = f"{from_table}_with_{to_table}"
-            else:
-                rel_table = f"{to_table}_with_{from_table}"
-        else:
-            rel_table = f"{from_table}_to_{to_table}"
-        
-        # Step 3: Create or update the relation
-        from_id = resource_info['from_id']
-        to_id = resource_info['to_id']
-        
-        # Check if relation already exists
-        check_sql = f"SELECT * FROM {rel_table} WHERE in = {from_id} AND out = {to_id} LIMIT 1;"
         try:
-            check_result = self.execute_sql(check_sql)
-            existing = check_result[0].get('result', []) if check_result else []
-            
-            if existing:
-                # Update existing relation
-                existing_id = existing[0].get('id')
-                update_sql = f"UPDATE {existing_id} SET updated_at = {now_ms};"
-                self.execute_sql(update_sql)
-                return existing[0]
-            else:
-                # Create new relation
-                relate_sql = f"RELATE {from_id}->{rel_table}->{to_id} CONTENT {{ created_at: {now_ms}, updated_at: {now_ms} }};"
-                relate_result = self.execute_sql(relate_sql)
-                if relate_result and relate_result[0].get('result'):
-                    records = relate_result[0]['result']
-                    if isinstance(records, list) and records:
-                        return records[0]
-                    elif isinstance(records, dict):
-                        return records
+            result = self.execute_sql(sql)
+            # The result is in the third statement (RETURN)
+            if result and len(result) >= 3:
+                return_result = result[2].get('result')
+                if isinstance(return_result, dict):
+                    return return_result.get('relation', return_result)
+                elif isinstance(return_result, list) and return_result:
+                    item = return_result[0] if isinstance(return_result[0], dict) else {}
+                    return item.get('relation', item)
         except Exception as e:
-            logger.warning(f"Error creating relation {rel_table}: {e}")
+            logger.warning(f"Error upserting relation {rel_table}: {e}")
         
-        return resource_info
+        return {}
 
     def upsert_node(
             self,
             resource_type: ResourceType,
             data: Dict[str, Any],
-            created_at: datetime,
             updated_at: datetime
     ) -> Tuple[str, int, str]:
         """
         Upsert a node using fn::upsert_resource_lifecycle function.
         
         This method calls the SurrealDB custom function for lifecycle management.
+        The function automatically determines whether to create a new record or
+        update an existing one based on the tolerance time.
         
         Returns:
             Tuple of (action, created_at_ms, node_id) where:
-            - action: 'insert', 'update', or 'restart'
+            - action: 'insert' or 'update'
             - created_at_ms: The created_at timestamp used for this node
             - node_id: The generated node ID
         """
@@ -917,15 +625,13 @@ class SurrealDBClient:
             self,
             resource_type: ResourceType,
             nodes: List[Dict[str, Any]],
-            created_at: datetime,
             updated_at: datetime
     ) -> List[Tuple[str, int, str]]:
         """
         Batch upsert nodes with lifecycle management.
         
         Note: This is not a true batch operation - it processes each node individually
-        to support lifecycle management logic. For pure batch insert (no lifecycle),
-        use batch_insert_nodes instead.
+        to support lifecycle management logic.
         
         Returns:
             List of (action, created_at_ms, node_id) tuples for each node
@@ -936,7 +642,7 @@ class SurrealDBClient:
         results = []
         
         for data in nodes:
-            result = self.upsert_node(resource_type, data, created_at, updated_at)
+            result = self.upsert_node(resource_type, data, updated_at)
             results.append(result)
         
         # Count actions
@@ -948,79 +654,32 @@ class SurrealDBClient:
         logger.info(f"  Processed {len(nodes)} {resource_type.value} nodes ({action_str})")
         return results
     
-    def batch_insert_nodes(
-            self,
-            resource_type: ResourceType,
-            nodes: List[Dict[str, Any]],
-            created_at_ms: int,
-            updated_at_ms: int
-    ) -> Dict[str, Any]:
-        """
-        Batch insert nodes without lifecycle management (pure CREATE).
-        Use this when you know all nodes are new.
-        
-        Args:
-            resource_type: The type of resource
-            nodes: List of node data dictionaries
-            created_at_ms: Created timestamp in milliseconds
-            updated_at_ms: Updated timestamp in milliseconds
-        
-        Returns:
-            Execution results
-        """
-        if not nodes:
-            return {}
-
-        statements = []
-        for data in nodes:
-            node_id = IDGenerator.generate_node_id(resource_type, data, created_at_ms)
-            
-            set_parts = []
-            for key, value in data.items():
-                if isinstance(value, (int, float)):
-                    set_parts.append(f"{key} = {value}")
-                else:
-                    set_parts.append(f"{key} = '{value}'")
-            
-            set_parts.append(f"created_at = {created_at_ms}")
-            set_parts.append(f"updated_at = {updated_at_ms}")
-            
-            set_clause = ', '.join(set_parts)
-            statements.append(f"CREATE {resource_type.value}:`{node_id}` SET {set_clause};")
-
-        sql = "BEGIN TRANSACTION; " + " ".join(statements) + " COMMIT TRANSACTION;"
-        results = self.execute_sql(sql)
-        logger.info(f"  Batch inserted {len(nodes)} {resource_type.value} nodes")
-        return results
-
     def upsert_static_relation(
             self,
             relation_type: RelationType,
             from_type: ResourceType,
             from_data: Dict[str, Any],
-            from_created_at_ms: int,
             to_type: ResourceType,
             to_data: Dict[str, Any],
-            to_created_at_ms: int,
-            created_at: datetime,
             updated_at: datetime
     ) -> Dict[str, Any]:
         """
         Upsert a static (bidirectional) relation using fn::upsert_relation_lifecycle.
         
+        Static relations represent topology relationships between resources.
+        They are always bidirectional (can be queried from either direction).
+        
+        The SurrealDB function automatically manages resource lifecycle:
+        - If resources exist and are within tolerance, update their updated_at
+        - Otherwise, create new resource records with new created_at
+        
         Args:
             relation_type: The type of relation
             from_type: Source resource type
             from_data: Source resource data
-            from_created_at_ms: Source resource created_at in milliseconds (may not be used by function)
             to_type: Target resource type
             to_data: Target resource data
-            to_created_at_ms: Target resource created_at in milliseconds (may not be used by function)
-            created_at: Relation created_at datetime
-            updated_at: Relation updated_at datetime
-        
-        Note: The from_created_at_ms and to_created_at_ms parameters are kept for backward
-        compatibility but the function automatically manages resource lifecycle.
+            updated_at: Current time for the upsert operation
         """
         current_time_ms = self.datetime_to_ms(updated_at)
         
@@ -1031,7 +690,8 @@ class SurrealDBClient:
             to_data,
             current_time_ms,
             MockConfig.TOLERANCE_TIME_MS,
-            "bidirectional"
+            relation_type="static",
+            bidirectional=True
         )
 
     def upsert_dynamic_relation(
@@ -1039,29 +699,27 @@ class SurrealDBClient:
             relation_type: RelationType,
             source_type: ResourceType,
             source_data: Dict[str, Any],
-            source_created_at_ms: int,
             target_type: ResourceType,
             target_data: Dict[str, Any],
-            target_created_at_ms: int,
-            created_at: datetime,
             updated_at: datetime
     ) -> Dict[str, Any]:
         """
         Upsert a dynamic (directional) relation using fn::upsert_relation_lifecycle.
         
+        Dynamic relations represent traffic flow between resources.
+        They have explicit direction (source -> target) and are not bidirectional.
+        
+        The SurrealDB function automatically manages resource lifecycle:
+        - If resources exist and are within tolerance, update their updated_at
+        - Otherwise, create new resource records with new created_at
+        
         Args:
             relation_type: The type of relation
             source_type: Source resource type
             source_data: Source resource data
-            source_created_at_ms: Source resource created_at in milliseconds (may not be used by function)
             target_type: Target resource type
             target_data: Target resource data
-            target_created_at_ms: Target resource created_at in milliseconds (may not be used by function)
-            created_at: Relation created_at datetime
-            updated_at: Relation updated_at datetime
-        
-        Note: The source_created_at_ms and target_created_at_ms parameters are kept for backward
-        compatibility but the function automatically manages resource lifecycle.
+            updated_at: Current time for the upsert operation
         """
         current_time_ms = self.datetime_to_ms(updated_at)
         
@@ -1072,7 +730,8 @@ class SurrealDBClient:
             target_data,
             current_time_ms,
             MockConfig.TOLERANCE_TIME_MS,
-            "single"
+            relation_type="dynamic",
+            bidirectional=False
         )
 
 
@@ -1085,22 +744,15 @@ class FullMockGenerator:
 
     def __init__(self, client: SurrealDBClient):
         self.client = client
-        # Store resources with their created_at timestamp
-        # Format: {ResourceType: [(data_dict, created_at_ms), ...]}
-        self.resources: Dict[ResourceType, List[Tuple[Dict[str, Any], int]]] = {}
+        # Store resources data only (lifecycle is managed by SurrealDB functions)
+        # Format: {ResourceType: [data_dict, ...]}
+        self.resources: Dict[ResourceType, List[Dict[str, Any]]] = {}
         # Use current UTC time for updated_at to ensure is_alive works correctly
         self.current_time = datetime.utcnow().replace(tzinfo=None)
         self.current_time_ms = self.client.datetime_to_ms(self.current_time)
-        self.traffic_relations: List[Tuple[Dict, int, Dict, int, str, RelationType]] = []
-
-    def random_time_in_range(self) -> datetime:
-        """Generate random UTC time within configured range (for created_at)"""
-        # Calculate range based on current UTC time
-        end_time = datetime.utcnow().replace(tzinfo=None)
-        start_time = end_time - timedelta(hours=MockConfig.DEFAULT_TIME_BACK_HOURS)
-        delta = end_time - start_time
-        random_seconds = random.randint(0, int(delta.total_seconds()))
-        return start_time + timedelta(seconds=random_seconds)
+        # Track traffic relations for metric associations
+        # Format: [(source_data, target_data, relation_type), ...]
+        self.traffic_relations: List[Tuple[Dict, Dict, RelationType]] = []
 
     # =========================================================================
     # CMDB Resources
@@ -1112,23 +764,23 @@ class FullMockGenerator:
         
         # Biz
         biz_data = {"bk_biz_id": MockConfig.BIZ_ID}
-        action, created_at_ms, _ = self.client.upsert_node(ResourceType.BIZ, biz_data, self.random_time_in_range(), self.current_time)
-        self.resources[ResourceType.BIZ] = [(biz_data, created_at_ms)]
+        self.client.upsert_node(ResourceType.BIZ, biz_data, self.current_time)
+        self.resources[ResourceType.BIZ] = [biz_data]
         
         # Set
         set_data = {"bk_set_id": MockConfig.SET_ID}
-        action, created_at_ms, _ = self.client.upsert_node(ResourceType.SET, set_data, self.random_time_in_range(), self.current_time)
-        self.resources[ResourceType.SET] = [(set_data, created_at_ms)]
+        self.client.upsert_node(ResourceType.SET, set_data, self.current_time)
+        self.resources[ResourceType.SET] = [set_data]
         
         # Module
         module_data = {"bk_module_id": MockConfig.MODULE_ID}
-        action, created_at_ms, _ = self.client.upsert_node(ResourceType.MODULE, module_data, self.random_time_in_range(), self.current_time)
-        self.resources[ResourceType.MODULE] = [(module_data, created_at_ms)]
+        self.client.upsert_node(ResourceType.MODULE, module_data, self.current_time)
+        self.resources[ResourceType.MODULE] = [module_data]
         
         # Host
         host_data = {"bk_host_id": MockConfig.HOST_ID}
-        action, created_at_ms, _ = self.client.upsert_node(ResourceType.HOST, host_data, self.random_time_in_range(), self.current_time)
-        self.resources[ResourceType.HOST] = [(host_data, created_at_ms)]
+        self.client.upsert_node(ResourceType.HOST, host_data, self.current_time)
+        self.resources[ResourceType.HOST] = [host_data]
         
         logger.info("  Created Biz, Set, Module, Host")
 
@@ -1136,44 +788,44 @@ class FullMockGenerator:
         """Create CMDB relations"""
         logger.info("Creating CMDB relations...")
         
-        biz_data, biz_created_at = self.resources[ResourceType.BIZ][0]
-        set_data, set_created_at = self.resources[ResourceType.SET][0]
-        module_data, module_created_at = self.resources[ResourceType.MODULE][0]
-        host_data, host_created_at = self.resources[ResourceType.HOST][0]
+        biz_data = self.resources[ResourceType.BIZ][0]
+        set_data = self.resources[ResourceType.SET][0]
+        module_data = self.resources[ResourceType.MODULE][0]
+        host_data = self.resources[ResourceType.HOST][0]
         system_list = self.resources.get(ResourceType.SYSTEM, [])
-        system_data, system_created_at = system_list[0] if system_list else ({}, 0)
+        system_data = system_list[0] if system_list else {}
         
         # biz_with_set
         self.client.upsert_static_relation(
             RelationType.BIZ_WITH_SET,
-            ResourceType.BIZ, biz_data, biz_created_at,
-            ResourceType.SET, set_data, set_created_at,
-            self.random_time_in_range(), self.current_time
+            ResourceType.BIZ, biz_data,
+            ResourceType.SET, set_data,
+            self.current_time
         )
         
         # module_with_set
         self.client.upsert_static_relation(
             RelationType.MODULE_WITH_SET,
-            ResourceType.MODULE, module_data, module_created_at,
-            ResourceType.SET, set_data, set_created_at,
-            self.random_time_in_range(), self.current_time
+            ResourceType.MODULE, module_data,
+            ResourceType.SET, set_data,
+            self.current_time
         )
         
         # host_with_module
         self.client.upsert_static_relation(
             RelationType.HOST_WITH_MODULE,
-            ResourceType.HOST, host_data, host_created_at,
-            ResourceType.MODULE, module_data, module_created_at,
-            self.random_time_in_range(), self.current_time
+            ResourceType.HOST, host_data,
+            ResourceType.MODULE, module_data,
+            self.current_time
         )
         
         # host_with_system
         if system_data:
             self.client.upsert_static_relation(
                 RelationType.HOST_WITH_SYSTEM,
-                ResourceType.HOST, host_data, host_created_at,
-                ResourceType.SYSTEM, system_data, system_created_at,
-                self.random_time_in_range(), self.current_time
+                ResourceType.HOST, host_data,
+                ResourceType.SYSTEM, system_data,
+                self.current_time
             )
         
         logger.info("  Created CMDB relations")
@@ -1188,13 +840,13 @@ class FullMockGenerator:
         
         # Cluster
         cluster_data = {"bcs_cluster_id": MockConfig.CLUSTER_ID}
-        action, created_at_ms, _ = self.client.upsert_node(ResourceType.CLUSTER, cluster_data, self.random_time_in_range(), self.current_time)
-        self.resources[ResourceType.CLUSTER] = [(cluster_data, created_at_ms)]
+        self.client.upsert_node(ResourceType.CLUSTER, cluster_data, self.current_time)
+        self.resources[ResourceType.CLUSTER] = [cluster_data]
         
         # Namespace
         ns_data = {"bcs_cluster_id": MockConfig.CLUSTER_ID, "namespace": MockConfig.NAMESPACE}
-        action, created_at_ms, _ = self.client.upsert_node(ResourceType.NAMESPACE, ns_data, self.random_time_in_range(), self.current_time)
-        self.resources[ResourceType.NAMESPACE] = [(ns_data, created_at_ms)]
+        self.client.upsert_node(ResourceType.NAMESPACE, ns_data, self.current_time)
+        self.resources[ResourceType.NAMESPACE] = [ns_data]
         
         # Nodes
         nodes = []
@@ -1203,8 +855,8 @@ class FullMockGenerator:
                 "bcs_cluster_id": MockConfig.CLUSTER_ID,
                 "node": f"{MockConfig.BIZ_NAME}-node-{i}"
             })
-        results = self.client.batch_upsert_nodes(ResourceType.NODE, nodes, self.random_time_in_range(), self.current_time)
-        self.resources[ResourceType.NODE] = [(nodes[i], results[i][1]) for i in range(len(nodes))]
+        self.client.batch_upsert_nodes(ResourceType.NODE, nodes, self.current_time)
+        self.resources[ResourceType.NODE] = nodes
         
         # Pods
         pods = []
@@ -1214,8 +866,8 @@ class FullMockGenerator:
                 "namespace": MockConfig.NAMESPACE,
                 "pod": f"{MockConfig.BIZ_NAME}-pod-{i:03d}"
             })
-        results = self.client.batch_upsert_nodes(ResourceType.POD, pods, self.random_time_in_range(), self.current_time)
-        self.resources[ResourceType.POD] = [(pods[i], results[i][1]) for i in range(len(pods))]
+        self.client.batch_upsert_nodes(ResourceType.POD, pods, self.current_time)
+        self.resources[ResourceType.POD] = pods
         
         # Containers
         containers = []
@@ -1227,8 +879,8 @@ class FullMockGenerator:
                 "pod": pods[pod_idx]["pod"],
                 "container": f"container-{i:03d}"
             })
-        results = self.client.batch_upsert_nodes(ResourceType.CONTAINER, containers, self.random_time_in_range(), self.current_time)
-        self.resources[ResourceType.CONTAINER] = [(containers[i], results[i][1]) for i in range(len(containers))]
+        self.client.batch_upsert_nodes(ResourceType.CONTAINER, containers, self.current_time)
+        self.resources[ResourceType.CONTAINER] = containers
         
         # Services
         services = []
@@ -1238,8 +890,8 @@ class FullMockGenerator:
                 "namespace": MockConfig.NAMESPACE,
                 "service": f"{MockConfig.BIZ_NAME}-{svc_name}"
             })
-        results = self.client.batch_upsert_nodes(ResourceType.SERVICE, services, self.random_time_in_range(), self.current_time)
-        self.resources[ResourceType.SERVICE] = [(services[i], results[i][1]) for i in range(len(services))]
+        self.client.batch_upsert_nodes(ResourceType.SERVICE, services, self.current_time)
+        self.resources[ResourceType.SERVICE] = services
         
         # Deployments
         deployments = []
@@ -1249,8 +901,8 @@ class FullMockGenerator:
                 "namespace": MockConfig.NAMESPACE,
                 "deployment": f"{MockConfig.BIZ_NAME}-{svc_name}-deploy"
             })
-        results = self.client.batch_upsert_nodes(ResourceType.DEPLOYMENT, deployments, self.random_time_in_range(), self.current_time)
-        self.resources[ResourceType.DEPLOYMENT] = [(deployments[i], results[i][1]) for i in range(len(deployments))]
+        self.client.batch_upsert_nodes(ResourceType.DEPLOYMENT, deployments, self.current_time)
+        self.resources[ResourceType.DEPLOYMENT] = deployments
         
         # ReplicaSets
         replicasets = []
@@ -1260,8 +912,8 @@ class FullMockGenerator:
                 "namespace": MockConfig.NAMESPACE,
                 "replicaset": f"{deploy['deployment']}-rs-001"
             })
-        results = self.client.batch_upsert_nodes(ResourceType.REPLICASET, replicasets, self.random_time_in_range(), self.current_time)
-        self.resources[ResourceType.REPLICASET] = [(replicasets[i], results[i][1]) for i in range(len(replicasets))]
+        self.client.batch_upsert_nodes(ResourceType.REPLICASET, replicasets, self.current_time)
+        self.resources[ResourceType.REPLICASET] = replicasets
         
         # StatefulSet
         statefulset_data = {
@@ -1269,8 +921,8 @@ class FullMockGenerator:
             "namespace": MockConfig.NAMESPACE,
             "statefulset": f"{MockConfig.BIZ_NAME}-statefulset"
         }
-        action, created_at_ms, _ = self.client.upsert_node(ResourceType.STATEFULSET, statefulset_data, self.random_time_in_range(), self.current_time)
-        self.resources[ResourceType.STATEFULSET] = [(statefulset_data, created_at_ms)]
+        self.client.upsert_node(ResourceType.STATEFULSET, statefulset_data, self.current_time)
+        self.resources[ResourceType.STATEFULSET] = [statefulset_data]
         
         # DaemonSet
         daemonset_data = {
@@ -1278,8 +930,8 @@ class FullMockGenerator:
             "namespace": MockConfig.NAMESPACE,
             "daemonset": f"{MockConfig.BIZ_NAME}-daemonset"
         }
-        action, created_at_ms, _ = self.client.upsert_node(ResourceType.DAEMONSET, daemonset_data, self.random_time_in_range(), self.current_time)
-        self.resources[ResourceType.DAEMONSET] = [(daemonset_data, created_at_ms)]
+        self.client.upsert_node(ResourceType.DAEMONSET, daemonset_data, self.current_time)
+        self.resources[ResourceType.DAEMONSET] = [daemonset_data]
         
         # Job
         job_data = {
@@ -1287,8 +939,8 @@ class FullMockGenerator:
             "namespace": MockConfig.NAMESPACE,
             "job": f"{MockConfig.BIZ_NAME}-job"
         }
-        action, created_at_ms, _ = self.client.upsert_node(ResourceType.JOB, job_data, self.random_time_in_range(), self.current_time)
-        self.resources[ResourceType.JOB] = [(job_data, created_at_ms)]
+        self.client.upsert_node(ResourceType.JOB, job_data, self.current_time)
+        self.resources[ResourceType.JOB] = [job_data]
         
         # Ingress
         ingress_data = {
@@ -1296,8 +948,8 @@ class FullMockGenerator:
             "namespace": MockConfig.NAMESPACE,
             "ingress": f"{MockConfig.BIZ_NAME}-ingress"
         }
-        action, created_at_ms, _ = self.client.upsert_node(ResourceType.INGRESS, ingress_data, self.random_time_in_range(), self.current_time)
-        self.resources[ResourceType.INGRESS] = [(ingress_data, created_at_ms)]
+        self.client.upsert_node(ResourceType.INGRESS, ingress_data, self.current_time)
+        self.resources[ResourceType.INGRESS] = [ingress_data]
         
         logger.info("  Created all Kubernetes resources")
 
@@ -1314,125 +966,124 @@ class FullMockGenerator:
         systems = self.resources.get(ResourceType.SYSTEM, [])
         
         # node_with_pod
-        for i, (pod_data, pod_created_at) in enumerate(pods):
-            node_data, node_created_at = nodes[i % len(nodes)]
+        for i, pod_data in enumerate(pods):
+            node_data = nodes[i % len(nodes)]
             self.client.upsert_static_relation(
                 RelationType.NODE_WITH_POD,
-                ResourceType.NODE, node_data, node_created_at,
-                ResourceType.POD, pod_data, pod_created_at,
-                self.random_time_in_range(), self.current_time
+                ResourceType.NODE, node_data,
+                ResourceType.POD, pod_data,
+                self.current_time
             )
         
         # node_with_system
-        for node_data, node_created_at in nodes:
+        for node_data in nodes:
             if systems:
-                system_data, system_created_at = systems[0]
+                system_data = systems[0]
                 self.client.upsert_static_relation(
                     RelationType.NODE_WITH_SYSTEM,
-                    ResourceType.NODE, node_data, node_created_at,
-                    ResourceType.SYSTEM, system_data, system_created_at,
-                    self.random_time_in_range(), self.current_time
+                    ResourceType.NODE, node_data,
+                    ResourceType.SYSTEM, system_data,
+                    self.current_time
                 )
         
         # pod_with_service
         pods_per_service = len(pods) // len(services)
-        for i, (service_data, service_created_at) in enumerate(services):
+        for i, service_data in enumerate(services):
             start_idx = i * pods_per_service
             end_idx = start_idx + pods_per_service if i < len(services) - 1 else len(pods)
-            for pod_data, pod_created_at in pods[start_idx:end_idx]:
+            for pod_data in pods[start_idx:end_idx]:
                 self.client.upsert_static_relation(
                     RelationType.POD_WITH_SERVICE,
-                    ResourceType.POD, pod_data, pod_created_at,
-                    ResourceType.SERVICE, service_data, service_created_at,
-                    self.random_time_in_range(), self.current_time
+                    ResourceType.POD, pod_data,
+                    ResourceType.SERVICE, service_data,
+                    self.current_time
                 )
         
         # deployment_with_replicaset and pod_with_replicaset
         pods_per_rs = len(pods) // len(replicasets)
-        for i, ((deploy_data, deploy_created_at), (rs_data, rs_created_at)) in enumerate(zip(deployments, replicasets)):
+        for i, (deploy_data, rs_data) in enumerate(zip(deployments, replicasets)):
             self.client.upsert_static_relation(
                 RelationType.DEPLOYMENT_WITH_REPLICASET,
-                ResourceType.DEPLOYMENT, deploy_data, deploy_created_at,
-                ResourceType.REPLICASET, rs_data, rs_created_at,
-                self.random_time_in_range(), self.current_time
+                ResourceType.DEPLOYMENT, deploy_data,
+                ResourceType.REPLICASET, rs_data,
+                self.current_time
             )
             
             start_idx = i * pods_per_rs
             end_idx = start_idx + pods_per_rs if i < len(replicasets) - 1 else len(pods)
-            for pod_data, pod_created_at in pods[start_idx:end_idx]:
+            for pod_data in pods[start_idx:end_idx]:
                 self.client.upsert_static_relation(
                     RelationType.POD_WITH_REPLICASET,
-                    ResourceType.POD, pod_data, pod_created_at,
-                    ResourceType.REPLICASET, rs_data, rs_created_at,
-                    self.random_time_in_range(), self.current_time
+                    ResourceType.POD, pod_data,
+                    ResourceType.REPLICASET, rs_data,
+                    self.current_time
                 )
         
         # container_with_pod - need to find matching pod
-        for container_data, container_created_at in containers:
+        for container_data in containers:
             # Find the pod that matches this container
             matching_pod = None
-            for pod_data, pod_created_at in pods:
+            for pod_data in pods:
                 if (pod_data["bcs_cluster_id"] == container_data["bcs_cluster_id"] and
                     pod_data["namespace"] == container_data["namespace"] and
                     pod_data["pod"] == container_data["pod"]):
-                    matching_pod = (pod_data, pod_created_at)
+                    matching_pod = pod_data
                     break
             
             if matching_pod:
-                pod_data, pod_created_at = matching_pod
                 self.client.upsert_static_relation(
                     RelationType.CONTAINER_WITH_POD,
-                    ResourceType.CONTAINER, container_data, container_created_at,
-                    ResourceType.POD, pod_data, pod_created_at,
-                    self.random_time_in_range(), self.current_time
+                    ResourceType.CONTAINER, container_data,
+                    ResourceType.POD, matching_pod,
+                    self.current_time
                 )
         
         # ingress_with_service
         ingress_list = self.resources.get(ResourceType.INGRESS, [])
         if ingress_list and services:
-            ingress_data, ingress_created_at = ingress_list[0]
-            service_data, service_created_at = services[0]
+            ingress_data = ingress_list[0]
+            service_data = services[0]
             self.client.upsert_static_relation(
                 RelationType.INGRESS_WITH_SERVICE,
-                ResourceType.INGRESS, ingress_data, ingress_created_at,
-                ResourceType.SERVICE, service_data, service_created_at,
-                self.random_time_in_range(), self.current_time
+                ResourceType.INGRESS, ingress_data,
+                ResourceType.SERVICE, service_data,
+                self.current_time
             )
         
         # job_with_pod
         job_list = self.resources.get(ResourceType.JOB, [])
         if job_list and pods:
-            job_data, job_created_at = job_list[0]
-            pod_data, pod_created_at = pods[0]
+            job_data = job_list[0]
+            pod_data = pods[0]
             self.client.upsert_static_relation(
                 RelationType.JOB_WITH_POD,
-                ResourceType.JOB, job_data, job_created_at,
-                ResourceType.POD, pod_data, pod_created_at,
-                self.random_time_in_range(), self.current_time
+                ResourceType.JOB, job_data,
+                ResourceType.POD, pod_data,
+                self.current_time
             )
         
         # pod_with_statefulset
         statefulset_list = self.resources.get(ResourceType.STATEFULSET, [])
         if statefulset_list and pods:
-            statefulset_data, statefulset_created_at = statefulset_list[0]
-            pod_data, pod_created_at = pods[0]
+            statefulset_data = statefulset_list[0]
+            pod_data = pods[0]
             self.client.upsert_static_relation(
                 RelationType.POD_WITH_STATEFULSET,
-                ResourceType.POD, pod_data, pod_created_at,
-                ResourceType.STATEFULSET, statefulset_data, statefulset_created_at,
-                self.random_time_in_range(), self.current_time
+                ResourceType.POD, pod_data,
+                ResourceType.STATEFULSET, statefulset_data,
+                self.current_time
             )
         
         # daemonset_with_pod
         daemonset_list = self.resources.get(ResourceType.DAEMONSET, [])
         if daemonset_list and pods:
-            daemonset_data, daemonset_created_at = daemonset_list[0]
-            pod_data, pod_created_at = pods[1] if len(pods) > 1 else pods[0]
+            daemonset_data = daemonset_list[0]
+            pod_data = pods[1] if len(pods) > 1 else pods[0]
             self.client.upsert_static_relation(
                 RelationType.DAEMONSET_WITH_POD,
-                ResourceType.DAEMONSET, daemonset_data, daemonset_created_at,
-                ResourceType.POD, pod_data, pod_created_at,
-                self.random_time_in_range(), self.current_time
+                ResourceType.DAEMONSET, daemonset_data,
+                ResourceType.POD, pod_data,
+                self.current_time
             )
         
         logger.info("  Created all Kubernetes relations")
@@ -1452,24 +1103,24 @@ class FullMockGenerator:
                 "bk_cloud_id": MockConfig.CLOUD_ID,
                 "bk_target_ip": f"10.0.0.{i+1}"
             })
-        results = self.client.batch_upsert_nodes(ResourceType.SYSTEM, systems, self.random_time_in_range(), self.current_time)
-        self.resources[ResourceType.SYSTEM] = [(systems[i], results[i][1]) for i in range(len(systems))]
+        self.client.batch_upsert_nodes(ResourceType.SYSTEM, systems, self.current_time)
+        self.resources[ResourceType.SYSTEM] = systems
         
         # K8s Address
         k8s_address_data = {
             "bcs_cluster_id": MockConfig.CLUSTER_ID,
             "address": "10.0.0.100"
         }
-        action, created_at_ms, _ = self.client.upsert_node(ResourceType.K8S_ADDRESS, k8s_address_data, self.random_time_in_range(), self.current_time)
-        self.resources[ResourceType.K8S_ADDRESS] = [(k8s_address_data, created_at_ms)]
+        self.client.upsert_node(ResourceType.K8S_ADDRESS, k8s_address_data, self.current_time)
+        self.resources[ResourceType.K8S_ADDRESS] = [k8s_address_data]
         
         # Domain
         domain_data = {
             "bcs_cluster_id": MockConfig.CLUSTER_ID,
             "domain": f"{MockConfig.BIZ_NAME}.example.com"
         }
-        action, created_at_ms, _ = self.client.upsert_node(ResourceType.DOMAIN, domain_data, self.random_time_in_range(), self.current_time)
-        self.resources[ResourceType.DOMAIN] = [(domain_data, created_at_ms)]
+        self.client.upsert_node(ResourceType.DOMAIN, domain_data, self.current_time)
+        self.resources[ResourceType.DOMAIN] = [domain_data]
         
         logger.info("  Created Network resources")
 
@@ -1483,24 +1134,24 @@ class FullMockGenerator:
         
         # k8s_address_with_service
         if k8s_address_list and services:
-            k8s_address_data, k8s_address_created_at = k8s_address_list[0]
-            service_data, service_created_at = services[0]
+            k8s_address_data = k8s_address_list[0]
+            service_data = services[0]
             self.client.upsert_static_relation(
                 RelationType.K8S_ADDRESS_WITH_SERVICE,
-                ResourceType.K8S_ADDRESS, k8s_address_data, k8s_address_created_at,
-                ResourceType.SERVICE, service_data, service_created_at,
-                self.random_time_in_range(), self.current_time
+                ResourceType.K8S_ADDRESS, k8s_address_data,
+                ResourceType.SERVICE, service_data,
+                self.current_time
             )
         
         # domain_with_service
         if domain_list and services:
-            domain_data, domain_created_at = domain_list[0]
-            service_data, service_created_at = services[0]
+            domain_data = domain_list[0]
+            service_data = services[0]
             self.client.upsert_static_relation(
                 RelationType.DOMAIN_WITH_SERVICE,
-                ResourceType.DOMAIN, domain_data, domain_created_at,
-                ResourceType.SERVICE, service_data, service_created_at,
-                self.random_time_in_range(), self.current_time
+                ResourceType.DOMAIN, domain_data,
+                ResourceType.SERVICE, service_data,
+                self.current_time
             )
         
         logger.info("  Created Network relations")
@@ -1518,8 +1169,8 @@ class FullMockGenerator:
             "apm_application_name": MockConfig.APM_APP_NAME,
             "apm_service_name": MockConfig.APM_SERVICE_NAME
         }
-        action, created_at_ms, _ = self.client.upsert_node(ResourceType.APM_SERVICE, apm_service_data, self.random_time_in_range(), self.current_time)
-        self.resources[ResourceType.APM_SERVICE] = [(apm_service_data, created_at_ms)]
+        self.client.upsert_node(ResourceType.APM_SERVICE, apm_service_data, self.current_time)
+        self.resources[ResourceType.APM_SERVICE] = [apm_service_data]
         
         # APM Service Instances
         apm_instances = []
@@ -1529,8 +1180,8 @@ class FullMockGenerator:
                 "apm_service_name": MockConfig.APM_SERVICE_NAME,
                 "apm_service_instance_name": f"{MockConfig.APM_SERVICE_NAME}-instance-{i}"
             })
-        results = self.client.batch_upsert_nodes(ResourceType.APM_SERVICE_INSTANCE, apm_instances, self.random_time_in_range(), self.current_time)
-        self.resources[ResourceType.APM_SERVICE_INSTANCE] = [(apm_instances[i], results[i][1]) for i in range(len(apm_instances))]
+        self.client.batch_upsert_nodes(ResourceType.APM_SERVICE_INSTANCE, apm_instances, self.current_time)
+        self.resources[ResourceType.APM_SERVICE_INSTANCE] = apm_instances
         
         logger.info("  Created APM resources")
 
@@ -1547,35 +1198,35 @@ class FullMockGenerator:
             logger.info("  No APM service found, skipping APM relations")
             return
         
-        apm_service_data, apm_service_created_at = apm_service_list[0]
+        apm_service_data = apm_service_list[0]
         
-        for i, (instance_data, instance_created_at) in enumerate(apm_instances):
+        for i, instance_data in enumerate(apm_instances):
             # apm_service_with_apm_service_instance
             self.client.upsert_static_relation(
                 RelationType.APM_SERVICE_WITH_APM_SERVICE_INSTANCE,
-                ResourceType.APM_SERVICE, apm_service_data, apm_service_created_at,
-                ResourceType.APM_SERVICE_INSTANCE, instance_data, instance_created_at,
-                self.random_time_in_range(), self.current_time
+                ResourceType.APM_SERVICE, apm_service_data,
+                ResourceType.APM_SERVICE_INSTANCE, instance_data,
+                self.current_time
             )
             
             # apm_service_instance_with_pod
             if pods:
-                pod_data, pod_created_at = pods[i % len(pods)]
+                pod_data = pods[i % len(pods)]
                 self.client.upsert_static_relation(
                     RelationType.APM_SERVICE_INSTANCE_WITH_POD,
-                    ResourceType.APM_SERVICE_INSTANCE, instance_data, instance_created_at,
-                    ResourceType.POD, pod_data, pod_created_at,
-                    self.random_time_in_range(), self.current_time
+                    ResourceType.APM_SERVICE_INSTANCE, instance_data,
+                    ResourceType.POD, pod_data,
+                    self.current_time
                 )
             
             # apm_service_instance_with_system
             if systems:
-                system_data, system_created_at = systems[i % len(systems)]
+                system_data = systems[i % len(systems)]
                 self.client.upsert_static_relation(
                     RelationType.APM_SERVICE_INSTANCE_WITH_SYSTEM,
-                    ResourceType.APM_SERVICE_INSTANCE, instance_data, instance_created_at,
-                    ResourceType.SYSTEM, system_data, system_created_at,
-                    self.random_time_in_range(), self.current_time
+                    ResourceType.APM_SERVICE_INSTANCE, instance_data,
+                    ResourceType.SYSTEM, system_data,
+                    self.current_time
                 )
         
         logger.info("  Created APM relations")
@@ -1590,16 +1241,16 @@ class FullMockGenerator:
         
         # DataSource
         datasource_data = {"bk_data_id": MockConfig.DATA_ID}
-        action, created_at_ms, _ = self.client.upsert_node(ResourceType.DATASOURCE, datasource_data, self.random_time_in_range(), self.current_time)
-        self.resources[ResourceType.DATASOURCE] = [(datasource_data, created_at_ms)]
+        self.client.upsert_node(ResourceType.DATASOURCE, datasource_data, self.current_time)
+        self.resources[ResourceType.DATASOURCE] = [datasource_data]
         
         # BKLogConfig
         bklogconfig_data = {
             "bklogconfig_namespace": MockConfig.NAMESPACE,
             "bklogconfig_name": f"{MockConfig.BIZ_NAME}-logconfig"
         }
-        action, created_at_ms, _ = self.client.upsert_node(ResourceType.BKLOGCONFIG, bklogconfig_data, self.random_time_in_range(), self.current_time)
-        self.resources[ResourceType.BKLOGCONFIG] = [(bklogconfig_data, created_at_ms)]
+        self.client.upsert_node(ResourceType.BKLOGCONFIG, bklogconfig_data, self.current_time)
+        self.resources[ResourceType.BKLOGCONFIG] = [bklogconfig_data]
         
         logger.info("  Created Data Source resources")
 
@@ -1616,36 +1267,36 @@ class FullMockGenerator:
             logger.info("  No datasource found, skipping datasource relations")
             return
             
-        datasource_data, datasource_created_at = datasource_list[0]
+        datasource_data = datasource_list[0]
         
         # datasource_with_pod
         if pods:
-            pod_data, pod_created_at = pods[0]
+            pod_data = pods[0]
             self.client.upsert_static_relation(
                 RelationType.DATASOURCE_WITH_POD,
-                ResourceType.DATASOURCE, datasource_data, datasource_created_at,
-                ResourceType.POD, pod_data, pod_created_at,
-                self.random_time_in_range(), self.current_time
+                ResourceType.DATASOURCE, datasource_data,
+                ResourceType.POD, pod_data,
+                self.current_time
             )
         
         # datasource_with_node
         if nodes:
-            node_data, node_created_at = nodes[0]
+            node_data = nodes[0]
             self.client.upsert_static_relation(
                 RelationType.DATASOURCE_WITH_NODE,
-                ResourceType.DATASOURCE, datasource_data, datasource_created_at,
-                ResourceType.NODE, node_data, node_created_at,
-                self.random_time_in_range(), self.current_time
+                ResourceType.DATASOURCE, datasource_data,
+                ResourceType.NODE, node_data,
+                self.current_time
             )
         
         # bklogconfig_with_datasource
         if bklogconfig_list:
-            bklogconfig_data, bklogconfig_created_at = bklogconfig_list[0]
+            bklogconfig_data = bklogconfig_list[0]
             self.client.upsert_static_relation(
                 RelationType.BKLOGCONFIG_WITH_DATASOURCE,
-                ResourceType.BKLOGCONFIG, bklogconfig_data, bklogconfig_created_at,
-                ResourceType.DATASOURCE, datasource_data, datasource_created_at,
-                self.random_time_in_range(), self.current_time
+                ResourceType.BKLOGCONFIG, bklogconfig_data,
+                ResourceType.DATASOURCE, datasource_data,
+                self.current_time
             )
         
         logger.info("  Created Data Source relations")
@@ -1663,21 +1314,21 @@ class FullMockGenerator:
             "app_name": MockConfig.APP_NAME,
             "version": MockConfig.VERSION
         }
-        action, created_at_ms, _ = self.client.upsert_node(ResourceType.APP_VERSION, app_version_data, self.random_time_in_range(), self.current_time)
-        self.resources[ResourceType.APP_VERSION] = [(app_version_data, created_at_ms)]
+        self.client.upsert_node(ResourceType.APP_VERSION, app_version_data, self.current_time)
+        self.resources[ResourceType.APP_VERSION] = [app_version_data]
         
         # Git Commit
         git_commit_data = {
             "git_repo": MockConfig.GIT_REPO,
             "commit_id": MockConfig.COMMIT_ID
         }
-        action, created_at_ms, _ = self.client.upsert_node(ResourceType.GIT_COMMIT, git_commit_data, self.random_time_in_range(), self.current_time)
-        self.resources[ResourceType.GIT_COMMIT] = [(git_commit_data, created_at_ms)]
+        self.client.upsert_node(ResourceType.GIT_COMMIT, git_commit_data, self.current_time)
+        self.resources[ResourceType.GIT_COMMIT] = [git_commit_data]
         
         # Environment
         env_data = {"environment": MockConfig.ENVIRONMENT}
-        action, created_at_ms, _ = self.client.upsert_node(ResourceType.ENVIRONMENT, env_data, self.random_time_in_range(), self.current_time)
-        self.resources[ResourceType.ENVIRONMENT] = [(env_data, created_at_ms)]
+        self.client.upsert_node(ResourceType.ENVIRONMENT, env_data, self.current_time)
+        self.resources[ResourceType.ENVIRONMENT] = [env_data]
         
         logger.info("  Created App Version resources")
 
@@ -1695,58 +1346,58 @@ class FullMockGenerator:
             logger.info("  No app version found, skipping app version relations")
             return
         
-        app_version_data, app_version_created_at = app_version_list[0]
+        app_version_data = app_version_list[0]
         
         # app_version_with_git_commit
         if git_commit_list:
-            git_commit_data, git_commit_created_at = git_commit_list[0]
+            git_commit_data = git_commit_list[0]
             self.client.upsert_static_relation(
                 RelationType.APP_VERSION_WITH_GIT_COMMIT,
-                ResourceType.APP_VERSION, app_version_data, app_version_created_at,
-                ResourceType.GIT_COMMIT, git_commit_data, git_commit_created_at,
-                self.random_time_in_range(), self.current_time
+                ResourceType.APP_VERSION, app_version_data,
+                ResourceType.GIT_COMMIT, git_commit_data,
+                self.current_time
             )
         
         # app_version_with_container
         if containers:
-            container_data, container_created_at = containers[0]
+            container_data = containers[0]
             self.client.upsert_static_relation(
                 RelationType.APP_VERSION_WITH_CONTAINER,
-                ResourceType.APP_VERSION, app_version_data, app_version_created_at,
-                ResourceType.CONTAINER, container_data, container_created_at,
-                self.random_time_in_range(), self.current_time
+                ResourceType.APP_VERSION, app_version_data,
+                ResourceType.CONTAINER, container_data,
+                self.current_time
             )
         
         # app_version_with_system
         if systems:
-            system_data, system_created_at = systems[0]
+            system_data = systems[0]
             self.client.upsert_static_relation(
                 RelationType.APP_VERSION_WITH_SYSTEM,
-                ResourceType.APP_VERSION, app_version_data, app_version_created_at,
-                ResourceType.SYSTEM, system_data, system_created_at,
-                self.random_time_in_range(), self.current_time
+                ResourceType.APP_VERSION, app_version_data,
+                ResourceType.SYSTEM, system_data,
+                self.current_time
             )
         
         # container_with_environment
         if containers and env_list:
-            container_data, container_created_at = containers[0]
-            env_data, env_created_at = env_list[0]
+            container_data = containers[0]
+            env_data = env_list[0]
             self.client.upsert_static_relation(
                 RelationType.CONTAINER_WITH_ENVIRONMENT,
-                ResourceType.CONTAINER, container_data, container_created_at,
-                ResourceType.ENVIRONMENT, env_data, env_created_at,
-                self.random_time_in_range(), self.current_time
+                ResourceType.CONTAINER, container_data,
+                ResourceType.ENVIRONMENT, env_data,
+                self.current_time
             )
         
         # environment_with_system
         if env_list and systems:
-            env_data, env_created_at = env_list[0]
-            system_data, system_created_at = systems[0]
+            env_data = env_list[0]
+            system_data = systems[0]
             self.client.upsert_static_relation(
                 RelationType.ENVIRONMENT_WITH_SYSTEM,
-                ResourceType.ENVIRONMENT, env_data, env_created_at,
-                ResourceType.SYSTEM, system_data, system_created_at,
-                self.random_time_in_range(), self.current_time
+                ResourceType.ENVIRONMENT, env_data,
+                ResourceType.SYSTEM, system_data,
+                self.current_time
             )
         
         logger.info("  Created App Version relations")
@@ -1765,83 +1416,79 @@ class FullMockGenerator:
         
         # pod_to_pod
         count = 0
-        for source_pod_data, source_created_at in pods:
+        for source_pod_data in pods:
             if random.random() < MockConfig.POD_TO_POD_TRAFFIC_PROBABILITY:
-                target_candidates = [(p, c) for p, c in pods if p != source_pod_data]
+                target_candidates = [p for p in pods if p != source_pod_data]
                 if target_candidates:
-                    target_pod_data, target_created_at = random.choice(target_candidates)
+                    target_pod_data = random.choice(target_candidates)
                     self.client.upsert_dynamic_relation(
                         RelationType.POD_TO_POD,
-                        ResourceType.POD, source_pod_data, source_created_at,
-                        ResourceType.POD, target_pod_data, target_created_at,
-                        self.random_time_in_range(), self.current_time
+                        ResourceType.POD, source_pod_data,
+                        ResourceType.POD, target_pod_data,
+                        self.current_time
                     )
-                    relation_id = IDGenerator.generate_dynamic_relation_id(
-                        RelationType.POD_TO_POD, ResourceType.POD, source_pod_data, source_created_at,
-                        ResourceType.POD, target_pod_data, target_created_at
-                    )
-                    self.traffic_relations.append((source_pod_data, source_created_at, target_pod_data, target_created_at, relation_id, RelationType.POD_TO_POD))
+                    self.traffic_relations.append((source_pod_data, target_pod_data, RelationType.POD_TO_POD))
                     count += 1
         logger.info(f"    Created {count} pod_to_pod relations")
         
         # pod_to_system
         count = 0
-        for pod_data, pod_created_at in pods:
+        for pod_data in pods:
             if random.random() < MockConfig.POD_TO_SYSTEM_TRAFFIC_PROBABILITY:
                 if systems:
-                    target_system_data, target_created_at = random.choice(systems)
+                    target_system_data = random.choice(systems)
                     self.client.upsert_dynamic_relation(
                         RelationType.POD_TO_SYSTEM,
-                        ResourceType.POD, pod_data, pod_created_at,
-                        ResourceType.SYSTEM, target_system_data, target_created_at,
-                        self.random_time_in_range(), self.current_time
+                        ResourceType.POD, pod_data,
+                        ResourceType.SYSTEM, target_system_data,
+                        self.current_time
                     )
                     count += 1
         logger.info(f"    Created {count} pod_to_system relations")
         
         # system_to_pod
         count = 0
-        for system_data, system_created_at in systems:
+        for system_data in systems:
             if random.random() < MockConfig.POD_TO_SYSTEM_TRAFFIC_PROBABILITY:
                 if pods:
-                    target_pod_data, target_created_at = random.choice(pods)
+                    target_pod_data = random.choice(pods)
                     self.client.upsert_dynamic_relation(
                         RelationType.SYSTEM_TO_POD,
-                        ResourceType.SYSTEM, system_data, system_created_at,
-                        ResourceType.POD, target_pod_data, target_created_at,
-                        self.random_time_in_range(), self.current_time
+                        ResourceType.SYSTEM, system_data,
+                        ResourceType.POD, target_pod_data,
+                        self.current_time
                     )
                     count += 1
         logger.info(f"    Created {count} system_to_pod relations")
         
         # system_to_system
         count = 0
-        for source_system_data, source_created_at in systems:
+        for source_system_data in systems:
             if random.random() < MockConfig.POD_TO_SYSTEM_TRAFFIC_PROBABILITY:
-                target_candidates = [(s, c) for s, c in systems if s != source_system_data]
+                target_candidates = [s for s in systems if s != source_system_data]
                 if target_candidates:
-                    target_system_data, target_created_at = random.choice(target_candidates)
+                    target_system_data = random.choice(target_candidates)
                     self.client.upsert_dynamic_relation(
                         RelationType.SYSTEM_TO_SYSTEM,
-                        ResourceType.SYSTEM, source_system_data, source_created_at,
-                        ResourceType.SYSTEM, target_system_data, target_created_at,
-                        self.random_time_in_range(), self.current_time
+                        ResourceType.SYSTEM, source_system_data,
+                        ResourceType.SYSTEM, target_system_data,
+                        self.current_time
                     )
                     count += 1
         logger.info(f"    Created {count} system_to_system relations")
         
         # service_to_service
         count = 0
-        for source_service_data, source_created_at in services:
+        for source_service_data in services:
             if random.random() < MockConfig.SERVICE_TO_SERVICE_TRAFFIC_PROBABILITY:
-                target_candidates = [(s, c) for s, c in services if s != source_service_data]
+                target_candidates = [s for s in services if s != source_service_data]
                 if target_candidates:
-                    target_service_data, target_created_at = random.choice(target_candidates)
+                    target_service_data = random.choice(target_candidates)
                     self.client.upsert_dynamic_relation(
                         RelationType.SERVICE_TO_SERVICE,
-                        ResourceType.SERVICE, source_service_data, source_created_at,
-                        ResourceType.SERVICE, target_service_data, target_created_at,
-                        self.random_time_in_range(), self.current_time
+                        ResourceType.SERVICE, source_service_data,
+                        ResourceType.SERVICE, target_service_data,
+                        self.current_time
                     )
                     count += 1
         logger.info(f"    Created {count} service_to_service relations")
@@ -1862,38 +1509,16 @@ class FullMockGenerator:
             {"metric_name": "memory_usage", "metric_type": "gauge", "unit": "bytes", "description": "内存使用量"},
         ]
         
-        metric_results = []
         for metric_data in metrics:
-            action, created_at_ms, _ = self.client.upsert_node(ResourceType.METRIC, metric_data, self.random_time_in_range(), self.current_time)
-            metric_results.append((metric_data, created_at_ms))
+            self.client.upsert_node(ResourceType.METRIC, metric_data, self.current_time)
         
-        self.resources[ResourceType.METRIC] = metric_results
+        self.resources[ResourceType.METRIC] = metrics
         logger.info(f"  Created {len(metrics)} metric definitions")
         
-        # Create relation_has_metric associations
-        count = 0
-        for source_data, source_created_at, target_data, target_created_at, relation_id, rel_type in self.traffic_relations:
-            if rel_type == RelationType.POD_TO_POD:
-                for metric_data, metric_created_at in metric_results[:3]:  # Only pod_to_pod metrics
-                    metric_id = IDGenerator.generate_node_id(ResourceType.METRIC, metric_data, metric_created_at)
-                    result_table_id = f"{MockConfig.RESULT_TABLE_ID}_{metric_data['metric_name']}"
-                    
-                    # Use correct RELATE syntax for TYPE RELATION table
-                    sql = f"""
-                    RELATE pod_to_pod:`{relation_id}`->relation_has_metric->metric:`{metric_id}` CONTENT {{
-                        result_table_id: '{result_table_id}',
-                        created_at: {self.current_time_ms},
-                        updated_at: {self.current_time_ms}
-                    }};
-                    """
-                    
-                    try:
-                        self.client.execute_sql(sql)
-                        count += 1
-                    except Exception as e:
-                        logger.warning(f"  Failed to create relation_has_metric: {e}")
-        
-        logger.info(f"  Created {count} relation_has_metric associations")
+        # Note: relation_has_metric associations require knowing the relation IDs
+        # which are now managed by SurrealDB. For simplicity, we skip this part
+        # as it requires querying the database to get the actual relation IDs.
+        logger.info("  Skipping relation_has_metric associations (requires relation ID lookup)")
 
     # =========================================================================
     # Main Generation
