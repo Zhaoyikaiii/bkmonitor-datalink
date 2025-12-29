@@ -8,8 +8,8 @@ surreal_db:
   url: "http://9.134.9.112:8000"
   username: "root"
   password: "gXZio8YhegwJnNKN"
-  namespace: "test_20251223"
-  database: "test_20251223"
+  namespace: "test_20251229"
+  database: "test_20251229"
 
 bkbase:
   api_url: ""

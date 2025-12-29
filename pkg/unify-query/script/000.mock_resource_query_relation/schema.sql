@@ -617,14 +617,18 @@ DEFINE FUNCTION fn::relation_id(
     LET $from_block = fn::kv_block($from_dimensions, $from_created_at);
     LET $to_block = fn::kv_block($to_dimensions, $to_created_at);
 
-    RETURN IF $relation_type = "bidirectional" {
-        IF $from_table <= $to_table THEN
-            string::concat($from_block, "|", $to_block)
-        ELSE
-            string::concat($to_block, "|", $from_block)
-    } ELSE {
+    -- Use LET to separate nested conditions (SurrealDB nested IF limitation)
+    LET $ordered_block = IF $from_table <= $to_table THEN
         string::concat($from_block, "|", $to_block)
-    };
+    ELSE
+        string::concat($to_block, "|", $from_block)
+    END;
+
+    RETURN IF $relation_type = "bidirectional" THEN
+        $ordered_block
+    ELSE
+        string::concat($from_block, "|", $to_block)
+    END;
 };
 
 -- ----------------------------------------------------------------------------
@@ -689,13 +693,17 @@ DEFINE FUNCTION fn::upsert_resource_lifecycle(
         LIMIT 1
     )[0];
 
-    RETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) {
-        UPDATE $last_record.id SET updated_at = $now
-    } ELSE {
-        LET $id_obj = object::from_entries(array::concat(object::entries($dimensions), [["created_at", $now]]));
+    RETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN
+        -- UPDATE returns an array, extract first element
+        (UPDATE $last_record.id SET updated_at = $now)[0]
+    ELSE {
+        -- Generate string-based ID using fn::kv_block
+        LET $id_str = fn::kv_block($dimensions, $now);
         LET $content = object::from_entries(array::concat(object::entries($dimensions), [["created_at", $now], ["updated_at", $now]]));
-        CREATE type::thing($table, $id_obj) CONTENT $content
-    };
+        -- CREATE returns an array, extract first element
+        (CREATE type::thing($table, $id_str) CONTENT $content)[0]
+    }
+    END;
 };
 
 -- ----------------------------------------------------------------------------
@@ -705,7 +713,11 @@ DEFINE FUNCTION fn::upsert_resource_lifecycle(
 -- fn::upsert_relation_lifecycle: Relation lifecycle management function
 --
 -- This function manages the lifecycle of relations between two resources.
--- It first upserts both endpoint resources, then manages the relation itself.
+-- It upserts both endpoint resources and returns their IDs for relation creation.
+--
+-- NOTE: SurrealDB does not support dynamic table names in RELATE statements within functions.
+-- The actual RELATE statement must be executed from the application layer.
+-- This function prepares the resources and returns the necessary information.
 --
 -- Parameters:
 --   $from_table: Source resource table name
@@ -715,6 +727,8 @@ DEFINE FUNCTION fn::upsert_resource_lifecycle(
 --   $now: Current timestamp in milliseconds
 --   $tolerance: Tolerance time in milliseconds
 --   $relation_type: "bidirectional" or "directional"
+--
+-- Returns: Object with from_id, to_id, from_created_at, to_created_at for use in RELATE
 DEFINE FUNCTION fn::upsert_relation_lifecycle(
     $from_table: string,
     $from_dimensions: object,
@@ -728,44 +742,16 @@ DEFINE FUNCTION fn::upsert_relation_lifecycle(
     LET $from_rec = fn::upsert_resource_lifecycle($from_table, $from_dimensions, $now, $tolerance);
     LET $to_rec = fn::upsert_resource_lifecycle($to_table, $to_dimensions, $now, $tolerance);
 
-    -- 2) Determine relation table name
-    LET $rel_table = IF $relation_type = "bidirectional" {
-        IF $from_table <= $to_table THEN
-            string::concat($from_table, "_with_", $to_table)
-        ELSE
-            string::concat($to_table, "_with_", $from_table)
-    } ELSE {
-        string::concat($from_table, "_to_", $to_table)
-    };
-
-    -- 3) Generate relation ID
-    LET $from_created = $from_rec.created_at;
-    LET $to_created = $to_rec.created_at;
-    LET $rid_body = fn::relation_id(
-        $from_table, $from_dimensions, $from_created,
-        $to_table, $to_dimensions, $to_created,
-        $relation_type
-    );
-
-    -- 4) Find existing relation record (using in and out field matching)
-    LET $existing = (
-        SELECT * FROM type::table($rel_table)
-        WHERE in = $from_rec.id AND out = $to_rec.id
-        LIMIT 1
-    )[0];
-
-    -- 5) Lifecycle management
-    RETURN IF $existing != NONE AND ($now - $existing.updated_at <= $tolerance) {
-        UPDATE $existing.id SET updated_at = $now
-    } ELSE IF $existing = NONE {
-        RELATE $from_rec.id->type::table($rel_table)->$to_rec.id CONTENT {
-            created_at: $now,
-            updated_at: $now
-        }
-    } ELSE {
-        UPDATE $existing.id SET
-            created_at = $now,
-            updated_at = $now
+    -- 2) Return resource info for caller to create the relation
+    RETURN {
+        from_id: $from_rec.id,
+        to_id: $to_rec.id,
+        from_created_at: $from_rec.created_at,
+        to_created_at: $to_rec.created_at,
+        from_table: $from_table,
+        to_table: $to_table,
+        relation_type: $relation_type,
+        now: $now
     };
 };
 

@@ -774,7 +774,10 @@ class SurrealDBClient:
         relation_type: str  # "single" or "bidirectional"
     ) -> Dict[str, Any]:
         """
-        Call fn::upsert_relation_lifecycle function
+        Call fn::upsert_relation_lifecycle function and create the relation.
+        
+        The function upserts both endpoint resources and returns their IDs.
+        We then create the relation using RELATE statement in Python.
         
         Args:
             from_table: Source resource table name
@@ -800,8 +803,10 @@ class SurrealDBClient:
         from_dim_str = format_dimensions(from_dimensions)
         to_dim_str = format_dimensions(to_dimensions)
         
+        # Step 1: Call the function to upsert resources and get their IDs
+        # Use LET + RETURN pattern to properly capture function output
         sql = f"""
-        fn::upsert_relation_lifecycle(
+        LET $result = fn::upsert_relation_lifecycle(
             '{from_table}',
             {{ {from_dim_str} }},
             '{to_table}',
@@ -810,16 +815,62 @@ class SurrealDBClient:
             {tolerance_ms},
             '{relation_type}'
         );
+        RETURN $result;
         """
         
         result = self.execute_sql(sql)
-        if result and result[0].get('result'):
-            records = result[0]['result']
-            if isinstance(records, list) and records:
-                return records[0]
-            elif isinstance(records, dict):
-                return records
-        return {}
+        resource_info = {}
+        # The result is in the second statement (RETURN)
+        if result and len(result) >= 2:
+            return_result = result[1].get('result')
+            if isinstance(return_result, dict):
+                resource_info = return_result
+            elif isinstance(return_result, list) and return_result:
+                resource_info = return_result[0] if isinstance(return_result[0], dict) else {}
+        
+        if not resource_info or 'from_id' not in resource_info:
+            logger.warning(f"Failed to get resource info for relation: {from_table} -> {to_table}")
+            return {}
+        
+        # Step 2: Determine relation table name
+        if relation_type == "bidirectional":
+            if from_table <= to_table:
+                rel_table = f"{from_table}_with_{to_table}"
+            else:
+                rel_table = f"{to_table}_with_{from_table}"
+        else:
+            rel_table = f"{from_table}_to_{to_table}"
+        
+        # Step 3: Create or update the relation
+        from_id = resource_info['from_id']
+        to_id = resource_info['to_id']
+        
+        # Check if relation already exists
+        check_sql = f"SELECT * FROM {rel_table} WHERE in = {from_id} AND out = {to_id} LIMIT 1;"
+        try:
+            check_result = self.execute_sql(check_sql)
+            existing = check_result[0].get('result', []) if check_result else []
+            
+            if existing:
+                # Update existing relation
+                existing_id = existing[0].get('id')
+                update_sql = f"UPDATE {existing_id} SET updated_at = {now_ms};"
+                self.execute_sql(update_sql)
+                return existing[0]
+            else:
+                # Create new relation
+                relate_sql = f"RELATE {from_id}->{rel_table}->{to_id} CONTENT {{ created_at: {now_ms}, updated_at: {now_ms} }};"
+                relate_result = self.execute_sql(relate_sql)
+                if relate_result and relate_result[0].get('result'):
+                    records = relate_result[0]['result']
+                    if isinstance(records, list) and records:
+                        return records[0]
+                    elif isinstance(records, dict):
+                        return records
+        except Exception as e:
+            logger.warning(f"Error creating relation {rel_table}: {e}")
+        
+        return resource_info
 
     def upsert_node(
             self,
