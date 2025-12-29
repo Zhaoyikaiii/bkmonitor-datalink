@@ -548,7 +548,7 @@ class SurrealDBClient:
             rel_table = f"{from_table}_to_{to_table}"
         
         # Step 2: Call fn::upsert_relation_lifecycle to upsert resources and 
-        #         fn::upsert_{rel_table} to upsert the relation in one SQL statement
+        #         fn::upsert_relation to upsert the relation in one SQL statement
         sql = f"""
         LET $resource_info = fn::upsert_relation_lifecycle(
             '{from_table}',
@@ -560,7 +560,7 @@ class SurrealDBClient:
             '{relation_type}',
             {bidirectional_str}
         );
-        LET $relation = fn::upsert_{rel_table}($resource_info.from_id, $resource_info.to_id, {now_ms});
+        LET $relation = fn::upsert_relation('{rel_table}', $resource_info.from_id, $resource_info.to_id, {now_ms});
         RETURN {{ resource_info: $resource_info, relation: $relation }};
         """
         

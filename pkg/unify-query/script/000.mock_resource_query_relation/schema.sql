@@ -603,6 +603,20 @@ DEFINE FUNCTION fn::kv_block($dimensions: object, $created_at: int) {
     RETURN string::concat($base, ",created_at=", <string>$created_at);
 };
 
+-- fn::relation_id: Generate a deterministic relation ID from two resource record IDs
+-- Format: {from_kv}|{to_kv} where kv is the key=value string extracted from resource ID
+-- Example: node_with_pod:⟨bcs_cluster_id=X,node=Y,created_at=T1|bcs_cluster_id=X,namespace=N,pod=P,created_at=T2⟩
+DEFINE FUNCTION fn::relation_id($from_id: record, $to_id: record) {
+    LET $from_str = <string>$from_id;
+    LET $to_str = <string>$to_id;
+    LET $from_kv = string::split($from_str, ":")[1];
+    LET $to_kv = string::split($to_str, ":")[1];
+    -- Remove the angle brackets ⟨ and ⟩ from the kv strings
+    LET $from_kv_clean = string::replace(string::replace($from_kv, "⟨", ""), "⟩", "");
+    LET $to_kv_clean = string::replace(string::replace($to_kv, "⟨", ""), "⟩", "");
+    RETURN string::concat($from_kv_clean, "|", $to_kv_clean);
+};
+
 
 -- ----------------------------------------------------------------------------
 -- 3.10.3 Resource Lifecycle Management
@@ -732,19 +746,22 @@ DEFINE FUNCTION fn::upsert_relation_lifecycle(
 };
 
 -- ============================================================================
--- SECTION 4: Relation Upsert Functions
+-- SECTION 4: Unified Relation Upsert Function
 --
--- These functions provide upsert capability for each relation table.
--- Since SurrealDB functions cannot use dynamic table names in RELATE statements,
--- we define a separate function for each relation type.
+-- This single function provides upsert capability for ALL relation tables.
+-- It uses dynamic table names with the RELATE statement.
 --
--- Each function:
---   1. Checks if relation already exists between the two endpoints
---   2. If exists: updates updated_at timestamp
---   3. If not exists: creates new relation with RELATE statement
+-- The function:
+--   1. Generates a deterministic relation ID from the two endpoint IDs
+--   2. Checks if relation already exists using the generated ID
+--   3. If exists: updates updated_at timestamp
+--   4. If not exists: creates new relation with RELATE statement
+--
+-- ID Format: {from_kv}|{to_kv}
+-- Example: node_with_pod:⟨bcs_cluster_id=X,node=Y,created_at=T1|bcs_cluster_id=X,namespace=N,pod=P,created_at=T2⟩
 -- ============================================================================
 
--- Remove existing relation upsert functions
+-- Remove all legacy per-table upsert functions (keep for backward compatibility cleanup)
 REMOVE FUNCTION IF EXISTS fn::upsert_node_with_system;
 REMOVE FUNCTION IF EXISTS fn::upsert_node_with_pod;
 REMOVE FUNCTION IF EXISTS fn::upsert_job_with_pod;
@@ -777,324 +794,48 @@ REMOVE FUNCTION IF EXISTS fn::upsert_pod_to_system;
 REMOVE FUNCTION IF EXISTS fn::upsert_system_to_pod;
 REMOVE FUNCTION IF EXISTS fn::upsert_system_to_system;
 REMOVE FUNCTION IF EXISTS fn::upsert_service_to_service;
+REMOVE FUNCTION IF EXISTS fn::upsert_relation;
 
 -- ----------------------------------------------------------------------------
--- 4.1 Kubernetes Static Relations Upsert Functions
+-- 4.1 Unified Relation Upsert Function
 -- ----------------------------------------------------------------------------
 
-DEFINE FUNCTION fn::upsert_node_with_system($from_id: record, $to_id: record, $now: int) {
-    LET $existing = (SELECT * FROM node_with_system WHERE in = $from_id AND out = $to_id LIMIT 1)[0];
+-- fn::upsert_relation: Universal relation upsert function for all relation tables
+--
+-- This function handles upsert operations for any relation table by:
+--   1. Generating a deterministic ID from the endpoint record IDs
+--   2. Checking for existing relation by ID (efficient lookup)
+--   3. Either updating the existing relation or creating a new one
+--
+-- Parameters:
+--   $relation_table: The relation table name (e.g., "node_with_pod", "pod_to_pod")
+--   $from_id: The source/from endpoint record ID
+--   $to_id: The target/to endpoint record ID
+--   $now: Current timestamp in milliseconds
+--
+-- Returns: The upserted relation record
+--
+-- Usage Examples:
+--   fn::upsert_relation("node_with_pod", $node_id, $pod_id, time::millis())
+--   fn::upsert_relation("pod_to_pod", $source_pod_id, $target_pod_id, time::millis())
+--   fn::upsert_relation("pod_with_service", $pod_id, $service_id, time::millis())
+DEFINE FUNCTION fn::upsert_relation($relation_table: string, $from_id: record, $to_id: record, $now: int) {
+    -- Generate deterministic relation ID from endpoint IDs
+    LET $rel_id = fn::relation_id($from_id, $to_id);
+    LET $full_id = type::thing($relation_table, $rel_id);
+    
+    -- Use dynamic table reference for both SELECT and RELATE
+    LET $rel_table = type::table($relation_table);
+    
+    -- Check if relation already exists by ID (efficient lookup)
+    LET $existing = (SELECT * FROM type::table($relation_table) WHERE id = $full_id LIMIT 1)[0];
+    
     RETURN IF $existing != NONE THEN
+        -- Update existing relation's updated_at timestamp
         (UPDATE $existing.id SET updated_at = $now)[0]
     ELSE
-        (RELATE $from_id->node_with_system->$to_id CONTENT { created_at: $now, updated_at: $now })[0]
-    END;
-};
-
-DEFINE FUNCTION fn::upsert_node_with_pod($from_id: record, $to_id: record, $now: int) {
-    LET $existing = (SELECT * FROM node_with_pod WHERE in = $from_id AND out = $to_id LIMIT 1)[0];
-    RETURN IF $existing != NONE THEN
-        (UPDATE $existing.id SET updated_at = $now)[0]
-    ELSE
-        (RELATE $from_id->node_with_pod->$to_id CONTENT { created_at: $now, updated_at: $now })[0]
-    END;
-};
-
-DEFINE FUNCTION fn::upsert_job_with_pod($from_id: record, $to_id: record, $now: int) {
-    LET $existing = (SELECT * FROM job_with_pod WHERE in = $from_id AND out = $to_id LIMIT 1)[0];
-    RETURN IF $existing != NONE THEN
-        (UPDATE $existing.id SET updated_at = $now)[0]
-    ELSE
-        (RELATE $from_id->job_with_pod->$to_id CONTENT { created_at: $now, updated_at: $now })[0]
-    END;
-};
-
-DEFINE FUNCTION fn::upsert_pod_with_replicaset($from_id: record, $to_id: record, $now: int) {
-    LET $existing = (SELECT * FROM pod_with_replicaset WHERE in = $from_id AND out = $to_id LIMIT 1)[0];
-    RETURN IF $existing != NONE THEN
-        (UPDATE $existing.id SET updated_at = $now)[0]
-    ELSE
-        (RELATE $from_id->pod_with_replicaset->$to_id CONTENT { created_at: $now, updated_at: $now })[0]
-    END;
-};
-
-DEFINE FUNCTION fn::upsert_pod_with_statefulset($from_id: record, $to_id: record, $now: int) {
-    LET $existing = (SELECT * FROM pod_with_statefulset WHERE in = $from_id AND out = $to_id LIMIT 1)[0];
-    RETURN IF $existing != NONE THEN
-        (UPDATE $existing.id SET updated_at = $now)[0]
-    ELSE
-        (RELATE $from_id->pod_with_statefulset->$to_id CONTENT { created_at: $now, updated_at: $now })[0]
-    END;
-};
-
-DEFINE FUNCTION fn::upsert_daemonset_with_pod($from_id: record, $to_id: record, $now: int) {
-    LET $existing = (SELECT * FROM daemonset_with_pod WHERE in = $from_id AND out = $to_id LIMIT 1)[0];
-    RETURN IF $existing != NONE THEN
-        (UPDATE $existing.id SET updated_at = $now)[0]
-    ELSE
-        (RELATE $from_id->daemonset_with_pod->$to_id CONTENT { created_at: $now, updated_at: $now })[0]
-    END;
-};
-
-DEFINE FUNCTION fn::upsert_deployment_with_replicaset($from_id: record, $to_id: record, $now: int) {
-    LET $existing = (SELECT * FROM deployment_with_replicaset WHERE in = $from_id AND out = $to_id LIMIT 1)[0];
-    RETURN IF $existing != NONE THEN
-        (UPDATE $existing.id SET updated_at = $now)[0]
-    ELSE
-        (RELATE $from_id->deployment_with_replicaset->$to_id CONTENT { created_at: $now, updated_at: $now })[0]
-    END;
-};
-
-DEFINE FUNCTION fn::upsert_pod_with_service($from_id: record, $to_id: record, $now: int) {
-    LET $existing = (SELECT * FROM pod_with_service WHERE in = $from_id AND out = $to_id LIMIT 1)[0];
-    RETURN IF $existing != NONE THEN
-        (UPDATE $existing.id SET updated_at = $now)[0]
-    ELSE
-        (RELATE $from_id->pod_with_service->$to_id CONTENT { created_at: $now, updated_at: $now })[0]
-    END;
-};
-
-DEFINE FUNCTION fn::upsert_ingress_with_service($from_id: record, $to_id: record, $now: int) {
-    LET $existing = (SELECT * FROM ingress_with_service WHERE in = $from_id AND out = $to_id LIMIT 1)[0];
-    RETURN IF $existing != NONE THEN
-        (UPDATE $existing.id SET updated_at = $now)[0]
-    ELSE
-        (RELATE $from_id->ingress_with_service->$to_id CONTENT { created_at: $now, updated_at: $now })[0]
-    END;
-};
-
--- ----------------------------------------------------------------------------
--- 4.2 Network Static Relations Upsert Functions
--- ----------------------------------------------------------------------------
-
-DEFINE FUNCTION fn::upsert_k8s_address_with_service($from_id: record, $to_id: record, $now: int) {
-    LET $existing = (SELECT * FROM k8s_address_with_service WHERE in = $from_id AND out = $to_id LIMIT 1)[0];
-    RETURN IF $existing != NONE THEN
-        (UPDATE $existing.id SET updated_at = $now)[0]
-    ELSE
-        (RELATE $from_id->k8s_address_with_service->$to_id CONTENT { created_at: $now, updated_at: $now })[0]
-    END;
-};
-
-DEFINE FUNCTION fn::upsert_domain_with_service($from_id: record, $to_id: record, $now: int) {
-    LET $existing = (SELECT * FROM domain_with_service WHERE in = $from_id AND out = $to_id LIMIT 1)[0];
-    RETURN IF $existing != NONE THEN
-        (UPDATE $existing.id SET updated_at = $now)[0]
-    ELSE
-        (RELATE $from_id->domain_with_service->$to_id CONTENT { created_at: $now, updated_at: $now })[0]
-    END;
-};
-
--- ----------------------------------------------------------------------------
--- 4.3 APM Static Relations Upsert Functions
--- ----------------------------------------------------------------------------
-
-DEFINE FUNCTION fn::upsert_apm_service_instance_with_pod($from_id: record, $to_id: record, $now: int) {
-    LET $existing = (SELECT * FROM apm_service_instance_with_pod WHERE in = $from_id AND out = $to_id LIMIT 1)[0];
-    RETURN IF $existing != NONE THEN
-        (UPDATE $existing.id SET updated_at = $now)[0]
-    ELSE
-        (RELATE $from_id->apm_service_instance_with_pod->$to_id CONTENT { created_at: $now, updated_at: $now })[0]
-    END;
-};
-
-DEFINE FUNCTION fn::upsert_apm_service_instance_with_system($from_id: record, $to_id: record, $now: int) {
-    LET $existing = (SELECT * FROM apm_service_instance_with_system WHERE in = $from_id AND out = $to_id LIMIT 1)[0];
-    RETURN IF $existing != NONE THEN
-        (UPDATE $existing.id SET updated_at = $now)[0]
-    ELSE
-        (RELATE $from_id->apm_service_instance_with_system->$to_id CONTENT { created_at: $now, updated_at: $now })[0]
-    END;
-};
-
-DEFINE FUNCTION fn::upsert_apm_service_with_apm_service_instance($from_id: record, $to_id: record, $now: int) {
-    LET $existing = (SELECT * FROM apm_service_with_apm_service_instance WHERE in = $from_id AND out = $to_id LIMIT 1)[0];
-    RETURN IF $existing != NONE THEN
-        (UPDATE $existing.id SET updated_at = $now)[0]
-    ELSE
-        (RELATE $from_id->apm_service_with_apm_service_instance->$to_id CONTENT { created_at: $now, updated_at: $now })[0]
-    END;
-};
-
--- ----------------------------------------------------------------------------
--- 4.4 Container Static Relations Upsert Functions
--- ----------------------------------------------------------------------------
-
-DEFINE FUNCTION fn::upsert_container_with_pod($from_id: record, $to_id: record, $now: int) {
-    LET $existing = (SELECT * FROM container_with_pod WHERE in = $from_id AND out = $to_id LIMIT 1)[0];
-    RETURN IF $existing != NONE THEN
-        (UPDATE $existing.id SET updated_at = $now)[0]
-    ELSE
-        (RELATE $from_id->container_with_pod->$to_id CONTENT { created_at: $now, updated_at: $now })[0]
-    END;
-};
-
--- ----------------------------------------------------------------------------
--- 4.5 Data Source Static Relations Upsert Functions
--- ----------------------------------------------------------------------------
-
-DEFINE FUNCTION fn::upsert_datasource_with_pod($from_id: record, $to_id: record, $now: int) {
-    LET $existing = (SELECT * FROM datasource_with_pod WHERE in = $from_id AND out = $to_id LIMIT 1)[0];
-    RETURN IF $existing != NONE THEN
-        (UPDATE $existing.id SET updated_at = $now)[0]
-    ELSE
-        (RELATE $from_id->datasource_with_pod->$to_id CONTENT { created_at: $now, updated_at: $now })[0]
-    END;
-};
-
-DEFINE FUNCTION fn::upsert_datasource_with_node($from_id: record, $to_id: record, $now: int) {
-    LET $existing = (SELECT * FROM datasource_with_node WHERE in = $from_id AND out = $to_id LIMIT 1)[0];
-    RETURN IF $existing != NONE THEN
-        (UPDATE $existing.id SET updated_at = $now)[0]
-    ELSE
-        (RELATE $from_id->datasource_with_node->$to_id CONTENT { created_at: $now, updated_at: $now })[0]
-    END;
-};
-
-DEFINE FUNCTION fn::upsert_bklogconfig_with_datasource($from_id: record, $to_id: record, $now: int) {
-    LET $existing = (SELECT * FROM bklogconfig_with_datasource WHERE in = $from_id AND out = $to_id LIMIT 1)[0];
-    RETURN IF $existing != NONE THEN
-        (UPDATE $existing.id SET updated_at = $now)[0]
-    ELSE
-        (RELATE $from_id->bklogconfig_with_datasource->$to_id CONTENT { created_at: $now, updated_at: $now })[0]
-    END;
-};
-
--- ----------------------------------------------------------------------------
--- 4.6 CMDB Static Relations Upsert Functions
--- ----------------------------------------------------------------------------
-
-DEFINE FUNCTION fn::upsert_biz_with_set($from_id: record, $to_id: record, $now: int) {
-    LET $existing = (SELECT * FROM biz_with_set WHERE in = $from_id AND out = $to_id LIMIT 1)[0];
-    RETURN IF $existing != NONE THEN
-        (UPDATE $existing.id SET updated_at = $now)[0]
-    ELSE
-        (RELATE $from_id->biz_with_set->$to_id CONTENT { created_at: $now, updated_at: $now })[0]
-    END;
-};
-
-DEFINE FUNCTION fn::upsert_module_with_set($from_id: record, $to_id: record, $now: int) {
-    LET $existing = (SELECT * FROM module_with_set WHERE in = $from_id AND out = $to_id LIMIT 1)[0];
-    RETURN IF $existing != NONE THEN
-        (UPDATE $existing.id SET updated_at = $now)[0]
-    ELSE
-        (RELATE $from_id->module_with_set->$to_id CONTENT { created_at: $now, updated_at: $now })[0]
-    END;
-};
-
-DEFINE FUNCTION fn::upsert_host_with_module($from_id: record, $to_id: record, $now: int) {
-    LET $existing = (SELECT * FROM host_with_module WHERE in = $from_id AND out = $to_id LIMIT 1)[0];
-    RETURN IF $existing != NONE THEN
-        (UPDATE $existing.id SET updated_at = $now)[0]
-    ELSE
-        (RELATE $from_id->host_with_module->$to_id CONTENT { created_at: $now, updated_at: $now })[0]
-    END;
-};
-
-DEFINE FUNCTION fn::upsert_host_with_system($from_id: record, $to_id: record, $now: int) {
-    LET $existing = (SELECT * FROM host_with_system WHERE in = $from_id AND out = $to_id LIMIT 1)[0];
-    RETURN IF $existing != NONE THEN
-        (UPDATE $existing.id SET updated_at = $now)[0]
-    ELSE
-        (RELATE $from_id->host_with_system->$to_id CONTENT { created_at: $now, updated_at: $now })[0]
-    END;
-};
-
--- ----------------------------------------------------------------------------
--- 4.7 App Version Static Relations Upsert Functions
--- ----------------------------------------------------------------------------
-
-DEFINE FUNCTION fn::upsert_app_version_with_container($from_id: record, $to_id: record, $now: int) {
-    LET $existing = (SELECT * FROM app_version_with_container WHERE in = $from_id AND out = $to_id LIMIT 1)[0];
-    RETURN IF $existing != NONE THEN
-        (UPDATE $existing.id SET updated_at = $now)[0]
-    ELSE
-        (RELATE $from_id->app_version_with_container->$to_id CONTENT { created_at: $now, updated_at: $now })[0]
-    END;
-};
-
-DEFINE FUNCTION fn::upsert_app_version_with_system($from_id: record, $to_id: record, $now: int) {
-    LET $existing = (SELECT * FROM app_version_with_system WHERE in = $from_id AND out = $to_id LIMIT 1)[0];
-    RETURN IF $existing != NONE THEN
-        (UPDATE $existing.id SET updated_at = $now)[0]
-    ELSE
-        (RELATE $from_id->app_version_with_system->$to_id CONTENT { created_at: $now, updated_at: $now })[0]
-    END;
-};
-
-DEFINE FUNCTION fn::upsert_container_with_environment($from_id: record, $to_id: record, $now: int) {
-    LET $existing = (SELECT * FROM container_with_environment WHERE in = $from_id AND out = $to_id LIMIT 1)[0];
-    RETURN IF $existing != NONE THEN
-        (UPDATE $existing.id SET updated_at = $now)[0]
-    ELSE
-        (RELATE $from_id->container_with_environment->$to_id CONTENT { created_at: $now, updated_at: $now })[0]
-    END;
-};
-
-DEFINE FUNCTION fn::upsert_environment_with_system($from_id: record, $to_id: record, $now: int) {
-    LET $existing = (SELECT * FROM environment_with_system WHERE in = $from_id AND out = $to_id LIMIT 1)[0];
-    RETURN IF $existing != NONE THEN
-        (UPDATE $existing.id SET updated_at = $now)[0]
-    ELSE
-        (RELATE $from_id->environment_with_system->$to_id CONTENT { created_at: $now, updated_at: $now })[0]
-    END;
-};
-
-DEFINE FUNCTION fn::upsert_app_version_with_git_commit($from_id: record, $to_id: record, $now: int) {
-    LET $existing = (SELECT * FROM app_version_with_git_commit WHERE in = $from_id AND out = $to_id LIMIT 1)[0];
-    RETURN IF $existing != NONE THEN
-        (UPDATE $existing.id SET updated_at = $now)[0]
-    ELSE
-        (RELATE $from_id->app_version_with_git_commit->$to_id CONTENT { created_at: $now, updated_at: $now })[0]
-    END;
-};
-
--- ----------------------------------------------------------------------------
--- 4.8 Dynamic Traffic Relations Upsert Functions
--- ----------------------------------------------------------------------------
-
-DEFINE FUNCTION fn::upsert_pod_to_pod($from_id: record, $to_id: record, $now: int) {
-    LET $existing = (SELECT * FROM pod_to_pod WHERE in = $from_id AND out = $to_id LIMIT 1)[0];
-    RETURN IF $existing != NONE THEN
-        (UPDATE $existing.id SET updated_at = $now)[0]
-    ELSE
-        (RELATE $from_id->pod_to_pod->$to_id CONTENT { created_at: $now, updated_at: $now })[0]
-    END;
-};
-
-DEFINE FUNCTION fn::upsert_pod_to_system($from_id: record, $to_id: record, $now: int) {
-    LET $existing = (SELECT * FROM pod_to_system WHERE in = $from_id AND out = $to_id LIMIT 1)[0];
-    RETURN IF $existing != NONE THEN
-        (UPDATE $existing.id SET updated_at = $now)[0]
-    ELSE
-        (RELATE $from_id->pod_to_system->$to_id CONTENT { created_at: $now, updated_at: $now })[0]
-    END;
-};
-
-DEFINE FUNCTION fn::upsert_system_to_pod($from_id: record, $to_id: record, $now: int) {
-    LET $existing = (SELECT * FROM system_to_pod WHERE in = $from_id AND out = $to_id LIMIT 1)[0];
-    RETURN IF $existing != NONE THEN
-        (UPDATE $existing.id SET updated_at = $now)[0]
-    ELSE
-        (RELATE $from_id->system_to_pod->$to_id CONTENT { created_at: $now, updated_at: $now })[0]
-    END;
-};
-
-DEFINE FUNCTION fn::upsert_system_to_system($from_id: record, $to_id: record, $now: int) {
-    LET $existing = (SELECT * FROM system_to_system WHERE in = $from_id AND out = $to_id LIMIT 1)[0];
-    RETURN IF $existing != NONE THEN
-        (UPDATE $existing.id SET updated_at = $now)[0]
-    ELSE
-        (RELATE $from_id->system_to_system->$to_id CONTENT { created_at: $now, updated_at: $now })[0]
-    END;
-};
-
-DEFINE FUNCTION fn::upsert_service_to_service($from_id: record, $to_id: record, $now: int) {
-    LET $existing = (SELECT * FROM service_to_service WHERE in = $from_id AND out = $to_id LIMIT 1)[0];
-    RETURN IF $existing != NONE THEN
-        (UPDATE $existing.id SET updated_at = $now)[0]
-    ELSE
-        (RELATE $from_id->service_to_service->$to_id CONTENT { created_at: $now, updated_at: $now })[0]
+        -- Create new relation with custom ID
+        (RELATE $from_id->$rel_table->$to_id SET id = $full_id, created_at = $now, updated_at = $now)[0]
     END;
 };
 
