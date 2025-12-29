@@ -572,6 +572,204 @@ DEFINE FIELD created_at ON relation_has_metric TYPE int;
 DEFINE FIELD updated_at ON relation_has_metric TYPE int;
 
 -- ============================================================================
+-- SECTION 3.10: Lifecycle Management Functions
+--
+-- These functions provide generalized lifecycle management capabilities for
+-- resources and relations. They handle upsert logic with tolerance-based
+-- lifecycle detection.
+-- ============================================================================
+
+-- ----------------------------------------------------------------------------
+-- 3.10.1 Remove Existing Functions (for clean reset)
+-- ----------------------------------------------------------------------------
+
+REMOVE FUNCTION IF EXISTS fn::kv_block;
+REMOVE FUNCTION IF EXISTS fn::upsert_resource_lifecycle;
+REMOVE FUNCTION IF EXISTS fn::relation_id;
+REMOVE FUNCTION IF EXISTS fn::upsert_relation_lifecycle;
+
+-- ----------------------------------------------------------------------------
+-- 3.10.2 Helper Functions
+-- ----------------------------------------------------------------------------
+
+-- fn::kv_block: Convert dimensions object to sorted key=value string with created_at
+-- This function creates a deterministic string representation of resource dimensions
+-- for use in ID generation.
+DEFINE FUNCTION fn::kv_block($dimensions: object, $created_at: int) {
+    LET $entries = object::entries($dimensions);
+    LET $sorted = array::sort($entries);
+    LET $pairs = array::map($sorted, |$e| string::concat($e[0], "=", <string>$e[1]));
+    LET $base = array::join($pairs, ",");
+    RETURN string::concat($base, ",created_at=", <string>$created_at);
+};
+
+-- fn::relation_id: Generate relation ID from source and target resource info
+-- Handles bidirectional relations by sorting table names alphabetically
+DEFINE FUNCTION fn::relation_id(
+    $from_table: string,
+    $from_dimensions: object,
+    $from_created_at: int,
+    $to_table: string,
+    $to_dimensions: object,
+    $to_created_at: int,
+    $relation_type: string
+) {
+    LET $from_block = fn::kv_block($from_dimensions, $from_created_at);
+    LET $to_block = fn::kv_block($to_dimensions, $to_created_at);
+
+    RETURN IF $relation_type = "bidirectional" {
+        IF $from_table <= $to_table THEN
+            string::concat($from_block, "|", $to_block)
+        ELSE
+            string::concat($to_block, "|", $from_block)
+    } ELSE {
+        string::concat($from_block, "|", $to_block)
+    };
+};
+
+-- ----------------------------------------------------------------------------
+-- 3.10.3 Resource Lifecycle Management
+-- ----------------------------------------------------------------------------
+
+-- fn::upsert_resource_lifecycle: Generalized resource lifecycle management function
+-- 
+-- This function implements the upsert logic for resources with tolerance-based
+-- lifecycle detection. If the last update was within tolerance, it updates the
+-- existing record. Otherwise, it creates a new lifecycle record.
+--
+-- Note: SurrealDB closures cannot access external variables, so we use explicit
+-- field matching for all possible dimension fields.
+--
+-- Parameters:
+--   $table: The resource table name
+--   $dimensions: Object containing the resource's dimension fields
+--   $now: Current timestamp in milliseconds
+--   $tolerance: Tolerance time in milliseconds for lifecycle detection
+DEFINE FUNCTION fn::upsert_resource_lifecycle(
+    $table: string,
+    $dimensions: object,
+    $now: int,
+    $tolerance: int
+) {
+    LET $last_record = (
+        SELECT * FROM type::table($table)
+        WHERE ($dimensions.bcs_cluster_id IS NONE OR bcs_cluster_id = $dimensions.bcs_cluster_id)
+          AND ($dimensions.namespace IS NONE OR namespace = $dimensions.namespace)
+          AND ($dimensions.pod IS NONE OR pod = $dimensions.pod)
+          AND ($dimensions.node IS NONE OR node = $dimensions.node)
+          AND ($dimensions.service IS NONE OR service = $dimensions.service)
+          AND ($dimensions.container IS NONE OR container = $dimensions.container)
+          AND ($dimensions.deployment IS NONE OR deployment = $dimensions.deployment)
+          AND ($dimensions.statefulset IS NONE OR statefulset = $dimensions.statefulset)
+          AND ($dimensions.daemonset IS NONE OR daemonset = $dimensions.daemonset)
+          AND ($dimensions.replicaset IS NONE OR replicaset = $dimensions.replicaset)
+          AND ($dimensions.job IS NONE OR job = $dimensions.job)
+          AND ($dimensions.ingress IS NONE OR ingress = $dimensions.ingress)
+          AND ($dimensions.bk_cloud_id IS NONE OR bk_cloud_id = $dimensions.bk_cloud_id)
+          AND ($dimensions.bk_target_ip IS NONE OR bk_target_ip = $dimensions.bk_target_ip)
+          AND ($dimensions.address IS NONE OR address = $dimensions.address)
+          AND ($dimensions.domain IS NONE OR domain = $dimensions.domain)
+          AND ($dimensions.apm_application_name IS NONE OR apm_application_name = $dimensions.apm_application_name)
+          AND ($dimensions.apm_service_name IS NONE OR apm_service_name = $dimensions.apm_service_name)
+          AND ($dimensions.apm_service_instance_name IS NONE OR apm_service_instance_name = $dimensions.apm_service_instance_name)
+          AND ($dimensions.bk_data_id IS NONE OR bk_data_id = $dimensions.bk_data_id)
+          AND ($dimensions.bklogconfig_namespace IS NONE OR bklogconfig_namespace = $dimensions.bklogconfig_namespace)
+          AND ($dimensions.bklogconfig_name IS NONE OR bklogconfig_name = $dimensions.bklogconfig_name)
+          AND ($dimensions.bk_biz_id IS NONE OR bk_biz_id = $dimensions.bk_biz_id)
+          AND ($dimensions.bk_set_id IS NONE OR bk_set_id = $dimensions.bk_set_id)
+          AND ($dimensions.bk_module_id IS NONE OR bk_module_id = $dimensions.bk_module_id)
+          AND ($dimensions.bk_host_id IS NONE OR bk_host_id = $dimensions.bk_host_id)
+          AND ($dimensions.app_name IS NONE OR app_name = $dimensions.app_name)
+          AND ($dimensions.version IS NONE OR version = $dimensions.version)
+          AND ($dimensions.git_repo IS NONE OR git_repo = $dimensions.git_repo)
+          AND ($dimensions.commit_id IS NONE OR commit_id = $dimensions.commit_id)
+          AND ($dimensions.environment IS NONE OR environment = $dimensions.environment)
+          AND ($dimensions.metric_name IS NONE OR metric_name = $dimensions.metric_name)
+        ORDER BY created_at DESC 
+        LIMIT 1
+    )[0];
+
+    RETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) {
+        UPDATE $last_record.id SET updated_at = $now
+    } ELSE {
+        LET $id_obj = object::from_entries(array::concat(object::entries($dimensions), [["created_at", $now]]));
+        LET $content = object::from_entries(array::concat(object::entries($dimensions), [["created_at", $now], ["updated_at", $now]]));
+        CREATE type::thing($table, $id_obj) CONTENT $content
+    };
+};
+
+-- ----------------------------------------------------------------------------
+-- 3.10.4 Relation Lifecycle Management
+-- ----------------------------------------------------------------------------
+
+-- fn::upsert_relation_lifecycle: Relation lifecycle management function
+--
+-- This function manages the lifecycle of relations between two resources.
+-- It first upserts both endpoint resources, then manages the relation itself.
+--
+-- Parameters:
+--   $from_table: Source resource table name
+--   $from_dimensions: Source resource dimensions
+--   $to_table: Target resource table name
+--   $to_dimensions: Target resource dimensions
+--   $now: Current timestamp in milliseconds
+--   $tolerance: Tolerance time in milliseconds
+--   $relation_type: "bidirectional" or "directional"
+DEFINE FUNCTION fn::upsert_relation_lifecycle(
+    $from_table: string,
+    $from_dimensions: object,
+    $to_table: string,
+    $to_dimensions: object,
+    $now: int,
+    $tolerance: int,
+    $relation_type: string
+) {
+    -- 1) Upsert both endpoint resources
+    LET $from_rec = fn::upsert_resource_lifecycle($from_table, $from_dimensions, $now, $tolerance);
+    LET $to_rec = fn::upsert_resource_lifecycle($to_table, $to_dimensions, $now, $tolerance);
+
+    -- 2) Determine relation table name
+    LET $rel_table = IF $relation_type = "bidirectional" {
+        IF $from_table <= $to_table THEN
+            string::concat($from_table, "_with_", $to_table)
+        ELSE
+            string::concat($to_table, "_with_", $from_table)
+    } ELSE {
+        string::concat($from_table, "_to_", $to_table)
+    };
+
+    -- 3) Generate relation ID
+    LET $from_created = $from_rec.created_at;
+    LET $to_created = $to_rec.created_at;
+    LET $rid_body = fn::relation_id(
+        $from_table, $from_dimensions, $from_created,
+        $to_table, $to_dimensions, $to_created,
+        $relation_type
+    );
+
+    -- 4) Find existing relation record (using in and out field matching)
+    LET $existing = (
+        SELECT * FROM type::table($rel_table)
+        WHERE in = $from_rec.id AND out = $to_rec.id
+        LIMIT 1
+    )[0];
+
+    -- 5) Lifecycle management
+    RETURN IF $existing != NONE AND ($now - $existing.updated_at <= $tolerance) {
+        UPDATE $existing.id SET updated_at = $now
+    } ELSE IF $existing = NONE {
+        RELATE $from_rec.id->type::table($rel_table)->$to_rec.id CONTENT {
+            created_at: $now,
+            updated_at: $now
+        }
+    } ELSE {
+        UPDATE $existing.id SET
+            created_at = $now,
+            updated_at = $now
+    };
+};
+
+-- ============================================================================
 -- SECTION 4: Lifecycle Events (per document section 8.2.4)
 --
 -- Event-driven lifecycle management for resources.

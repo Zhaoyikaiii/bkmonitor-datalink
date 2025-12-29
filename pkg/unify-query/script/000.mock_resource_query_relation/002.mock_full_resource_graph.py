@@ -716,6 +716,111 @@ class SurrealDBClient:
         sql = f"UPDATE {record_id} SET updated_at = {updated_at_ms};"
         self.execute_sql(sql)
 
+    def call_upsert_resource_lifecycle(
+        self,
+        table: str,
+        dimensions: Dict[str, Any],
+        now_ms: int,
+        tolerance_ms: int
+    ) -> Dict[str, Any]:
+        """
+        Call fn::upsert_resource_lifecycle function
+        
+        Args:
+            table: The resource table name
+            dimensions: Dictionary of dimension key-value pairs
+            now_ms: Current timestamp in milliseconds
+            tolerance_ms: Tolerance time in milliseconds for lifecycle decisions
+        
+        Returns:
+            The created/updated record
+        """
+        # Build dimensions object string
+        dim_parts = []
+        for k, v in dimensions.items():
+            if isinstance(v, (int, float)):
+                dim_parts.append(f"{k}: {v}")
+            else:
+                dim_parts.append(f"{k}: '{v}'")
+        dim_str = ", ".join(dim_parts)
+        
+        sql = f"""
+        fn::upsert_resource_lifecycle(
+            '{table}',
+            {{ {dim_str} }},
+            {now_ms},
+            {tolerance_ms}
+        );
+        """
+        
+        result = self.execute_sql(sql)
+        # Function returns the created/updated record
+        if result and result[0].get('result'):
+            records = result[0]['result']
+            if isinstance(records, list) and records:
+                return records[0]
+            elif isinstance(records, dict):
+                return records
+        return {}
+
+    def call_upsert_relation_lifecycle(
+        self,
+        from_table: str,
+        from_dimensions: Dict[str, Any],
+        to_table: str,
+        to_dimensions: Dict[str, Any],
+        now_ms: int,
+        tolerance_ms: int,
+        relation_type: str  # "single" or "bidirectional"
+    ) -> Dict[str, Any]:
+        """
+        Call fn::upsert_relation_lifecycle function
+        
+        Args:
+            from_table: Source resource table name
+            from_dimensions: Source resource dimensions
+            to_table: Target resource table name
+            to_dimensions: Target resource dimensions
+            now_ms: Current timestamp in milliseconds
+            tolerance_ms: Tolerance time in milliseconds
+            relation_type: "single" for directional, "bidirectional" for static relations
+        
+        Returns:
+            The created/updated relation record
+        """
+        def format_dimensions(dims):
+            parts = []
+            for k, v in dims.items():
+                if isinstance(v, (int, float)):
+                    parts.append(f"{k}: {v}")
+                else:
+                    parts.append(f"{k}: '{v}'")
+            return ", ".join(parts)
+        
+        from_dim_str = format_dimensions(from_dimensions)
+        to_dim_str = format_dimensions(to_dimensions)
+        
+        sql = f"""
+        fn::upsert_relation_lifecycle(
+            '{from_table}',
+            {{ {from_dim_str} }},
+            '{to_table}',
+            {{ {to_dim_str} }},
+            {now_ms},
+            {tolerance_ms},
+            '{relation_type}'
+        );
+        """
+        
+        result = self.execute_sql(sql)
+        if result and result[0].get('result'):
+            records = result[0]['result']
+            if isinstance(records, list) and records:
+                return records[0]
+            elif isinstance(records, dict):
+                return records
+        return {}
+
     def upsert_node(
             self,
             resource_type: ResourceType,
@@ -724,16 +829,38 @@ class SurrealDBClient:
             updated_at: datetime
     ) -> Tuple[str, int, str]:
         """
-        Upsert a node using lifecycle management (document section 2.0.2).
+        Upsert a node using fn::upsert_resource_lifecycle function.
         
-        This method wraps upsert_node_with_lifecycle for backward compatibility,
-        converting datetime to milliseconds.
+        This method calls the SurrealDB custom function for lifecycle management.
         
         Returns:
-            Tuple of (action, created_at_ms, node_id)
+            Tuple of (action, created_at_ms, node_id) where:
+            - action: 'insert', 'update', or 'restart'
+            - created_at_ms: The created_at timestamp used for this node
+            - node_id: The generated node ID
         """
         current_time_ms = self.datetime_to_ms(updated_at)
-        return self.upsert_node_with_lifecycle(resource_type, data, current_time_ms)
+        
+        result = self.call_upsert_resource_lifecycle(
+            resource_type.value,
+            data,
+            current_time_ms,
+            MockConfig.TOLERANCE_TIME_MS
+        )
+        
+        # Extract created_at and id from the returned record
+        created_at_ms = result.get('created_at', current_time_ms)
+        node_id = str(result.get('id', ''))
+        
+        # Determine action based on whether created_at equals now
+        # If created_at == current_time_ms, it's a new insert or restart
+        # Otherwise, it's an update (renewal)
+        if created_at_ms == current_time_ms:
+            action = 'insert'  # Could also be 'restart'
+        else:
+            action = 'update'
+        
+        return (action, created_at_ms, node_id)
 
     def batch_upsert_nodes(
             self,
@@ -756,10 +883,9 @@ class SurrealDBClient:
             return []
 
         results = []
-        current_time_ms = self.datetime_to_ms(updated_at)
         
         for data in nodes:
-            result = self.upsert_node_with_lifecycle(resource_type, data, current_time_ms)
+            result = self.upsert_node(resource_type, data, created_at, updated_at)
             results.append(result)
         
         # Count actions
@@ -829,40 +955,33 @@ class SurrealDBClient:
             updated_at: datetime
     ) -> Dict[str, Any]:
         """
-        Upsert a static (bidirectional) relation using TYPE RELATION table.
+        Upsert a static (bidirectional) relation using fn::upsert_relation_lifecycle.
         
         Args:
             relation_type: The type of relation
             from_type: Source resource type
             from_data: Source resource data
-            from_created_at_ms: Source resource created_at in milliseconds
+            from_created_at_ms: Source resource created_at in milliseconds (may not be used by function)
             to_type: Target resource type
             to_data: Target resource data
-            to_created_at_ms: Target resource created_at in milliseconds
+            to_created_at_ms: Target resource created_at in milliseconds (may not be used by function)
             created_at: Relation created_at datetime
             updated_at: Relation updated_at datetime
-        """
-        from_id = IDGenerator.generate_node_id(from_type, from_data, from_created_at_ms)
-        to_id = IDGenerator.generate_node_id(to_type, to_data, to_created_at_ms)
-        relation_id = IDGenerator.generate_static_relation_id(
-            relation_type, from_type, from_data, from_created_at_ms, to_type, to_data, to_created_at_ms
-        )
         
-        created_at_ms = self.datetime_to_ms(created_at)
-        updated_at_ms = self.datetime_to_ms(updated_at)
-
-        # Use RELATE with custom ID via CONTENT
-        # Format: RELATE from->table->to CONTENT { id: custom_id, ... }
-        sql = f"""
-        RELATE {from_type.value}:`{from_id}`->{relation_type.value}->{to_type.value}:`{to_id}` CONTENT {{
-            id: {relation_type.value}:`{relation_id}`,
-            created_at: created_at OR {created_at_ms},
-            updated_at: {updated_at_ms}
-        }};
+        Note: The from_created_at_ms and to_created_at_ms parameters are kept for backward
+        compatibility but the function automatically manages resource lifecycle.
         """
-
-        result = self.execute_sql(sql)
-        return result[0].get('result', []) if result else []
+        current_time_ms = self.datetime_to_ms(updated_at)
+        
+        return self.call_upsert_relation_lifecycle(
+            from_type.value,
+            from_data,
+            to_type.value,
+            to_data,
+            current_time_ms,
+            MockConfig.TOLERANCE_TIME_MS,
+            "bidirectional"
+        )
 
     def upsert_dynamic_relation(
             self,
@@ -877,40 +996,33 @@ class SurrealDBClient:
             updated_at: datetime
     ) -> Dict[str, Any]:
         """
-        Upsert a dynamic (directional) relation using TYPE RELATION table.
+        Upsert a dynamic (directional) relation using fn::upsert_relation_lifecycle.
         
         Args:
             relation_type: The type of relation
             source_type: Source resource type
             source_data: Source resource data
-            source_created_at_ms: Source resource created_at in milliseconds
+            source_created_at_ms: Source resource created_at in milliseconds (may not be used by function)
             target_type: Target resource type
             target_data: Target resource data
-            target_created_at_ms: Target resource created_at in milliseconds
+            target_created_at_ms: Target resource created_at in milliseconds (may not be used by function)
             created_at: Relation created_at datetime
             updated_at: Relation updated_at datetime
-        """
-        source_id = IDGenerator.generate_node_id(source_type, source_data, source_created_at_ms)
-        target_id = IDGenerator.generate_node_id(target_type, target_data, target_created_at_ms)
-        relation_id = IDGenerator.generate_dynamic_relation_id(
-            relation_type, source_type, source_data, source_created_at_ms, 
-            target_type, target_data, target_created_at_ms
-        )
         
-        created_at_ms = self.datetime_to_ms(created_at)
-        updated_at_ms = self.datetime_to_ms(updated_at)
-
-        # Use RELATE with custom ID via CONTENT
-        sql = f"""
-        RELATE {source_type.value}:`{source_id}`->{relation_type.value}->{target_type.value}:`{target_id}` CONTENT {{
-            id: {relation_type.value}:`{relation_id}`,
-            created_at: created_at OR {created_at_ms},
-            updated_at: {updated_at_ms}
-        }};
+        Note: The source_created_at_ms and target_created_at_ms parameters are kept for backward
+        compatibility but the function automatically manages resource lifecycle.
         """
-
-        result = self.execute_sql(sql)
-        return result[0].get('result', []) if result else []
+        current_time_ms = self.datetime_to_ms(updated_at)
+        
+        return self.call_upsert_relation_lifecycle(
+            source_type.value,
+            source_data,
+            target_type.value,
+            target_data,
+            current_time_ms,
+            MockConfig.TOLERANCE_TIME_MS,
+            "single"
+        )
 
 
 # ============================================================================
