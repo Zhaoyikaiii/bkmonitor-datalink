@@ -572,24 +572,51 @@ DEFINE FIELD created_at ON relation_has_metric TYPE int;
 DEFINE FIELD updated_at ON relation_has_metric TYPE int;
 
 -- ============================================================================
--- SECTION 3.10: Lifecycle Management Functions
+-- SECTION 4: Helper Functions
 --
--- These functions provide generalized lifecycle management capabilities for
--- resources and relations. They handle upsert logic with tolerance-based
--- lifecycle detection.
+-- These functions provide utility capabilities for ID generation and
+-- lifecycle management.
 -- ============================================================================
 
 -- ----------------------------------------------------------------------------
--- 3.10.1 Remove Existing Functions (for clean reset)
+-- 4.1 Remove Existing Functions (for clean reset)
 -- ----------------------------------------------------------------------------
 
 REMOVE FUNCTION IF EXISTS fn::kv_block;
-REMOVE FUNCTION IF EXISTS fn::upsert_resource_lifecycle;
 REMOVE FUNCTION IF EXISTS fn::relation_id;
-REMOVE FUNCTION IF EXISTS fn::upsert_relation_lifecycle;
+REMOVE FUNCTION IF EXISTS fn::upsert_relation;
+
+-- Remove all resource-specific upsert functions
+REMOVE FUNCTION IF EXISTS fn::upsert_pod;
+REMOVE FUNCTION IF EXISTS fn::upsert_node;
+REMOVE FUNCTION IF EXISTS fn::upsert_container;
+REMOVE FUNCTION IF EXISTS fn::upsert_deployment;
+REMOVE FUNCTION IF EXISTS fn::upsert_replicaset;
+REMOVE FUNCTION IF EXISTS fn::upsert_statefulset;
+REMOVE FUNCTION IF EXISTS fn::upsert_daemonset;
+REMOVE FUNCTION IF EXISTS fn::upsert_job;
+REMOVE FUNCTION IF EXISTS fn::upsert_service;
+REMOVE FUNCTION IF EXISTS fn::upsert_ingress;
+REMOVE FUNCTION IF EXISTS fn::upsert_cluster;
+REMOVE FUNCTION IF EXISTS fn::upsert_namespace;
+REMOVE FUNCTION IF EXISTS fn::upsert_system;
+REMOVE FUNCTION IF EXISTS fn::upsert_k8s_address;
+REMOVE FUNCTION IF EXISTS fn::upsert_domain;
+REMOVE FUNCTION IF EXISTS fn::upsert_apm_service;
+REMOVE FUNCTION IF EXISTS fn::upsert_apm_service_instance;
+REMOVE FUNCTION IF EXISTS fn::upsert_datasource;
+REMOVE FUNCTION IF EXISTS fn::upsert_bklogconfig;
+REMOVE FUNCTION IF EXISTS fn::upsert_biz;
+REMOVE FUNCTION IF EXISTS fn::upsert_set;
+REMOVE FUNCTION IF EXISTS fn::upsert_module;
+REMOVE FUNCTION IF EXISTS fn::upsert_host;
+REMOVE FUNCTION IF EXISTS fn::upsert_app_version;
+REMOVE FUNCTION IF EXISTS fn::upsert_git_commit;
+REMOVE FUNCTION IF EXISTS fn::upsert_environment;
+REMOVE FUNCTION IF EXISTS fn::upsert_metric;
 
 -- ----------------------------------------------------------------------------
--- 3.10.2 Helper Functions
+-- 4.2 Helper Functions
 -- ----------------------------------------------------------------------------
 
 -- fn::kv_block: Convert dimensions object to sorted key=value string with created_at
@@ -617,136 +644,742 @@ DEFINE FUNCTION fn::relation_id($from_id: record, $to_id: record) {
     RETURN string::concat($from_kv_clean, "|", $to_kv_clean);
 };
 
-
--- ----------------------------------------------------------------------------
--- 3.10.3 Resource Lifecycle Management
--- ----------------------------------------------------------------------------
-
--- fn::upsert_resource_lifecycle: Generalized resource lifecycle management function
--- 
--- This function implements the upsert logic for resources with tolerance-based
--- lifecycle detection. If the last update was within tolerance, it updates the
--- existing record. Otherwise, it creates a new lifecycle record.
+-- ============================================================================
+-- SECTION 5: Resource-Specific Upsert Functions
 --
--- Note: SurrealDB closures cannot access external variables, so we use explicit
--- field matching for all possible dimension fields.
+-- Each resource type has its own upsert function with explicit field matching.
+-- This design allows:
+--   1. Easy modification of individual resource types
+--   2. Clear field definitions per resource
+--   3. Better performance (no dynamic field checking)
+--   4. Type safety at the database level
 --
--- Parameters:
---   $table: The resource table name
+-- Parameters for all functions:
 --   $dimensions: Object containing the resource's dimension fields
 --   $now: Current timestamp in milliseconds
 --   $tolerance: Tolerance time in milliseconds for lifecycle detection
-DEFINE FUNCTION fn::upsert_resource_lifecycle(
-    $table: string,
-    $dimensions: object,
-    $now: int,
-    $tolerance: int
-) {
+-- ============================================================================
+
+-- ----------------------------------------------------------------------------
+-- 5.1 Kubernetes Resource Upsert Functions
+-- ----------------------------------------------------------------------------
+
+-- fn::upsert_pod: Upsert pod resource
+-- Index fields: bcs_cluster_id, namespace, pod
+DEFINE FUNCTION fn::upsert_pod($dimensions: object, $now: int, $tolerance: int) {
     LET $last_record = (
-        SELECT * FROM type::table($table)
-        WHERE ($dimensions.bcs_cluster_id IS NONE OR bcs_cluster_id = $dimensions.bcs_cluster_id)
-          AND ($dimensions.namespace IS NONE OR namespace = $dimensions.namespace)
-          AND ($dimensions.pod IS NONE OR pod = $dimensions.pod)
-          AND ($dimensions.node IS NONE OR node = $dimensions.node)
-          AND ($dimensions.service IS NONE OR service = $dimensions.service)
-          AND ($dimensions.container IS NONE OR container = $dimensions.container)
-          AND ($dimensions.deployment IS NONE OR deployment = $dimensions.deployment)
-          AND ($dimensions.statefulset IS NONE OR statefulset = $dimensions.statefulset)
-          AND ($dimensions.daemonset IS NONE OR daemonset = $dimensions.daemonset)
-          AND ($dimensions.replicaset IS NONE OR replicaset = $dimensions.replicaset)
-          AND ($dimensions.job IS NONE OR job = $dimensions.job)
-          AND ($dimensions.ingress IS NONE OR ingress = $dimensions.ingress)
-          AND ($dimensions.bk_cloud_id IS NONE OR bk_cloud_id = $dimensions.bk_cloud_id)
-          AND ($dimensions.bk_target_ip IS NONE OR bk_target_ip = $dimensions.bk_target_ip)
-          AND ($dimensions.address IS NONE OR address = $dimensions.address)
-          AND ($dimensions.domain IS NONE OR domain = $dimensions.domain)
-          AND ($dimensions.apm_application_name IS NONE OR apm_application_name = $dimensions.apm_application_name)
-          AND ($dimensions.apm_service_name IS NONE OR apm_service_name = $dimensions.apm_service_name)
-          AND ($dimensions.apm_service_instance_name IS NONE OR apm_service_instance_name = $dimensions.apm_service_instance_name)
-          AND ($dimensions.bk_data_id IS NONE OR bk_data_id = $dimensions.bk_data_id)
-          AND ($dimensions.bklogconfig_namespace IS NONE OR bklogconfig_namespace = $dimensions.bklogconfig_namespace)
-          AND ($dimensions.bklogconfig_name IS NONE OR bklogconfig_name = $dimensions.bklogconfig_name)
-          AND ($dimensions.bk_biz_id IS NONE OR bk_biz_id = $dimensions.bk_biz_id)
-          AND ($dimensions.bk_set_id IS NONE OR bk_set_id = $dimensions.bk_set_id)
-          AND ($dimensions.bk_module_id IS NONE OR bk_module_id = $dimensions.bk_module_id)
-          AND ($dimensions.bk_host_id IS NONE OR bk_host_id = $dimensions.bk_host_id)
-          AND ($dimensions.app_name IS NONE OR app_name = $dimensions.app_name)
-          AND ($dimensions.version IS NONE OR version = $dimensions.version)
-          AND ($dimensions.git_repo IS NONE OR git_repo = $dimensions.git_repo)
-          AND ($dimensions.commit_id IS NONE OR commit_id = $dimensions.commit_id)
-          AND ($dimensions.environment IS NONE OR environment = $dimensions.environment)
-          AND ($dimensions.metric_name IS NONE OR metric_name = $dimensions.metric_name)
+        SELECT * FROM pod
+        WHERE bcs_cluster_id = $dimensions.bcs_cluster_id
+          AND namespace = $dimensions.namespace
+          AND pod = $dimensions.pod
         ORDER BY created_at DESC 
         LIMIT 1
     )[0];
 
     RETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN
-        -- UPDATE returns an array, extract first element
         (UPDATE $last_record.id SET updated_at = $now)[0]
     ELSE {
-        -- Generate string-based ID using fn::kv_block
         LET $id_str = fn::kv_block($dimensions, $now);
-        LET $content = object::from_entries(array::concat(object::entries($dimensions), [["created_at", $now], ["updated_at", $now]]));
-        -- CREATE returns an array, extract first element
-        (CREATE type::thing($table, $id_str) CONTENT $content)[0]
+        (CREATE type::thing('pod', $id_str) CONTENT {
+            bcs_cluster_id: $dimensions.bcs_cluster_id,
+            namespace: $dimensions.namespace,
+            pod: $dimensions.pod,
+            created_at: $now,
+            updated_at: $now
+        })[0]
+    }
+    END;
+};
+
+-- fn::upsert_node: Upsert node resource
+-- Index fields: bcs_cluster_id, node
+DEFINE FUNCTION fn::upsert_node($dimensions: object, $now: int, $tolerance: int) {
+    LET $last_record = (
+        SELECT * FROM node
+        WHERE bcs_cluster_id = $dimensions.bcs_cluster_id
+          AND node = $dimensions.node
+        ORDER BY created_at DESC 
+        LIMIT 1
+    )[0];
+
+    RETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN
+        (UPDATE $last_record.id SET updated_at = $now)[0]
+    ELSE {
+        LET $id_str = fn::kv_block($dimensions, $now);
+        (CREATE type::thing('node', $id_str) CONTENT {
+            bcs_cluster_id: $dimensions.bcs_cluster_id,
+            node: $dimensions.node,
+            created_at: $now,
+            updated_at: $now
+        })[0]
+    }
+    END;
+};
+
+-- fn::upsert_container: Upsert container resource
+-- Index fields: bcs_cluster_id, namespace, pod, container
+DEFINE FUNCTION fn::upsert_container($dimensions: object, $now: int, $tolerance: int) {
+    LET $last_record = (
+        SELECT * FROM container
+        WHERE bcs_cluster_id = $dimensions.bcs_cluster_id
+          AND namespace = $dimensions.namespace
+          AND pod = $dimensions.pod
+          AND container = $dimensions.container
+        ORDER BY created_at DESC 
+        LIMIT 1
+    )[0];
+
+    RETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN
+        (UPDATE $last_record.id SET updated_at = $now)[0]
+    ELSE {
+        LET $id_str = fn::kv_block($dimensions, $now);
+        (CREATE type::thing('container', $id_str) CONTENT {
+            bcs_cluster_id: $dimensions.bcs_cluster_id,
+            namespace: $dimensions.namespace,
+            pod: $dimensions.pod,
+            container: $dimensions.container,
+            created_at: $now,
+            updated_at: $now
+        })[0]
+    }
+    END;
+};
+
+-- fn::upsert_deployment: Upsert deployment resource
+-- Index fields: bcs_cluster_id, namespace, deployment
+DEFINE FUNCTION fn::upsert_deployment($dimensions: object, $now: int, $tolerance: int) {
+    LET $last_record = (
+        SELECT * FROM deployment
+        WHERE bcs_cluster_id = $dimensions.bcs_cluster_id
+          AND namespace = $dimensions.namespace
+          AND deployment = $dimensions.deployment
+        ORDER BY created_at DESC 
+        LIMIT 1
+    )[0];
+
+    RETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN
+        (UPDATE $last_record.id SET updated_at = $now)[0]
+    ELSE {
+        LET $id_str = fn::kv_block($dimensions, $now);
+        (CREATE type::thing('deployment', $id_str) CONTENT {
+            bcs_cluster_id: $dimensions.bcs_cluster_id,
+            namespace: $dimensions.namespace,
+            deployment: $dimensions.deployment,
+            created_at: $now,
+            updated_at: $now
+        })[0]
+    }
+    END;
+};
+
+-- fn::upsert_replicaset: Upsert replicaset resource
+-- Index fields: bcs_cluster_id, namespace, replicaset
+DEFINE FUNCTION fn::upsert_replicaset($dimensions: object, $now: int, $tolerance: int) {
+    LET $last_record = (
+        SELECT * FROM replicaset
+        WHERE bcs_cluster_id = $dimensions.bcs_cluster_id
+          AND namespace = $dimensions.namespace
+          AND replicaset = $dimensions.replicaset
+        ORDER BY created_at DESC 
+        LIMIT 1
+    )[0];
+
+    RETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN
+        (UPDATE $last_record.id SET updated_at = $now)[0]
+    ELSE {
+        LET $id_str = fn::kv_block($dimensions, $now);
+        (CREATE type::thing('replicaset', $id_str) CONTENT {
+            bcs_cluster_id: $dimensions.bcs_cluster_id,
+            namespace: $dimensions.namespace,
+            replicaset: $dimensions.replicaset,
+            created_at: $now,
+            updated_at: $now
+        })[0]
+    }
+    END;
+};
+
+-- fn::upsert_statefulset: Upsert statefulset resource
+-- Index fields: bcs_cluster_id, namespace, statefulset
+DEFINE FUNCTION fn::upsert_statefulset($dimensions: object, $now: int, $tolerance: int) {
+    LET $last_record = (
+        SELECT * FROM statefulset
+        WHERE bcs_cluster_id = $dimensions.bcs_cluster_id
+          AND namespace = $dimensions.namespace
+          AND statefulset = $dimensions.statefulset
+        ORDER BY created_at DESC 
+        LIMIT 1
+    )[0];
+
+    RETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN
+        (UPDATE $last_record.id SET updated_at = $now)[0]
+    ELSE {
+        LET $id_str = fn::kv_block($dimensions, $now);
+        (CREATE type::thing('statefulset', $id_str) CONTENT {
+            bcs_cluster_id: $dimensions.bcs_cluster_id,
+            namespace: $dimensions.namespace,
+            statefulset: $dimensions.statefulset,
+            created_at: $now,
+            updated_at: $now
+        })[0]
+    }
+    END;
+};
+
+-- fn::upsert_daemonset: Upsert daemonset resource
+-- Index fields: bcs_cluster_id, namespace, daemonset
+DEFINE FUNCTION fn::upsert_daemonset($dimensions: object, $now: int, $tolerance: int) {
+    LET $last_record = (
+        SELECT * FROM daemonset
+        WHERE bcs_cluster_id = $dimensions.bcs_cluster_id
+          AND namespace = $dimensions.namespace
+          AND daemonset = $dimensions.daemonset
+        ORDER BY created_at DESC 
+        LIMIT 1
+    )[0];
+
+    RETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN
+        (UPDATE $last_record.id SET updated_at = $now)[0]
+    ELSE {
+        LET $id_str = fn::kv_block($dimensions, $now);
+        (CREATE type::thing('daemonset', $id_str) CONTENT {
+            bcs_cluster_id: $dimensions.bcs_cluster_id,
+            namespace: $dimensions.namespace,
+            daemonset: $dimensions.daemonset,
+            created_at: $now,
+            updated_at: $now
+        })[0]
+    }
+    END;
+};
+
+-- fn::upsert_job: Upsert job resource
+-- Index fields: bcs_cluster_id, namespace, job
+DEFINE FUNCTION fn::upsert_job($dimensions: object, $now: int, $tolerance: int) {
+    LET $last_record = (
+        SELECT * FROM job
+        WHERE bcs_cluster_id = $dimensions.bcs_cluster_id
+          AND namespace = $dimensions.namespace
+          AND job = $dimensions.job
+        ORDER BY created_at DESC 
+        LIMIT 1
+    )[0];
+
+    RETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN
+        (UPDATE $last_record.id SET updated_at = $now)[0]
+    ELSE {
+        LET $id_str = fn::kv_block($dimensions, $now);
+        (CREATE type::thing('job', $id_str) CONTENT {
+            bcs_cluster_id: $dimensions.bcs_cluster_id,
+            namespace: $dimensions.namespace,
+            job: $dimensions.job,
+            created_at: $now,
+            updated_at: $now
+        })[0]
+    }
+    END;
+};
+
+-- fn::upsert_service: Upsert service resource
+-- Index fields: bcs_cluster_id, namespace, service
+DEFINE FUNCTION fn::upsert_service($dimensions: object, $now: int, $tolerance: int) {
+    LET $last_record = (
+        SELECT * FROM service
+        WHERE bcs_cluster_id = $dimensions.bcs_cluster_id
+          AND namespace = $dimensions.namespace
+          AND service = $dimensions.service
+        ORDER BY created_at DESC 
+        LIMIT 1
+    )[0];
+
+    RETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN
+        (UPDATE $last_record.id SET updated_at = $now)[0]
+    ELSE {
+        LET $id_str = fn::kv_block($dimensions, $now);
+        (CREATE type::thing('service', $id_str) CONTENT {
+            bcs_cluster_id: $dimensions.bcs_cluster_id,
+            namespace: $dimensions.namespace,
+            service: $dimensions.service,
+            created_at: $now,
+            updated_at: $now
+        })[0]
+    }
+    END;
+};
+
+-- fn::upsert_ingress: Upsert ingress resource
+-- Index fields: bcs_cluster_id, namespace, ingress
+DEFINE FUNCTION fn::upsert_ingress($dimensions: object, $now: int, $tolerance: int) {
+    LET $last_record = (
+        SELECT * FROM ingress
+        WHERE bcs_cluster_id = $dimensions.bcs_cluster_id
+          AND namespace = $dimensions.namespace
+          AND ingress = $dimensions.ingress
+        ORDER BY created_at DESC 
+        LIMIT 1
+    )[0];
+
+    RETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN
+        (UPDATE $last_record.id SET updated_at = $now)[0]
+    ELSE {
+        LET $id_str = fn::kv_block($dimensions, $now);
+        (CREATE type::thing('ingress', $id_str) CONTENT {
+            bcs_cluster_id: $dimensions.bcs_cluster_id,
+            namespace: $dimensions.namespace,
+            ingress: $dimensions.ingress,
+            created_at: $now,
+            updated_at: $now
+        })[0]
+    }
+    END;
+};
+
+-- fn::upsert_cluster: Upsert cluster resource
+-- Index fields: bcs_cluster_id
+DEFINE FUNCTION fn::upsert_cluster($dimensions: object, $now: int, $tolerance: int) {
+    LET $last_record = (
+        SELECT * FROM cluster
+        WHERE bcs_cluster_id = $dimensions.bcs_cluster_id
+        ORDER BY created_at DESC 
+        LIMIT 1
+    )[0];
+
+    RETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN
+        (UPDATE $last_record.id SET updated_at = $now)[0]
+    ELSE {
+        LET $id_str = fn::kv_block($dimensions, $now);
+        (CREATE type::thing('cluster', $id_str) CONTENT {
+            bcs_cluster_id: $dimensions.bcs_cluster_id,
+            created_at: $now,
+            updated_at: $now
+        })[0]
+    }
+    END;
+};
+
+-- fn::upsert_namespace: Upsert namespace resource
+-- Index fields: bcs_cluster_id, namespace
+DEFINE FUNCTION fn::upsert_namespace($dimensions: object, $now: int, $tolerance: int) {
+    LET $last_record = (
+        SELECT * FROM namespace
+        WHERE bcs_cluster_id = $dimensions.bcs_cluster_id
+          AND namespace = $dimensions.namespace
+        ORDER BY created_at DESC 
+        LIMIT 1
+    )[0];
+
+    RETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN
+        (UPDATE $last_record.id SET updated_at = $now)[0]
+    ELSE {
+        LET $id_str = fn::kv_block($dimensions, $now);
+        (CREATE type::thing('namespace', $id_str) CONTENT {
+            bcs_cluster_id: $dimensions.bcs_cluster_id,
+            namespace: $dimensions.namespace,
+            created_at: $now,
+            updated_at: $now
+        })[0]
     }
     END;
 };
 
 -- ----------------------------------------------------------------------------
--- 3.10.4 Relation Lifecycle Management
+-- 5.2 Network Resource Upsert Functions
 -- ----------------------------------------------------------------------------
 
--- fn::upsert_relation_lifecycle: Relation lifecycle management function
---
--- This function manages the lifecycle of relations between two resources.
--- It upserts both endpoint resources and returns their IDs for relation creation.
---
--- NOTE: SurrealDB does not support dynamic table names in RELATE statements within functions.
--- The actual RELATE statement must be executed from the application layer.
--- This function prepares the resources and returns the necessary information.
---
--- Parameters:
---   $from_table: Source resource table name
---   $from_dimensions: Source resource dimensions
---   $to_table: Target resource table name
---   $to_dimensions: Target resource dimensions
---   $now: Current timestamp in milliseconds
---   $tolerance: Tolerance time in milliseconds
---   $relation_type: "static" or "dynamic" - indicates the type of relation
---   $bidirectional: bool - true for bidirectional relations, false for directional
---
--- Returns: Object with from_id, to_id, from_created_at, to_created_at for use in RELATE
-DEFINE FUNCTION fn::upsert_relation_lifecycle(
-    $from_table: string,
-    $from_dimensions: object,
-    $to_table: string,
-    $to_dimensions: object,
-    $now: int,
-    $tolerance: int,
-    $relation_type: string,
-    $bidirectional: bool
-) {
-    -- 1) Upsert both endpoint resources
-    LET $from_rec = fn::upsert_resource_lifecycle($from_table, $from_dimensions, $now, $tolerance);
-    LET $to_rec = fn::upsert_resource_lifecycle($to_table, $to_dimensions, $now, $tolerance);
+-- fn::upsert_system: Upsert system resource
+-- Index fields: bk_cloud_id, bk_target_ip
+DEFINE FUNCTION fn::upsert_system($dimensions: object, $now: int, $tolerance: int) {
+    LET $last_record = (
+        SELECT * FROM system
+        WHERE bk_cloud_id = $dimensions.bk_cloud_id
+          AND bk_target_ip = $dimensions.bk_target_ip
+        ORDER BY created_at DESC 
+        LIMIT 1
+    )[0];
 
-    -- 2) Return resource info for caller to create the relation
-    RETURN {
-        from_id: $from_rec.id,
-        to_id: $to_rec.id,
-        from_created_at: $from_rec.created_at,
-        to_created_at: $to_rec.created_at,
-        from_table: $from_table,
-        to_table: $to_table,
-        relation_type: $relation_type,
-        bidirectional: $bidirectional,
-        now: $now
-    };
+    RETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN
+        (UPDATE $last_record.id SET updated_at = $now)[0]
+    ELSE {
+        LET $id_str = fn::kv_block($dimensions, $now);
+        (CREATE type::thing('system', $id_str) CONTENT {
+            bk_cloud_id: $dimensions.bk_cloud_id,
+            bk_target_ip: $dimensions.bk_target_ip,
+            created_at: $now,
+            updated_at: $now
+        })[0]
+    }
+    END;
+};
+
+-- fn::upsert_k8s_address: Upsert k8s_address resource
+-- Index fields: bcs_cluster_id, address
+DEFINE FUNCTION fn::upsert_k8s_address($dimensions: object, $now: int, $tolerance: int) {
+    LET $last_record = (
+        SELECT * FROM k8s_address
+        WHERE bcs_cluster_id = $dimensions.bcs_cluster_id
+          AND address = $dimensions.address
+        ORDER BY created_at DESC 
+        LIMIT 1
+    )[0];
+
+    RETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN
+        (UPDATE $last_record.id SET updated_at = $now)[0]
+    ELSE {
+        LET $id_str = fn::kv_block($dimensions, $now);
+        (CREATE type::thing('k8s_address', $id_str) CONTENT {
+            bcs_cluster_id: $dimensions.bcs_cluster_id,
+            address: $dimensions.address,
+            created_at: $now,
+            updated_at: $now
+        })[0]
+    }
+    END;
+};
+
+-- fn::upsert_domain: Upsert domain resource
+-- Index fields: bcs_cluster_id, domain
+DEFINE FUNCTION fn::upsert_domain($dimensions: object, $now: int, $tolerance: int) {
+    LET $last_record = (
+        SELECT * FROM domain
+        WHERE bcs_cluster_id = $dimensions.bcs_cluster_id
+          AND domain = $dimensions.domain
+        ORDER BY created_at DESC 
+        LIMIT 1
+    )[0];
+
+    RETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN
+        (UPDATE $last_record.id SET updated_at = $now)[0]
+    ELSE {
+        LET $id_str = fn::kv_block($dimensions, $now);
+        (CREATE type::thing('domain', $id_str) CONTENT {
+            bcs_cluster_id: $dimensions.bcs_cluster_id,
+            domain: $dimensions.domain,
+            created_at: $now,
+            updated_at: $now
+        })[0]
+    }
+    END;
+};
+
+-- ----------------------------------------------------------------------------
+-- 5.3 APM Resource Upsert Functions
+-- ----------------------------------------------------------------------------
+
+-- fn::upsert_apm_service: Upsert apm_service resource
+-- Index fields: apm_application_name, apm_service_name
+DEFINE FUNCTION fn::upsert_apm_service($dimensions: object, $now: int, $tolerance: int) {
+    LET $last_record = (
+        SELECT * FROM apm_service
+        WHERE apm_application_name = $dimensions.apm_application_name
+          AND apm_service_name = $dimensions.apm_service_name
+        ORDER BY created_at DESC 
+        LIMIT 1
+    )[0];
+
+    RETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN
+        (UPDATE $last_record.id SET updated_at = $now)[0]
+    ELSE {
+        LET $id_str = fn::kv_block($dimensions, $now);
+        (CREATE type::thing('apm_service', $id_str) CONTENT {
+            apm_application_name: $dimensions.apm_application_name,
+            apm_service_name: $dimensions.apm_service_name,
+            created_at: $now,
+            updated_at: $now
+        })[0]
+    }
+    END;
+};
+
+-- fn::upsert_apm_service_instance: Upsert apm_service_instance resource
+-- Index fields: apm_application_name, apm_service_name, apm_service_instance_name
+DEFINE FUNCTION fn::upsert_apm_service_instance($dimensions: object, $now: int, $tolerance: int) {
+    LET $last_record = (
+        SELECT * FROM apm_service_instance
+        WHERE apm_application_name = $dimensions.apm_application_name
+          AND apm_service_name = $dimensions.apm_service_name
+          AND apm_service_instance_name = $dimensions.apm_service_instance_name
+        ORDER BY created_at DESC 
+        LIMIT 1
+    )[0];
+
+    RETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN
+        (UPDATE $last_record.id SET updated_at = $now)[0]
+    ELSE {
+        LET $id_str = fn::kv_block($dimensions, $now);
+        (CREATE type::thing('apm_service_instance', $id_str) CONTENT {
+            apm_application_name: $dimensions.apm_application_name,
+            apm_service_name: $dimensions.apm_service_name,
+            apm_service_instance_name: $dimensions.apm_service_instance_name,
+            created_at: $now,
+            updated_at: $now
+        })[0]
+    }
+    END;
+};
+
+-- ----------------------------------------------------------------------------
+-- 5.4 Data Source Resource Upsert Functions
+-- ----------------------------------------------------------------------------
+
+-- fn::upsert_datasource: Upsert datasource resource
+-- Index fields: bk_data_id
+DEFINE FUNCTION fn::upsert_datasource($dimensions: object, $now: int, $tolerance: int) {
+    LET $last_record = (
+        SELECT * FROM datasource
+        WHERE bk_data_id = $dimensions.bk_data_id
+        ORDER BY created_at DESC 
+        LIMIT 1
+    )[0];
+
+    RETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN
+        (UPDATE $last_record.id SET updated_at = $now)[0]
+    ELSE {
+        LET $id_str = fn::kv_block($dimensions, $now);
+        (CREATE type::thing('datasource', $id_str) CONTENT {
+            bk_data_id: $dimensions.bk_data_id,
+            created_at: $now,
+            updated_at: $now
+        })[0]
+    }
+    END;
+};
+
+-- fn::upsert_bklogconfig: Upsert bklogconfig resource
+-- Index fields: bklogconfig_namespace, bklogconfig_name
+DEFINE FUNCTION fn::upsert_bklogconfig($dimensions: object, $now: int, $tolerance: int) {
+    LET $last_record = (
+        SELECT * FROM bklogconfig
+        WHERE bklogconfig_namespace = $dimensions.bklogconfig_namespace
+          AND bklogconfig_name = $dimensions.bklogconfig_name
+        ORDER BY created_at DESC 
+        LIMIT 1
+    )[0];
+
+    RETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN
+        (UPDATE $last_record.id SET updated_at = $now)[0]
+    ELSE {
+        LET $id_str = fn::kv_block($dimensions, $now);
+        (CREATE type::thing('bklogconfig', $id_str) CONTENT {
+            bklogconfig_namespace: $dimensions.bklogconfig_namespace,
+            bklogconfig_name: $dimensions.bklogconfig_name,
+            created_at: $now,
+            updated_at: $now
+        })[0]
+    }
+    END;
+};
+
+-- ----------------------------------------------------------------------------
+-- 5.5 CMDB Resource Upsert Functions
+-- ----------------------------------------------------------------------------
+
+-- fn::upsert_biz: Upsert biz resource
+-- Index fields: bk_biz_id
+DEFINE FUNCTION fn::upsert_biz($dimensions: object, $now: int, $tolerance: int) {
+    LET $last_record = (
+        SELECT * FROM biz
+        WHERE bk_biz_id = $dimensions.bk_biz_id
+        ORDER BY created_at DESC 
+        LIMIT 1
+    )[0];
+
+    RETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN
+        (UPDATE $last_record.id SET updated_at = $now)[0]
+    ELSE {
+        LET $id_str = fn::kv_block($dimensions, $now);
+        (CREATE type::thing('biz', $id_str) CONTENT {
+            bk_biz_id: $dimensions.bk_biz_id,
+            created_at: $now,
+            updated_at: $now
+        })[0]
+    }
+    END;
+};
+
+-- fn::upsert_set: Upsert set resource
+-- Index fields: bk_set_id
+DEFINE FUNCTION fn::upsert_set($dimensions: object, $now: int, $tolerance: int) {
+    LET $last_record = (
+        SELECT * FROM set
+        WHERE bk_set_id = $dimensions.bk_set_id
+        ORDER BY created_at DESC 
+        LIMIT 1
+    )[0];
+
+    RETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN
+        (UPDATE $last_record.id SET updated_at = $now)[0]
+    ELSE {
+        LET $id_str = fn::kv_block($dimensions, $now);
+        (CREATE type::thing('set', $id_str) CONTENT {
+            bk_set_id: $dimensions.bk_set_id,
+            created_at: $now,
+            updated_at: $now
+        })[0]
+    }
+    END;
+};
+
+-- fn::upsert_module: Upsert module resource
+-- Index fields: bk_module_id
+DEFINE FUNCTION fn::upsert_module($dimensions: object, $now: int, $tolerance: int) {
+    LET $last_record = (
+        SELECT * FROM module
+        WHERE bk_module_id = $dimensions.bk_module_id
+        ORDER BY created_at DESC 
+        LIMIT 1
+    )[0];
+
+    RETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN
+        (UPDATE $last_record.id SET updated_at = $now)[0]
+    ELSE {
+        LET $id_str = fn::kv_block($dimensions, $now);
+        (CREATE type::thing('module', $id_str) CONTENT {
+            bk_module_id: $dimensions.bk_module_id,
+            created_at: $now,
+            updated_at: $now
+        })[0]
+    }
+    END;
+};
+
+-- fn::upsert_host: Upsert host resource
+-- Index fields: bk_host_id
+DEFINE FUNCTION fn::upsert_host($dimensions: object, $now: int, $tolerance: int) {
+    LET $last_record = (
+        SELECT * FROM host
+        WHERE bk_host_id = $dimensions.bk_host_id
+        ORDER BY created_at DESC 
+        LIMIT 1
+    )[0];
+
+    RETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN
+        (UPDATE $last_record.id SET updated_at = $now)[0]
+    ELSE {
+        LET $id_str = fn::kv_block($dimensions, $now);
+        (CREATE type::thing('host', $id_str) CONTENT {
+            bk_host_id: $dimensions.bk_host_id,
+            created_at: $now,
+            updated_at: $now
+        })[0]
+    }
+    END;
+};
+
+-- ----------------------------------------------------------------------------
+-- 5.6 App Version Resource Upsert Functions
+-- ----------------------------------------------------------------------------
+
+-- fn::upsert_app_version: Upsert app_version resource
+-- Index fields: app_name, version
+DEFINE FUNCTION fn::upsert_app_version($dimensions: object, $now: int, $tolerance: int) {
+    LET $last_record = (
+        SELECT * FROM app_version
+        WHERE app_name = $dimensions.app_name
+          AND version = $dimensions.version
+        ORDER BY created_at DESC 
+        LIMIT 1
+    )[0];
+
+    RETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN
+        (UPDATE $last_record.id SET updated_at = $now)[0]
+    ELSE {
+        LET $id_str = fn::kv_block($dimensions, $now);
+        (CREATE type::thing('app_version', $id_str) CONTENT {
+            app_name: $dimensions.app_name,
+            version: $dimensions.version,
+            created_at: $now,
+            updated_at: $now
+        })[0]
+    }
+    END;
+};
+
+-- fn::upsert_git_commit: Upsert git_commit resource
+-- Index fields: git_repo, commit_id
+DEFINE FUNCTION fn::upsert_git_commit($dimensions: object, $now: int, $tolerance: int) {
+    LET $last_record = (
+        SELECT * FROM git_commit
+        WHERE git_repo = $dimensions.git_repo
+          AND commit_id = $dimensions.commit_id
+        ORDER BY created_at DESC 
+        LIMIT 1
+    )[0];
+
+    RETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN
+        (UPDATE $last_record.id SET updated_at = $now)[0]
+    ELSE {
+        LET $id_str = fn::kv_block($dimensions, $now);
+        (CREATE type::thing('git_commit', $id_str) CONTENT {
+            git_repo: $dimensions.git_repo,
+            commit_id: $dimensions.commit_id,
+            created_at: $now,
+            updated_at: $now
+        })[0]
+    }
+    END;
+};
+
+-- fn::upsert_environment: Upsert environment resource
+-- Index fields: environment
+DEFINE FUNCTION fn::upsert_environment($dimensions: object, $now: int, $tolerance: int) {
+    LET $last_record = (
+        SELECT * FROM environment
+        WHERE environment = $dimensions.environment
+        ORDER BY created_at DESC 
+        LIMIT 1
+    )[0];
+
+    RETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN
+        (UPDATE $last_record.id SET updated_at = $now)[0]
+    ELSE {
+        LET $id_str = fn::kv_block($dimensions, $now);
+        (CREATE type::thing('environment', $id_str) CONTENT {
+            environment: $dimensions.environment,
+            created_at: $now,
+            updated_at: $now
+        })[0]
+    }
+    END;
+};
+
+-- ----------------------------------------------------------------------------
+-- 5.7 Metric Resource Upsert Function
+-- ----------------------------------------------------------------------------
+
+-- fn::upsert_metric: Upsert metric resource
+-- Index fields: metric_name
+-- Additional fields: metric_type, unit, description
+DEFINE FUNCTION fn::upsert_metric($dimensions: object, $now: int, $tolerance: int) {
+    LET $last_record = (
+        SELECT * FROM metric
+        WHERE metric_name = $dimensions.metric_name
+        ORDER BY created_at DESC 
+        LIMIT 1
+    )[0];
+
+    RETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN
+        (UPDATE $last_record.id SET 
+            updated_at = $now,
+            metric_type = $dimensions.metric_type,
+            unit = $dimensions.unit,
+            description = $dimensions.description
+        )[0]
+    ELSE {
+        LET $id_str = fn::kv_block({ metric_name: $dimensions.metric_name }, $now);
+        (CREATE type::thing('metric', $id_str) CONTENT {
+            metric_name: $dimensions.metric_name,
+            metric_type: $dimensions.metric_type,
+            unit: $dimensions.unit,
+            description: $dimensions.description,
+            created_at: $now,
+            updated_at: $now
+        })[0]
+    }
+    END;
 };
 
 -- ============================================================================
--- SECTION 4: Unified Relation Upsert Function
+-- SECTION 6: Unified Relation Upsert Function
 --
 -- This single function provides upsert capability for ALL relation tables.
 -- It uses dynamic table names with the RELATE statement.
@@ -760,10 +1393,6 @@ DEFINE FUNCTION fn::upsert_relation_lifecycle(
 -- ID Format: {from_kv}|{to_kv}
 -- Example: node_with_pod:⟨bcs_cluster_id=X,node=Y,created_at=T1|bcs_cluster_id=X,namespace=N,pod=P,created_at=T2⟩
 -- ============================================================================
-
--- ----------------------------------------------------------------------------
--- 4.1 Unified Relation Upsert Function
--- ----------------------------------------------------------------------------
 
 -- fn::upsert_relation: Universal relation upsert function for all relation tables
 --

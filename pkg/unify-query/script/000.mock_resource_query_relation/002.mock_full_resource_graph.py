@@ -21,6 +21,7 @@ Key Features:
     - Implements ALL resource types from design document section 2
     - Implements ALL relation types from design document section 3
     - Idempotent: can be run multiple times without data conflicts
+    - Uses resource-specific upsert functions (fn::upsert_{resource_type})
 
 ID Format (per documentation section 4):
     - Node ID: {resource_type}:{key1}={value1},{key2}={value2},...
@@ -445,18 +446,18 @@ class SurrealDBClient:
         """Convert milliseconds timestamp to datetime"""
         return datetime.fromtimestamp(ms / 1000.0)
     
-    def call_upsert_resource_lifecycle(
+    def call_upsert_resource(
         self,
-        table: str,
+        resource_type: ResourceType,
         dimensions: Dict[str, Any],
         now_ms: int,
         tolerance_ms: int
     ) -> Dict[str, Any]:
         """
-        Call fn::upsert_resource_lifecycle function
+        Call resource-specific fn::upsert_{resource_type} function
         
         Args:
-            table: The resource table name
+            resource_type: The resource type enum
             dimensions: Dictionary of dimension key-value pairs
             now_ms: Current timestamp in milliseconds
             tolerance_ms: Tolerance time in milliseconds for lifecycle decisions
@@ -473,9 +474,10 @@ class SurrealDBClient:
                 dim_parts.append(f"{k}: '{v}'")
         dim_str = ", ".join(dim_parts)
         
+        # Call resource-specific function
+        func_name = f"fn::upsert_{resource_type.value}"
         sql = f"""
-        fn::upsert_resource_lifecycle(
-            '{table}',
+        {func_name}(
             {{ {dim_str} }},
             {now_ms},
             {tolerance_ms}
@@ -492,90 +494,39 @@ class SurrealDBClient:
                 return records
         return {}
 
-    def call_upsert_relation_lifecycle(
+    def call_upsert_relation(
         self,
-        from_table: str,
-        from_dimensions: Dict[str, Any],
-        to_table: str,
-        to_dimensions: Dict[str, Any],
-        now_ms: int,
-        tolerance_ms: int,
-        relation_type: str,  # "static" or "dynamic"
-        bidirectional: bool  # True for bidirectional, False for directional
+        relation_table: str,
+        from_id: str,
+        to_id: str,
+        now_ms: int
     ) -> Dict[str, Any]:
         """
-        Call fn::upsert_relation_lifecycle function and upsert the relation.
-        
-        This method:
-        1. Calls fn::upsert_relation_lifecycle to upsert both endpoint resources
-        2. Calls fn::upsert_{relation_table} to upsert the relation itself
+        Call fn::upsert_relation function to upsert a relation.
         
         Args:
-            from_table: Source resource table name
-            from_dimensions: Source resource dimensions
-            to_table: Target resource table name
-            to_dimensions: Target resource dimensions
+            relation_table: The relation table name (e.g., "node_with_pod")
+            from_id: The source/from endpoint record ID
+            to_id: The target/to endpoint record ID
             now_ms: Current timestamp in milliseconds
-            tolerance_ms: Tolerance time in milliseconds
-            relation_type: "static" for static relations, "dynamic" for dynamic relations
-            bidirectional: True for bidirectional relations (static), False for directional (dynamic)
         
         Returns:
             The created/updated relation record
         """
-        def format_dimensions(dims):
-            parts = []
-            for k, v in dims.items():
-                if isinstance(v, (int, float)):
-                    parts.append(f"{k}: {v}")
-                else:
-                    parts.append(f"{k}: '{v}'")
-            return ", ".join(parts)
-        
-        from_dim_str = format_dimensions(from_dimensions)
-        to_dim_str = format_dimensions(to_dimensions)
-        bidirectional_str = "true" if bidirectional else "false"
-        
-        # Step 1: Determine relation table name based on bidirectional flag
-        if bidirectional:
-            # Static relations use alphabetical ordering: {res1}_with_{res2}
-            if from_table <= to_table:
-                rel_table = f"{from_table}_with_{to_table}"
-            else:
-                rel_table = f"{to_table}_with_{from_table}"
-        else:
-            # Dynamic relations preserve direction: {src}_to_{dst}
-            rel_table = f"{from_table}_to_{to_table}"
-        
-        # Step 2: Call fn::upsert_relation_lifecycle to upsert resources and 
-        #         fn::upsert_relation to upsert the relation in one SQL statement
         sql = f"""
-        LET $resource_info = fn::upsert_relation_lifecycle(
-            '{from_table}',
-            {{ {from_dim_str} }},
-            '{to_table}',
-            {{ {to_dim_str} }},
-            {now_ms},
-            {tolerance_ms},
-            '{relation_type}',
-            {bidirectional_str}
-        );
-        LET $relation = fn::upsert_relation('{rel_table}', $resource_info.from_id, $resource_info.to_id, {now_ms});
-        RETURN {{ resource_info: $resource_info, relation: $relation }};
+        fn::upsert_relation('{relation_table}', {from_id}, {to_id}, {now_ms});
         """
         
         try:
             result = self.execute_sql(sql)
-            # The result is in the third statement (RETURN)
-            if result and len(result) >= 3:
-                return_result = result[2].get('result')
-                if isinstance(return_result, dict):
-                    return return_result.get('relation', return_result)
-                elif isinstance(return_result, list) and return_result:
-                    item = return_result[0] if isinstance(return_result[0], dict) else {}
-                    return item.get('relation', item)
+            if result and result[0].get('result'):
+                records = result[0]['result']
+                if isinstance(records, list) and records:
+                    return records[0]
+                elif isinstance(records, dict):
+                    return records
         except Exception as e:
-            logger.warning(f"Error upserting relation {rel_table}: {e}")
+            logger.warning(f"Error upserting relation {relation_table}: {e}")
         
         return {}
 
@@ -586,7 +537,7 @@ class SurrealDBClient:
             updated_at: datetime
     ) -> Tuple[str, int, str]:
         """
-        Upsert a node using fn::upsert_resource_lifecycle function.
+        Upsert a node using resource-specific fn::upsert_{resource_type} function.
         
         This method calls the SurrealDB custom function for lifecycle management.
         The function automatically determines whether to create a new record or
@@ -600,8 +551,8 @@ class SurrealDBClient:
         """
         current_time_ms = self.datetime_to_ms(updated_at)
         
-        result = self.call_upsert_resource_lifecycle(
-            resource_type.value,
+        result = self.call_upsert_resource(
+            resource_type,
             data,
             current_time_ms,
             MockConfig.TOLERANCE_TIME_MS
@@ -664,14 +615,14 @@ class SurrealDBClient:
             updated_at: datetime
     ) -> Dict[str, Any]:
         """
-        Upsert a static (bidirectional) relation using fn::upsert_relation_lifecycle.
+        Upsert a static (bidirectional) relation.
         
         Static relations represent topology relationships between resources.
         They are always bidirectional (can be queried from either direction).
         
-        The SurrealDB function automatically manages resource lifecycle:
-        - If resources exist and are within tolerance, update their updated_at
-        - Otherwise, create new resource records with new created_at
+        This method:
+        1. Upserts both endpoint resources using their specific functions
+        2. Upserts the relation using fn::upsert_relation
         
         Args:
             relation_type: The type of relation
@@ -683,15 +634,28 @@ class SurrealDBClient:
         """
         current_time_ms = self.datetime_to_ms(updated_at)
         
-        return self.call_upsert_relation_lifecycle(
-            from_type.value,
-            from_data,
-            to_type.value,
-            to_data,
-            current_time_ms,
-            MockConfig.TOLERANCE_TIME_MS,
-            relation_type="static",
-            bidirectional=True
+        # Step 1: Upsert both endpoint resources
+        from_result = self.call_upsert_resource(
+            from_type, from_data, current_time_ms, MockConfig.TOLERANCE_TIME_MS
+        )
+        to_result = self.call_upsert_resource(
+            to_type, to_data, current_time_ms, MockConfig.TOLERANCE_TIME_MS
+        )
+        
+        # Step 2: Get the record IDs
+        from_id = from_result.get('id')
+        to_id = to_result.get('id')
+        
+        if not from_id or not to_id:
+            logger.warning(f"Failed to get record IDs for relation {relation_type.value}")
+            return {}
+        
+        # Step 3: Upsert the relation
+        return self.call_upsert_relation(
+            relation_type.value,
+            from_id,
+            to_id,
+            current_time_ms
         )
 
     def upsert_dynamic_relation(
@@ -704,14 +668,14 @@ class SurrealDBClient:
             updated_at: datetime
     ) -> Dict[str, Any]:
         """
-        Upsert a dynamic (directional) relation using fn::upsert_relation_lifecycle.
+        Upsert a dynamic (directional) relation.
         
         Dynamic relations represent traffic flow between resources.
         They have explicit direction (source -> target) and are not bidirectional.
         
-        The SurrealDB function automatically manages resource lifecycle:
-        - If resources exist and are within tolerance, update their updated_at
-        - Otherwise, create new resource records with new created_at
+        This method:
+        1. Upserts both endpoint resources using their specific functions
+        2. Upserts the relation using fn::upsert_relation
         
         Args:
             relation_type: The type of relation
@@ -723,15 +687,28 @@ class SurrealDBClient:
         """
         current_time_ms = self.datetime_to_ms(updated_at)
         
-        return self.call_upsert_relation_lifecycle(
-            source_type.value,
-            source_data,
-            target_type.value,
-            target_data,
-            current_time_ms,
-            MockConfig.TOLERANCE_TIME_MS,
-            relation_type="dynamic",
-            bidirectional=False
+        # Step 1: Upsert both endpoint resources
+        source_result = self.call_upsert_resource(
+            source_type, source_data, current_time_ms, MockConfig.TOLERANCE_TIME_MS
+        )
+        target_result = self.call_upsert_resource(
+            target_type, target_data, current_time_ms, MockConfig.TOLERANCE_TIME_MS
+        )
+        
+        # Step 2: Get the record IDs
+        source_id = source_result.get('id')
+        target_id = target_result.get('id')
+        
+        if not source_id or not target_id:
+            logger.warning(f"Failed to get record IDs for relation {relation_type.value}")
+            return {}
+        
+        # Step 3: Upsert the relation
+        return self.call_upsert_relation(
+            relation_type.value,
+            source_id,
+            target_id,
+            current_time_ms
         )
 
 
