@@ -11,6 +11,14 @@ surreal_db:
   namespace: "test_20251229"
   database: "test_20251229"
 
+# Unify-Query API 配置
+unify_query:
+  url: "http://bkapi.bkop.woa.com/api/bk-unify-query/prod/query/ts"
+  app_code: "bk_monitorv3"
+  app_secret: "684b6bef-519b-4108-ad39-d55b9c76c6b5"
+  username: "admin"
+  space_uid: "bkcc__7"
+
 bkbase:
   api_url: ""
   username: ""
