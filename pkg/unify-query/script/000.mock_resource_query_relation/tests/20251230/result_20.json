@@ -1,0 +1,1949 @@
+{
+  "timestamp": "2025-12-30T15:06:14.558777",
+  "environment": {
+    "url": "http://9.134.9.112:8000",
+    "namespace": "default",
+    "database": "benchmark"
+  },
+  "data_pool": {
+    "pods": 10000,
+    "services": 3567,
+    "namespaces": 150
+  },
+  "summary": {
+    "total_time_sec": 60.65,
+    "total_ops": 1802,
+    "qps": 29.71,
+    "success_rate": 100.0
+  },
+  "operations": {
+    "read_single": 463,
+    "read_batch": 394,
+    "read_relation": 389,
+    "write_heartbeat": 449,
+    "write_new": 107,
+    "total_reads": 1246,
+    "total_writes": 556,
+    "total_ops": 1802,
+    "errors": 0
+  },
+  "latency": {
+    "overall": {
+      "p50": 657.0676271803677,
+      "p95": 1093.2811116799712,
+      "p99": 1270.323133096099,
+      "avg": 669.9000912990842,
+      "min": 69.88083897158504,
+      "max": 1439.8435838520527
+    },
+    "read": {
+      "p50": 649.8078224249184,
+      "p95": 1087.4891793355346,
+      "p99": 1258.6267180740833,
+      "avg": 662.2595742672239,
+      "min": 69.88083897158504,
+      "max": 1403.7855979986489
+    },
+    "write": {
+      "p50": 639.1460662707686,
+      "p95": 1037.6226790249348,
+      "p99": 1075.7803129963577,
+      "avg": 639.3334125038062,
+      "min": 117.2529892064631,
+      "max": 1170.388976112008
+    },
+    "heartbeat": {
+      "p50": 688.1675641052425,
+      "p95": 1149.3030888959765,
+      "p99": 1313.078516162932,
+      "avg": 698.387215692832,
+      "min": 109.95475575327873,
+      "max": 1439.8435838520527
+    }
+  },
+  "health_checks": [
+    {
+      "timestamp": "2025-12-30T15:05:11.459829",
+      "status": "ok",
+      "latency_ms": 3.43,
+      "error": null
+    },
+    {
+      "timestamp": "2025-12-30T15:05:11.463959",
+      "status": "ok",
+      "latency_ms": 4.66,
+      "error": null
+    },
+    {
+      "timestamp": "2025-12-30T15:05:16.470183",
+      "status": "ok",
+      "latency_ms": 871.67,
+      "error": null
+    },
+    {
+      "timestamp": "2025-12-30T15:05:22.342094",
+      "status": "ok",
+      "latency_ms": 479.29,
+      "error": null
+    },
+    {
+      "timestamp": "2025-12-30T15:05:27.821752",
+      "status": "ok",
+      "latency_ms": 40.67,
+      "error": null
+    },
+    {
+      "timestamp": "2025-12-30T15:05:32.862650",
+      "status": "ok",
+      "latency_ms": 895.8,
+      "error": null
+    },
+    {
+      "timestamp": "2025-12-30T15:05:38.760064",
+      "status": "ok",
+      "latency_ms": 519.58,
+      "error": null
+    },
+    {
+      "timestamp": "2025-12-30T15:05:44.279923",
+      "status": "ok",
+      "latency_ms": 403.69,
+      "error": null
+    },
+    {
+      "timestamp": "2025-12-30T15:05:49.684653",
+      "status": "ok",
+      "latency_ms": 348.28,
+      "error": null
+    },
+    {
+      "timestamp": "2025-12-30T15:05:55.033241",
+      "status": "ok",
+      "latency_ms": 928.13,
+      "error": null
+    },
+    {
+      "timestamp": "2025-12-30T15:06:00.963063",
+      "status": "ok",
+      "latency_ms": 308.29,
+      "error": null
+    },
+    {
+      "timestamp": "2025-12-30T15:06:06.271575",
+      "status": "ok",
+      "latency_ms": 17.71,
+      "error": null
+    },
+    {
+      "timestamp": "2025-12-30T15:06:11.289520",
+      "status": "ok",
+      "latency_ms": 559.39,
+      "error": null
+    },
+    {
+      "timestamp": "2025-12-30T15:06:12.109922",
+      "status": "ok",
+      "latency_ms": 2.67,
+      "error": null
+    }
+  ],
+  "db_info": {
+    "before": {
+      "info": {
+        "root": {
+          "accesses": {},
+          "namespaces": {
+            "benchmark_real": "DEFINE NAMESPACE benchmark_real",
+            "default": "DEFINE NAMESPACE default",
+            "test": "DEFINE NAMESPACE test",
+            "test_1229": "DEFINE NAMESPACE test_1229",
+            "test_20251223": "DEFINE NAMESPACE test_20251223",
+            "test_20251229": "DEFINE NAMESPACE test_20251229",
+            "test_auto_id": "DEFINE NAMESPACE test_auto_id",
+            "test_event_auto": "DEFINE NAMESPACE test_event_auto",
+            "test_full": "DEFINE NAMESPACE test_full",
+            "test_logic_id": "DEFINE NAMESPACE test_logic_id",
+            "test_multi_pod": "DEFINE NAMESPACE test_multi_pod",
+            "test_relate": "DEFINE NAMESPACE test_relate",
+            "test_relation": "DEFINE NAMESPACE test_relation",
+            "test_schemaless": "DEFINE NAMESPACE test_schemaless",
+            "test_syntax2": "DEFINE NAMESPACE test_syntax2",
+            "test_temp": "DEFINE NAMESPACE test_temp"
+          },
+          "nodes": {
+            "ba7d10ea-5ce7-44dd-bcb2-f1e5a718df64": "NODE ba7d10ea-5ce7-44dd-bcb2-f1e5a718df64 SEEN 1767078306032 ACTIVE"
+          },
+          "users": {
+            "root": "DEFINE USER root ON ROOT PASSHASH '$argon2id$v=19$m=19456,t=2,p=1$BRHvBfihvzuGW7jkWHjB5w$hmHrzOcolIT8C1Ai6bAKGDatTU8It1PlmuMPBn44vXg' ROLES OWNER DURATION FOR TOKEN 1h, FOR SESSION NONE"
+          }
+        },
+        "namespace": {
+          "accesses": {},
+          "databases": {
+            "benchmark": "DEFINE DATABASE benchmark",
+            "default": "DEFINE DATABASE default",
+            "shamcleren": "DEFINE DATABASE shamcleren"
+          },
+          "users": {}
+        },
+        "database": {
+          "accesses": {},
+          "analyzers": {},
+          "configs": {},
+          "functions": {
+            "kv_block": "DEFINE FUNCTION fn::kv_block($dimensions: object, $created_at: int) {\nLET $entries = object::entries($dimensions);\nLET $sorted = array::sort($entries);\nLET $pairs = array::map($sorted, |$e: any| string::concat($e[0], '=', <string> $e[1]));\nLET $base = array::join($pairs, ',');\nRETURN string::concat($base, ',created_at=', <string> $created_at);\n} PERMISSIONS FULL",
+            "relation_id": "DEFINE FUNCTION fn::relation_id($from_id: record, $to_id: record) {\nLET $from_str = <string> $from_id;\nLET $to_str = <string> $to_id;\nLET $from_kv = string::split($from_str, ':')[1];\nLET $to_kv = string::split($to_str, ':')[1];\nLET $from_kv_clean = string::replace(string::replace($from_kv, '\u27e8', ''), '\u27e9', '');\nLET $to_kv_clean = string::replace(string::replace($to_kv, '\u27e8', ''), '\u27e9', '');\nRETURN string::concat($from_kv_clean, '|', $to_kv_clean);\n} PERMISSIONS FULL",
+            "upsert_apm_service": "DEFINE FUNCTION fn::upsert_apm_service($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM apm_service WHERE apm_application_name = $dimensions.apm_application_name AND apm_service_name = $dimensions.apm_service_name ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('apm_service', $id_str) CONTENT { apm_application_name: $dimensions.apm_application_name, apm_service_name: $dimensions.apm_service_name, created_at: $now, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_apm_service_instance": "DEFINE FUNCTION fn::upsert_apm_service_instance($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM apm_service_instance WHERE apm_application_name = $dimensions.apm_application_name AND apm_service_name = $dimensions.apm_service_name AND apm_service_instance_name = $dimensions.apm_service_instance_name ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('apm_service_instance', $id_str) CONTENT { apm_application_name: $dimensions.apm_application_name, apm_service_instance_name: $dimensions.apm_service_instance_name, apm_service_name: $dimensions.apm_service_name, created_at: $now, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_app_version": "DEFINE FUNCTION fn::upsert_app_version($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM app_version WHERE app_name = $dimensions.app_name AND version = $dimensions.version ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('app_version', $id_str) CONTENT { app_name: $dimensions.app_name, created_at: $now, updated_at: $now, version: $dimensions.version })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_biz": "DEFINE FUNCTION fn::upsert_biz($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM biz WHERE bk_biz_id = $dimensions.bk_biz_id ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('biz', $id_str) CONTENT { bk_biz_id: $dimensions.bk_biz_id, created_at: $now, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_bklogconfig": "DEFINE FUNCTION fn::upsert_bklogconfig($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM bklogconfig WHERE bklogconfig_namespace = $dimensions.bklogconfig_namespace AND bklogconfig_name = $dimensions.bklogconfig_name ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('bklogconfig', $id_str) CONTENT { bklogconfig_name: $dimensions.bklogconfig_name, bklogconfig_namespace: $dimensions.bklogconfig_namespace, created_at: $now, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_cluster": "DEFINE FUNCTION fn::upsert_cluster($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM cluster WHERE bcs_cluster_id = $dimensions.bcs_cluster_id ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('cluster', $id_str) CONTENT { bcs_cluster_id: $dimensions.bcs_cluster_id, created_at: $now, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_container": "DEFINE FUNCTION fn::upsert_container($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM container WHERE bcs_cluster_id = $dimensions.bcs_cluster_id AND namespace = $dimensions.namespace AND pod = $dimensions.pod AND container = $dimensions.container ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('container', $id_str) CONTENT { bcs_cluster_id: $dimensions.bcs_cluster_id, container: $dimensions.container, created_at: $now, namespace: $dimensions.namespace, pod: $dimensions.pod, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_daemonset": "DEFINE FUNCTION fn::upsert_daemonset($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM daemonset WHERE bcs_cluster_id = $dimensions.bcs_cluster_id AND namespace = $dimensions.namespace AND daemonset = $dimensions.daemonset ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('daemonset', $id_str) CONTENT { bcs_cluster_id: $dimensions.bcs_cluster_id, created_at: $now, daemonset: $dimensions.daemonset, namespace: $dimensions.namespace, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_datasource": "DEFINE FUNCTION fn::upsert_datasource($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM datasource WHERE bk_data_id = $dimensions.bk_data_id ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('datasource', $id_str) CONTENT { bk_data_id: $dimensions.bk_data_id, created_at: $now, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_deployment": "DEFINE FUNCTION fn::upsert_deployment($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM deployment WHERE bcs_cluster_id = $dimensions.bcs_cluster_id AND namespace = $dimensions.namespace AND deployment = $dimensions.deployment ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('deployment', $id_str) CONTENT { bcs_cluster_id: $dimensions.bcs_cluster_id, created_at: $now, deployment: $dimensions.deployment, namespace: $dimensions.namespace, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_domain": "DEFINE FUNCTION fn::upsert_domain($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM domain WHERE bcs_cluster_id = $dimensions.bcs_cluster_id AND domain = $dimensions.domain ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('domain', $id_str) CONTENT { bcs_cluster_id: $dimensions.bcs_cluster_id, created_at: $now, domain: $dimensions.domain, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_environment": "DEFINE FUNCTION fn::upsert_environment($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM environment WHERE environment = $dimensions.environment ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('environment', $id_str) CONTENT { created_at: $now, environment: $dimensions.environment, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_git_commit": "DEFINE FUNCTION fn::upsert_git_commit($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM git_commit WHERE git_repo = $dimensions.git_repo AND commit_id = $dimensions.commit_id ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('git_commit', $id_str) CONTENT { commit_id: $dimensions.commit_id, created_at: $now, git_repo: $dimensions.git_repo, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_host": "DEFINE FUNCTION fn::upsert_host($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM host WHERE bk_host_id = $dimensions.bk_host_id ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('host', $id_str) CONTENT { bk_host_id: $dimensions.bk_host_id, created_at: $now, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_ingress": "DEFINE FUNCTION fn::upsert_ingress($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM ingress WHERE bcs_cluster_id = $dimensions.bcs_cluster_id AND namespace = $dimensions.namespace AND ingress = $dimensions.ingress ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('ingress', $id_str) CONTENT { bcs_cluster_id: $dimensions.bcs_cluster_id, created_at: $now, ingress: $dimensions.ingress, namespace: $dimensions.namespace, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_job": "DEFINE FUNCTION fn::upsert_job($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM job WHERE bcs_cluster_id = $dimensions.bcs_cluster_id AND namespace = $dimensions.namespace AND job = $dimensions.job ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('job', $id_str) CONTENT { bcs_cluster_id: $dimensions.bcs_cluster_id, created_at: $now, job: $dimensions.job, namespace: $dimensions.namespace, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_k8s_address": "DEFINE FUNCTION fn::upsert_k8s_address($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM k8s_address WHERE bcs_cluster_id = $dimensions.bcs_cluster_id AND address = $dimensions.address ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('k8s_address', $id_str) CONTENT { address: $dimensions.address, bcs_cluster_id: $dimensions.bcs_cluster_id, created_at: $now, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_metric": "DEFINE FUNCTION fn::upsert_metric($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM metric WHERE metric_name = $dimensions.metric_name ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now, metric_type = $dimensions.metric_type, unit = $dimensions.unit, description = $dimensions.description)[0] ELSE {\nLET $id_str = fn::kv_block({ metric_name: $dimensions.metric_name }, $now);\n(CREATE type::thing('metric', $id_str) CONTENT { created_at: $now, description: $dimensions.description, metric_name: $dimensions.metric_name, metric_type: $dimensions.metric_type, unit: $dimensions.unit, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_module": "DEFINE FUNCTION fn::upsert_module($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM module WHERE bk_module_id = $dimensions.bk_module_id ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('module', $id_str) CONTENT { bk_module_id: $dimensions.bk_module_id, created_at: $now, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_namespace": "DEFINE FUNCTION fn::upsert_namespace($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM namespace WHERE bcs_cluster_id = $dimensions.bcs_cluster_id AND namespace = $dimensions.namespace ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('namespace', $id_str) CONTENT { bcs_cluster_id: $dimensions.bcs_cluster_id, created_at: $now, namespace: $dimensions.namespace, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_node": "DEFINE FUNCTION fn::upsert_node($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM node WHERE bcs_cluster_id = $dimensions.bcs_cluster_id AND node = $dimensions.node ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('node', $id_str) CONTENT { bcs_cluster_id: $dimensions.bcs_cluster_id, created_at: $now, node: $dimensions.node, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_pod": "DEFINE FUNCTION fn::upsert_pod($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM pod WHERE bcs_cluster_id = $dimensions.bcs_cluster_id AND namespace = $dimensions.namespace AND pod = $dimensions.pod ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('pod', $id_str) CONTENT { bcs_cluster_id: $dimensions.bcs_cluster_id, created_at: $now, namespace: $dimensions.namespace, pod: $dimensions.pod, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_relation": "DEFINE FUNCTION fn::upsert_relation($relation_table: string, $from_id: record, $to_id: record, $now: int) {\nLET $rel_id = fn::relation_id($from_id, $to_id);\nLET $full_id = type::thing($relation_table, $rel_id);\nLET $rel_table = type::table($relation_table);\nLET $existing = (SELECT * FROM type::table($relation_table) WHERE id = $full_id LIMIT 1)[0];\nRETURN IF $existing != NONE THEN (UPDATE $existing.id SET updated_at = $now)[0] ELSE (RELATE $from_id -> $rel_table -> $to_id SET id = $full_id, created_at = $now, updated_at = $now)[0] END;\n} PERMISSIONS FULL",
+            "upsert_replicaset": "DEFINE FUNCTION fn::upsert_replicaset($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM replicaset WHERE bcs_cluster_id = $dimensions.bcs_cluster_id AND namespace = $dimensions.namespace AND replicaset = $dimensions.replicaset ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('replicaset', $id_str) CONTENT { bcs_cluster_id: $dimensions.bcs_cluster_id, created_at: $now, namespace: $dimensions.namespace, replicaset: $dimensions.replicaset, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_service": "DEFINE FUNCTION fn::upsert_service($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM service WHERE bcs_cluster_id = $dimensions.bcs_cluster_id AND namespace = $dimensions.namespace AND service = $dimensions.service ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('service', $id_str) CONTENT { bcs_cluster_id: $dimensions.bcs_cluster_id, created_at: $now, namespace: $dimensions.namespace, service: $dimensions.service, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_set": "DEFINE FUNCTION fn::upsert_set($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM set WHERE bk_set_id = $dimensions.bk_set_id ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('set', $id_str) CONTENT { bk_set_id: $dimensions.bk_set_id, created_at: $now, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_statefulset": "DEFINE FUNCTION fn::upsert_statefulset($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM statefulset WHERE bcs_cluster_id = $dimensions.bcs_cluster_id AND namespace = $dimensions.namespace AND statefulset = $dimensions.statefulset ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('statefulset', $id_str) CONTENT { bcs_cluster_id: $dimensions.bcs_cluster_id, created_at: $now, namespace: $dimensions.namespace, statefulset: $dimensions.statefulset, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_system": "DEFINE FUNCTION fn::upsert_system($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM system WHERE bk_cloud_id = $dimensions.bk_cloud_id AND bk_target_ip = $dimensions.bk_target_ip ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('system', $id_str) CONTENT { bk_cloud_id: $dimensions.bk_cloud_id, bk_target_ip: $dimensions.bk_target_ip, created_at: $now, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL"
+          },
+          "models": {},
+          "params": {},
+          "tables": {
+            "apm_service": "DEFINE TABLE apm_service TYPE NORMAL SCHEMAFULL PERMISSIONS NONE",
+            "apm_service_instance": "DEFINE TABLE apm_service_instance TYPE NORMAL SCHEMAFULL PERMISSIONS NONE",
+            "apm_service_instance_with_pod": "DEFINE TABLE apm_service_instance_with_pod TYPE RELATION IN apm_service_instance OUT pod SCHEMAFULL PERMISSIONS NONE",
+            "apm_service_instance_with_system": "DEFINE TABLE apm_service_instance_with_system TYPE RELATION IN apm_service_instance OUT system SCHEMAFULL PERMISSIONS NONE",
+            "apm_service_with_apm_service_instance": "DEFINE TABLE apm_service_with_apm_service_instance TYPE RELATION IN apm_service OUT apm_service_instance SCHEMAFULL PERMISSIONS NONE",
+            "app_version": "DEFINE TABLE app_version TYPE NORMAL SCHEMAFULL PERMISSIONS NONE",
+            "app_version_with_container": "DEFINE TABLE app_version_with_container TYPE RELATION IN app_version OUT container SCHEMAFULL PERMISSIONS NONE",
+            "app_version_with_git_commit": "DEFINE TABLE app_version_with_git_commit TYPE RELATION IN app_version OUT git_commit SCHEMAFULL PERMISSIONS NONE",
+            "app_version_with_system": "DEFINE TABLE app_version_with_system TYPE RELATION IN app_version OUT system SCHEMAFULL PERMISSIONS NONE",
+            "biz": "DEFINE TABLE biz TYPE NORMAL SCHEMAFULL PERMISSIONS NONE",
+            "biz_with_set": "DEFINE TABLE biz_with_set TYPE RELATION IN biz OUT set SCHEMAFULL PERMISSIONS NONE",
+            "bklogconfig": "DEFINE TABLE bklogconfig TYPE NORMAL SCHEMAFULL PERMISSIONS NONE",
+            "bklogconfig_with_datasource": "DEFINE TABLE bklogconfig_with_datasource TYPE RELATION IN bklogconfig OUT datasource SCHEMAFULL PERMISSIONS NONE",
+            "cluster": "DEFINE TABLE cluster TYPE NORMAL SCHEMAFULL PERMISSIONS NONE",
+            "container": "DEFINE TABLE container TYPE NORMAL SCHEMAFULL PERMISSIONS NONE",
+            "container_with_environment": "DEFINE TABLE container_with_environment TYPE RELATION IN container OUT environment SCHEMAFULL PERMISSIONS NONE",
+            "container_with_pod": "DEFINE TABLE container_with_pod TYPE RELATION IN container OUT pod SCHEMAFULL PERMISSIONS NONE",
+            "daemonset": "DEFINE TABLE daemonset TYPE NORMAL SCHEMAFULL PERMISSIONS NONE",
+            "daemonset_with_pod": "DEFINE TABLE daemonset_with_pod TYPE RELATION IN daemonset OUT pod SCHEMAFULL PERMISSIONS NONE",
+            "datasource": "DEFINE TABLE datasource TYPE NORMAL SCHEMAFULL PERMISSIONS NONE",
+            "datasource_with_node": "DEFINE TABLE datasource_with_node TYPE RELATION IN datasource OUT node SCHEMAFULL PERMISSIONS NONE",
+            "datasource_with_pod": "DEFINE TABLE datasource_with_pod TYPE RELATION IN datasource OUT pod SCHEMAFULL PERMISSIONS NONE",
+            "deployment": "DEFINE TABLE deployment TYPE NORMAL SCHEMAFULL PERMISSIONS NONE",
+            "deployment_with_replicaset": "DEFINE TABLE deployment_with_replicaset TYPE RELATION IN deployment OUT replicaset SCHEMAFULL PERMISSIONS NONE",
+            "domain": "DEFINE TABLE domain TYPE NORMAL SCHEMAFULL PERMISSIONS NONE",
+            "domain_with_service": "DEFINE TABLE domain_with_service TYPE RELATION IN domain OUT service SCHEMAFULL PERMISSIONS NONE",
+            "environment": "DEFINE TABLE environment TYPE NORMAL SCHEMAFULL PERMISSIONS NONE",
+            "environment_with_system": "DEFINE TABLE environment_with_system TYPE RELATION IN environment OUT system SCHEMAFULL PERMISSIONS NONE",
+            "git_commit": "DEFINE TABLE git_commit TYPE NORMAL SCHEMAFULL PERMISSIONS NONE",
+            "host": "DEFINE TABLE host TYPE NORMAL SCHEMAFULL PERMISSIONS NONE",
+            "host_with_module": "DEFINE TABLE host_with_module TYPE RELATION IN host OUT module SCHEMAFULL PERMISSIONS NONE",
+            "host_with_system": "DEFINE TABLE host_with_system TYPE RELATION IN host OUT system SCHEMAFULL PERMISSIONS NONE",
+            "ingress": "DEFINE TABLE ingress TYPE NORMAL SCHEMAFULL PERMISSIONS NONE",
+            "ingress_with_service": "DEFINE TABLE ingress_with_service TYPE RELATION IN ingress OUT service SCHEMAFULL PERMISSIONS NONE",
+            "job": "DEFINE TABLE job TYPE NORMAL SCHEMAFULL PERMISSIONS NONE",
+            "job_with_pod": "DEFINE TABLE job_with_pod TYPE RELATION IN job OUT pod SCHEMAFULL PERMISSIONS NONE",
+            "k8s_address": "DEFINE TABLE k8s_address TYPE NORMAL SCHEMAFULL PERMISSIONS NONE",
+            "k8s_address_with_service": "DEFINE TABLE k8s_address_with_service TYPE RELATION IN k8s_address OUT service SCHEMAFULL PERMISSIONS NONE",
+            "metric": "DEFINE TABLE metric TYPE NORMAL SCHEMAFULL PERMISSIONS NONE",
+            "module": "DEFINE TABLE module TYPE NORMAL SCHEMAFULL PERMISSIONS NONE",
+            "module_with_set": "DEFINE TABLE module_with_set TYPE RELATION IN module OUT set SCHEMAFULL PERMISSIONS NONE",
+            "namespace": "DEFINE TABLE namespace TYPE NORMAL SCHEMAFULL PERMISSIONS NONE",
+            "node": "DEFINE TABLE node TYPE NORMAL SCHEMAFULL PERMISSIONS NONE",
+            "node_has_metric": "DEFINE TABLE node_has_metric TYPE RELATION IN pod OUT metric SCHEMAFULL PERMISSIONS NONE",
+            "node_with_pod": "DEFINE TABLE node_with_pod TYPE RELATION IN node OUT pod SCHEMAFULL PERMISSIONS NONE",
+            "node_with_system": "DEFINE TABLE node_with_system TYPE RELATION IN node OUT system SCHEMAFULL PERMISSIONS NONE",
+            "pod": "DEFINE TABLE pod TYPE NORMAL SCHEMAFULL PERMISSIONS NONE",
+            "pod_to_pod": "DEFINE TABLE pod_to_pod TYPE RELATION IN pod OUT pod SCHEMAFULL PERMISSIONS NONE",
+            "pod_to_system": "DEFINE TABLE pod_to_system TYPE RELATION IN pod OUT system SCHEMAFULL PERMISSIONS NONE",
+            "pod_with_replicaset": "DEFINE TABLE pod_with_replicaset TYPE RELATION IN pod OUT replicaset SCHEMAFULL PERMISSIONS NONE",
+            "pod_with_service": "DEFINE TABLE pod_with_service TYPE RELATION IN pod OUT service SCHEMAFULL PERMISSIONS NONE",
+            "pod_with_statefulset": "DEFINE TABLE pod_with_statefulset TYPE RELATION IN pod OUT statefulset SCHEMAFULL PERMISSIONS NONE",
+            "relation_has_metric": "DEFINE TABLE relation_has_metric TYPE RELATION IN pod_to_pod OUT metric SCHEMAFULL PERMISSIONS NONE",
+            "replicaset": "DEFINE TABLE replicaset TYPE NORMAL SCHEMAFULL PERMISSIONS NONE",
+            "service": "DEFINE TABLE service TYPE NORMAL SCHEMAFULL PERMISSIONS NONE",
+            "service_to_service": "DEFINE TABLE service_to_service TYPE RELATION IN service OUT service SCHEMAFULL PERMISSIONS NONE",
+            "set": "DEFINE TABLE set TYPE NORMAL SCHEMAFULL PERMISSIONS NONE",
+            "statefulset": "DEFINE TABLE statefulset TYPE NORMAL SCHEMAFULL PERMISSIONS NONE",
+            "system": "DEFINE TABLE system TYPE NORMAL SCHEMAFULL PERMISSIONS NONE",
+            "system_to_pod": "DEFINE TABLE system_to_pod TYPE RELATION IN system OUT pod SCHEMAFULL PERMISSIONS NONE",
+            "system_to_system": "DEFINE TABLE system_to_system TYPE RELATION IN system OUT system SCHEMAFULL PERMISSIONS NONE"
+          },
+          "users": {}
+        },
+        "tables": {
+          "apm_service": {
+            "events": {},
+            "fields": {
+              "apm_application_name": "DEFINE FIELD apm_application_name ON apm_service TYPE string PERMISSIONS FULL",
+              "apm_service_name": "DEFINE FIELD apm_service_name ON apm_service TYPE string PERMISSIONS FULL",
+              "created_at": "DEFINE FIELD created_at ON apm_service TYPE int PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON apm_service TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "apm_service_instance": {
+            "events": {},
+            "fields": {
+              "apm_application_name": "DEFINE FIELD apm_application_name ON apm_service_instance TYPE string PERMISSIONS FULL",
+              "apm_service_instance_name": "DEFINE FIELD apm_service_instance_name ON apm_service_instance TYPE string PERMISSIONS FULL",
+              "apm_service_name": "DEFINE FIELD apm_service_name ON apm_service_instance TYPE string PERMISSIONS FULL",
+              "created_at": "DEFINE FIELD created_at ON apm_service_instance TYPE int PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON apm_service_instance TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "apm_service_instance_with_pod": {
+            "events": {},
+            "fields": {
+              "created_at": "DEFINE FIELD created_at ON apm_service_instance_with_pod TYPE int PERMISSIONS FULL",
+              "in": "DEFINE FIELD in ON apm_service_instance_with_pod TYPE record<apm_service_instance> PERMISSIONS FULL",
+              "out": "DEFINE FIELD out ON apm_service_instance_with_pod TYPE record<pod> PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON apm_service_instance_with_pod TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "apm_service_instance_with_system": {
+            "events": {},
+            "fields": {
+              "created_at": "DEFINE FIELD created_at ON apm_service_instance_with_system TYPE int PERMISSIONS FULL",
+              "in": "DEFINE FIELD in ON apm_service_instance_with_system TYPE record<apm_service_instance> PERMISSIONS FULL",
+              "out": "DEFINE FIELD out ON apm_service_instance_with_system TYPE record<system> PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON apm_service_instance_with_system TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "apm_service_with_apm_service_instance": {
+            "events": {},
+            "fields": {
+              "created_at": "DEFINE FIELD created_at ON apm_service_with_apm_service_instance TYPE int PERMISSIONS FULL",
+              "in": "DEFINE FIELD in ON apm_service_with_apm_service_instance TYPE record<apm_service> PERMISSIONS FULL",
+              "out": "DEFINE FIELD out ON apm_service_with_apm_service_instance TYPE record<apm_service_instance> PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON apm_service_with_apm_service_instance TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "app_version": {
+            "events": {},
+            "fields": {
+              "app_name": "DEFINE FIELD app_name ON app_version TYPE string PERMISSIONS FULL",
+              "created_at": "DEFINE FIELD created_at ON app_version TYPE int PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON app_version TYPE int PERMISSIONS FULL",
+              "version": "DEFINE FIELD version ON app_version TYPE string PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "app_version_with_container": {
+            "events": {},
+            "fields": {
+              "created_at": "DEFINE FIELD created_at ON app_version_with_container TYPE int PERMISSIONS FULL",
+              "in": "DEFINE FIELD in ON app_version_with_container TYPE record<app_version> PERMISSIONS FULL",
+              "out": "DEFINE FIELD out ON app_version_with_container TYPE record<container> PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON app_version_with_container TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "app_version_with_git_commit": {
+            "events": {},
+            "fields": {
+              "created_at": "DEFINE FIELD created_at ON app_version_with_git_commit TYPE int PERMISSIONS FULL",
+              "in": "DEFINE FIELD in ON app_version_with_git_commit TYPE record<app_version> PERMISSIONS FULL",
+              "out": "DEFINE FIELD out ON app_version_with_git_commit TYPE record<git_commit> PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON app_version_with_git_commit TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "app_version_with_system": {
+            "events": {},
+            "fields": {
+              "created_at": "DEFINE FIELD created_at ON app_version_with_system TYPE int PERMISSIONS FULL",
+              "in": "DEFINE FIELD in ON app_version_with_system TYPE record<app_version> PERMISSIONS FULL",
+              "out": "DEFINE FIELD out ON app_version_with_system TYPE record<system> PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON app_version_with_system TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "biz": {
+            "events": {},
+            "fields": {
+              "bk_biz_id": "DEFINE FIELD bk_biz_id ON biz TYPE string PERMISSIONS FULL",
+              "created_at": "DEFINE FIELD created_at ON biz TYPE int PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON biz TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "biz_with_set": {
+            "events": {},
+            "fields": {
+              "created_at": "DEFINE FIELD created_at ON biz_with_set TYPE int PERMISSIONS FULL",
+              "in": "DEFINE FIELD in ON biz_with_set TYPE record<biz> PERMISSIONS FULL",
+              "out": "DEFINE FIELD out ON biz_with_set TYPE record<set> PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON biz_with_set TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "bklogconfig": {
+            "events": {},
+            "fields": {
+              "bklogconfig_name": "DEFINE FIELD bklogconfig_name ON bklogconfig TYPE string PERMISSIONS FULL",
+              "bklogconfig_namespace": "DEFINE FIELD bklogconfig_namespace ON bklogconfig TYPE string PERMISSIONS FULL",
+              "created_at": "DEFINE FIELD created_at ON bklogconfig TYPE int PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON bklogconfig TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "bklogconfig_with_datasource": {
+            "events": {},
+            "fields": {
+              "created_at": "DEFINE FIELD created_at ON bklogconfig_with_datasource TYPE int PERMISSIONS FULL",
+              "in": "DEFINE FIELD in ON bklogconfig_with_datasource TYPE record<bklogconfig> PERMISSIONS FULL",
+              "out": "DEFINE FIELD out ON bklogconfig_with_datasource TYPE record<datasource> PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON bklogconfig_with_datasource TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "cluster": {
+            "events": {},
+            "fields": {
+              "bcs_cluster_id": "DEFINE FIELD bcs_cluster_id ON cluster TYPE string PERMISSIONS FULL",
+              "created_at": "DEFINE FIELD created_at ON cluster TYPE int PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON cluster TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "container": {
+            "events": {},
+            "fields": {
+              "bcs_cluster_id": "DEFINE FIELD bcs_cluster_id ON container TYPE string PERMISSIONS FULL",
+              "container": "DEFINE FIELD container ON container TYPE string PERMISSIONS FULL",
+              "created_at": "DEFINE FIELD created_at ON container TYPE int PERMISSIONS FULL",
+              "namespace": "DEFINE FIELD namespace ON container TYPE string PERMISSIONS FULL",
+              "pod": "DEFINE FIELD pod ON container TYPE string PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON container TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "container_with_environment": {
+            "events": {},
+            "fields": {
+              "created_at": "DEFINE FIELD created_at ON container_with_environment TYPE int PERMISSIONS FULL",
+              "in": "DEFINE FIELD in ON container_with_environment TYPE record<container> PERMISSIONS FULL",
+              "out": "DEFINE FIELD out ON container_with_environment TYPE record<environment> PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON container_with_environment TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "container_with_pod": {
+            "events": {},
+            "fields": {
+              "created_at": "DEFINE FIELD created_at ON container_with_pod TYPE int PERMISSIONS FULL",
+              "in": "DEFINE FIELD in ON container_with_pod TYPE record<container> PERMISSIONS FULL",
+              "out": "DEFINE FIELD out ON container_with_pod TYPE record<pod> PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON container_with_pod TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "daemonset": {
+            "events": {},
+            "fields": {
+              "bcs_cluster_id": "DEFINE FIELD bcs_cluster_id ON daemonset TYPE string PERMISSIONS FULL",
+              "created_at": "DEFINE FIELD created_at ON daemonset TYPE int PERMISSIONS FULL",
+              "daemonset": "DEFINE FIELD daemonset ON daemonset TYPE string PERMISSIONS FULL",
+              "namespace": "DEFINE FIELD namespace ON daemonset TYPE string PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON daemonset TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "daemonset_with_pod": {
+            "events": {},
+            "fields": {
+              "created_at": "DEFINE FIELD created_at ON daemonset_with_pod TYPE int PERMISSIONS FULL",
+              "in": "DEFINE FIELD in ON daemonset_with_pod TYPE record<daemonset> PERMISSIONS FULL",
+              "out": "DEFINE FIELD out ON daemonset_with_pod TYPE record<pod> PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON daemonset_with_pod TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "datasource": {
+            "events": {},
+            "fields": {
+              "bk_data_id": "DEFINE FIELD bk_data_id ON datasource TYPE string PERMISSIONS FULL",
+              "created_at": "DEFINE FIELD created_at ON datasource TYPE int PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON datasource TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "datasource_with_node": {
+            "events": {},
+            "fields": {
+              "created_at": "DEFINE FIELD created_at ON datasource_with_node TYPE int PERMISSIONS FULL",
+              "in": "DEFINE FIELD in ON datasource_with_node TYPE record<datasource> PERMISSIONS FULL",
+              "out": "DEFINE FIELD out ON datasource_with_node TYPE record<node> PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON datasource_with_node TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "datasource_with_pod": {
+            "events": {},
+            "fields": {
+              "created_at": "DEFINE FIELD created_at ON datasource_with_pod TYPE int PERMISSIONS FULL",
+              "in": "DEFINE FIELD in ON datasource_with_pod TYPE record<datasource> PERMISSIONS FULL",
+              "out": "DEFINE FIELD out ON datasource_with_pod TYPE record<pod> PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON datasource_with_pod TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "deployment": {
+            "events": {},
+            "fields": {
+              "bcs_cluster_id": "DEFINE FIELD bcs_cluster_id ON deployment TYPE string PERMISSIONS FULL",
+              "created_at": "DEFINE FIELD created_at ON deployment TYPE int PERMISSIONS FULL",
+              "deployment": "DEFINE FIELD deployment ON deployment TYPE string PERMISSIONS FULL",
+              "namespace": "DEFINE FIELD namespace ON deployment TYPE string PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON deployment TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "deployment_with_replicaset": {
+            "events": {},
+            "fields": {
+              "created_at": "DEFINE FIELD created_at ON deployment_with_replicaset TYPE int PERMISSIONS FULL",
+              "in": "DEFINE FIELD in ON deployment_with_replicaset TYPE record<deployment> PERMISSIONS FULL",
+              "out": "DEFINE FIELD out ON deployment_with_replicaset TYPE record<replicaset> PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON deployment_with_replicaset TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "domain": {
+            "events": {},
+            "fields": {
+              "bcs_cluster_id": "DEFINE FIELD bcs_cluster_id ON domain TYPE string PERMISSIONS FULL",
+              "created_at": "DEFINE FIELD created_at ON domain TYPE int PERMISSIONS FULL",
+              "domain": "DEFINE FIELD domain ON domain TYPE string PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON domain TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "domain_with_service": {
+            "events": {},
+            "fields": {
+              "created_at": "DEFINE FIELD created_at ON domain_with_service TYPE int PERMISSIONS FULL",
+              "in": "DEFINE FIELD in ON domain_with_service TYPE record<domain> PERMISSIONS FULL",
+              "out": "DEFINE FIELD out ON domain_with_service TYPE record<service> PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON domain_with_service TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "environment": {
+            "events": {},
+            "fields": {
+              "created_at": "DEFINE FIELD created_at ON environment TYPE int PERMISSIONS FULL",
+              "environment": "DEFINE FIELD environment ON environment TYPE string PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON environment TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "environment_with_system": {
+            "events": {},
+            "fields": {
+              "created_at": "DEFINE FIELD created_at ON environment_with_system TYPE int PERMISSIONS FULL",
+              "in": "DEFINE FIELD in ON environment_with_system TYPE record<environment> PERMISSIONS FULL",
+              "out": "DEFINE FIELD out ON environment_with_system TYPE record<system> PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON environment_with_system TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "git_commit": {
+            "events": {},
+            "fields": {
+              "commit_id": "DEFINE FIELD commit_id ON git_commit TYPE string PERMISSIONS FULL",
+              "created_at": "DEFINE FIELD created_at ON git_commit TYPE int PERMISSIONS FULL",
+              "git_repo": "DEFINE FIELD git_repo ON git_commit TYPE string PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON git_commit TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "host": {
+            "events": {},
+            "fields": {
+              "bk_host_id": "DEFINE FIELD bk_host_id ON host TYPE string PERMISSIONS FULL",
+              "created_at": "DEFINE FIELD created_at ON host TYPE int PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON host TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "host_with_module": {
+            "events": {},
+            "fields": {
+              "created_at": "DEFINE FIELD created_at ON host_with_module TYPE int PERMISSIONS FULL",
+              "in": "DEFINE FIELD in ON host_with_module TYPE record<host> PERMISSIONS FULL",
+              "out": "DEFINE FIELD out ON host_with_module TYPE record<module> PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON host_with_module TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "host_with_system": {
+            "events": {},
+            "fields": {
+              "created_at": "DEFINE FIELD created_at ON host_with_system TYPE int PERMISSIONS FULL",
+              "in": "DEFINE FIELD in ON host_with_system TYPE record<host> PERMISSIONS FULL",
+              "out": "DEFINE FIELD out ON host_with_system TYPE record<system> PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON host_with_system TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "ingress": {
+            "events": {},
+            "fields": {
+              "bcs_cluster_id": "DEFINE FIELD bcs_cluster_id ON ingress TYPE string PERMISSIONS FULL",
+              "created_at": "DEFINE FIELD created_at ON ingress TYPE int PERMISSIONS FULL",
+              "ingress": "DEFINE FIELD ingress ON ingress TYPE string PERMISSIONS FULL",
+              "namespace": "DEFINE FIELD namespace ON ingress TYPE string PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON ingress TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "ingress_with_service": {
+            "events": {},
+            "fields": {
+              "created_at": "DEFINE FIELD created_at ON ingress_with_service TYPE int PERMISSIONS FULL",
+              "in": "DEFINE FIELD in ON ingress_with_service TYPE record<ingress> PERMISSIONS FULL",
+              "out": "DEFINE FIELD out ON ingress_with_service TYPE record<service> PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON ingress_with_service TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "job": {
+            "events": {},
+            "fields": {
+              "bcs_cluster_id": "DEFINE FIELD bcs_cluster_id ON job TYPE string PERMISSIONS FULL",
+              "created_at": "DEFINE FIELD created_at ON job TYPE int PERMISSIONS FULL",
+              "job": "DEFINE FIELD job ON job TYPE string PERMISSIONS FULL",
+              "namespace": "DEFINE FIELD namespace ON job TYPE string PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON job TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "job_with_pod": {
+            "events": {},
+            "fields": {
+              "created_at": "DEFINE FIELD created_at ON job_with_pod TYPE int PERMISSIONS FULL",
+              "in": "DEFINE FIELD in ON job_with_pod TYPE record<job> PERMISSIONS FULL",
+              "out": "DEFINE FIELD out ON job_with_pod TYPE record<pod> PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON job_with_pod TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "k8s_address": {
+            "events": {},
+            "fields": {
+              "address": "DEFINE FIELD address ON k8s_address TYPE string PERMISSIONS FULL",
+              "bcs_cluster_id": "DEFINE FIELD bcs_cluster_id ON k8s_address TYPE string PERMISSIONS FULL",
+              "created_at": "DEFINE FIELD created_at ON k8s_address TYPE int PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON k8s_address TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "k8s_address_with_service": {
+            "events": {},
+            "fields": {
+              "created_at": "DEFINE FIELD created_at ON k8s_address_with_service TYPE int PERMISSIONS FULL",
+              "in": "DEFINE FIELD in ON k8s_address_with_service TYPE record<k8s_address> PERMISSIONS FULL",
+              "out": "DEFINE FIELD out ON k8s_address_with_service TYPE record<service> PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON k8s_address_with_service TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "metric": {
+            "events": {},
+            "fields": {
+              "created_at": "DEFINE FIELD created_at ON metric TYPE int PERMISSIONS FULL",
+              "description": "DEFINE FIELD description ON metric TYPE string PERMISSIONS FULL",
+              "metric_name": "DEFINE FIELD metric_name ON metric TYPE string PERMISSIONS FULL",
+              "metric_type": "DEFINE FIELD metric_type ON metric TYPE string PERMISSIONS FULL",
+              "unit": "DEFINE FIELD unit ON metric TYPE string PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON metric TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "module": {
+            "events": {},
+            "fields": {
+              "bk_module_id": "DEFINE FIELD bk_module_id ON module TYPE string PERMISSIONS FULL",
+              "created_at": "DEFINE FIELD created_at ON module TYPE int PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON module TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "module_with_set": {
+            "events": {},
+            "fields": {
+              "created_at": "DEFINE FIELD created_at ON module_with_set TYPE int PERMISSIONS FULL",
+              "in": "DEFINE FIELD in ON module_with_set TYPE record<module> PERMISSIONS FULL",
+              "out": "DEFINE FIELD out ON module_with_set TYPE record<set> PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON module_with_set TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "namespace": {
+            "events": {},
+            "fields": {
+              "bcs_cluster_id": "DEFINE FIELD bcs_cluster_id ON namespace TYPE string PERMISSIONS FULL",
+              "created_at": "DEFINE FIELD created_at ON namespace TYPE int PERMISSIONS FULL",
+              "namespace": "DEFINE FIELD namespace ON namespace TYPE string PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON namespace TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "node": {
+            "events": {},
+            "fields": {
+              "bcs_cluster_id": "DEFINE FIELD bcs_cluster_id ON node TYPE string PERMISSIONS FULL",
+              "created_at": "DEFINE FIELD created_at ON node TYPE int PERMISSIONS FULL",
+              "node": "DEFINE FIELD node ON node TYPE string PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON node TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "node_has_metric": {
+            "events": {},
+            "fields": {
+              "created_at": "DEFINE FIELD created_at ON node_has_metric TYPE int PERMISSIONS FULL",
+              "in": "DEFINE FIELD in ON node_has_metric TYPE record<pod> PERMISSIONS FULL",
+              "out": "DEFINE FIELD out ON node_has_metric TYPE record<metric> PERMISSIONS FULL",
+              "result_table_id": "DEFINE FIELD result_table_id ON node_has_metric TYPE string PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON node_has_metric TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "node_with_pod": {
+            "events": {},
+            "fields": {
+              "created_at": "DEFINE FIELD created_at ON node_with_pod TYPE int PERMISSIONS FULL",
+              "in": "DEFINE FIELD in ON node_with_pod TYPE record<node> PERMISSIONS FULL",
+              "out": "DEFINE FIELD out ON node_with_pod TYPE record<pod> PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON node_with_pod TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "node_with_system": {
+            "events": {},
+            "fields": {
+              "created_at": "DEFINE FIELD created_at ON node_with_system TYPE int PERMISSIONS FULL",
+              "in": "DEFINE FIELD in ON node_with_system TYPE record<node> PERMISSIONS FULL",
+              "out": "DEFINE FIELD out ON node_with_system TYPE record<system> PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON node_with_system TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "pod": {
+            "events": {},
+            "fields": {
+              "bcs_cluster_id": "DEFINE FIELD bcs_cluster_id ON pod TYPE string PERMISSIONS FULL",
+              "created_at": "DEFINE FIELD created_at ON pod TYPE int PERMISSIONS FULL",
+              "namespace": "DEFINE FIELD namespace ON pod TYPE string PERMISSIONS FULL",
+              "pod": "DEFINE FIELD pod ON pod TYPE string PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON pod TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "pod_to_pod": {
+            "events": {},
+            "fields": {
+              "created_at": "DEFINE FIELD created_at ON pod_to_pod TYPE int PERMISSIONS FULL",
+              "in": "DEFINE FIELD in ON pod_to_pod TYPE record<pod> PERMISSIONS FULL",
+              "out": "DEFINE FIELD out ON pod_to_pod TYPE record<pod> PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON pod_to_pod TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "pod_to_system": {
+            "events": {},
+            "fields": {
+              "created_at": "DEFINE FIELD created_at ON pod_to_system TYPE int PERMISSIONS FULL",
+              "in": "DEFINE FIELD in ON pod_to_system TYPE record<pod> PERMISSIONS FULL",
+              "out": "DEFINE FIELD out ON pod_to_system TYPE record<system> PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON pod_to_system TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "pod_with_replicaset": {
+            "events": {},
+            "fields": {
+              "created_at": "DEFINE FIELD created_at ON pod_with_replicaset TYPE int PERMISSIONS FULL",
+              "in": "DEFINE FIELD in ON pod_with_replicaset TYPE record<pod> PERMISSIONS FULL",
+              "out": "DEFINE FIELD out ON pod_with_replicaset TYPE record<replicaset> PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON pod_with_replicaset TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "pod_with_service": {
+            "events": {},
+            "fields": {
+              "created_at": "DEFINE FIELD created_at ON pod_with_service TYPE int PERMISSIONS FULL",
+              "in": "DEFINE FIELD in ON pod_with_service TYPE record<pod> PERMISSIONS FULL",
+              "out": "DEFINE FIELD out ON pod_with_service TYPE record<service> PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON pod_with_service TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "pod_with_statefulset": {
+            "events": {},
+            "fields": {
+              "created_at": "DEFINE FIELD created_at ON pod_with_statefulset TYPE int PERMISSIONS FULL",
+              "in": "DEFINE FIELD in ON pod_with_statefulset TYPE record<pod> PERMISSIONS FULL",
+              "out": "DEFINE FIELD out ON pod_with_statefulset TYPE record<statefulset> PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON pod_with_statefulset TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "relation_has_metric": {
+            "events": {},
+            "fields": {
+              "created_at": "DEFINE FIELD created_at ON relation_has_metric TYPE int PERMISSIONS FULL",
+              "in": "DEFINE FIELD in ON relation_has_metric TYPE record<pod_to_pod> PERMISSIONS FULL",
+              "out": "DEFINE FIELD out ON relation_has_metric TYPE record<metric> PERMISSIONS FULL",
+              "result_table_id": "DEFINE FIELD result_table_id ON relation_has_metric TYPE string PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON relation_has_metric TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "replicaset": {
+            "events": {},
+            "fields": {
+              "bcs_cluster_id": "DEFINE FIELD bcs_cluster_id ON replicaset TYPE string PERMISSIONS FULL",
+              "created_at": "DEFINE FIELD created_at ON replicaset TYPE int PERMISSIONS FULL",
+              "namespace": "DEFINE FIELD namespace ON replicaset TYPE string PERMISSIONS FULL",
+              "replicaset": "DEFINE FIELD replicaset ON replicaset TYPE string PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON replicaset TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "service": {
+            "events": {},
+            "fields": {
+              "bcs_cluster_id": "DEFINE FIELD bcs_cluster_id ON service TYPE string PERMISSIONS FULL",
+              "created_at": "DEFINE FIELD created_at ON service TYPE int PERMISSIONS FULL",
+              "namespace": "DEFINE FIELD namespace ON service TYPE string PERMISSIONS FULL",
+              "service": "DEFINE FIELD service ON service TYPE string PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON service TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "service_to_service": {
+            "events": {},
+            "fields": {
+              "created_at": "DEFINE FIELD created_at ON service_to_service TYPE int PERMISSIONS FULL",
+              "in": "DEFINE FIELD in ON service_to_service TYPE record<service> PERMISSIONS FULL",
+              "out": "DEFINE FIELD out ON service_to_service TYPE record<service> PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON service_to_service TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "set": {
+            "events": {},
+            "fields": {
+              "bk_set_id": "DEFINE FIELD bk_set_id ON set TYPE string PERMISSIONS FULL",
+              "created_at": "DEFINE FIELD created_at ON set TYPE int PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON set TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "statefulset": {
+            "events": {},
+            "fields": {
+              "bcs_cluster_id": "DEFINE FIELD bcs_cluster_id ON statefulset TYPE string PERMISSIONS FULL",
+              "created_at": "DEFINE FIELD created_at ON statefulset TYPE int PERMISSIONS FULL",
+              "namespace": "DEFINE FIELD namespace ON statefulset TYPE string PERMISSIONS FULL",
+              "statefulset": "DEFINE FIELD statefulset ON statefulset TYPE string PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON statefulset TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "system": {
+            "events": {},
+            "fields": {
+              "bk_cloud_id": "DEFINE FIELD bk_cloud_id ON system TYPE string PERMISSIONS FULL",
+              "bk_target_ip": "DEFINE FIELD bk_target_ip ON system TYPE string PERMISSIONS FULL",
+              "created_at": "DEFINE FIELD created_at ON system TYPE int PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON system TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "system_to_pod": {
+            "events": {},
+            "fields": {
+              "created_at": "DEFINE FIELD created_at ON system_to_pod TYPE int PERMISSIONS FULL",
+              "in": "DEFINE FIELD in ON system_to_pod TYPE record<system> PERMISSIONS FULL",
+              "out": "DEFINE FIELD out ON system_to_pod TYPE record<pod> PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON system_to_pod TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "system_to_system": {
+            "events": {},
+            "fields": {
+              "created_at": "DEFINE FIELD created_at ON system_to_system TYPE int PERMISSIONS FULL",
+              "in": "DEFINE FIELD in ON system_to_system TYPE record<system> PERMISSIONS FULL",
+              "out": "DEFINE FIELD out ON system_to_system TYPE record<system> PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON system_to_system TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          }
+        }
+      },
+      "table_counts": {
+        "pod": 10721,
+        "service": 3567,
+        "pod_with_service": 12782
+      }
+    },
+    "after": {
+      "info": {
+        "root": {
+          "accesses": {},
+          "namespaces": {
+            "benchmark_real": "DEFINE NAMESPACE benchmark_real",
+            "default": "DEFINE NAMESPACE default",
+            "test": "DEFINE NAMESPACE test",
+            "test_1229": "DEFINE NAMESPACE test_1229",
+            "test_20251223": "DEFINE NAMESPACE test_20251223",
+            "test_20251229": "DEFINE NAMESPACE test_20251229",
+            "test_auto_id": "DEFINE NAMESPACE test_auto_id",
+            "test_event_auto": "DEFINE NAMESPACE test_event_auto",
+            "test_full": "DEFINE NAMESPACE test_full",
+            "test_logic_id": "DEFINE NAMESPACE test_logic_id",
+            "test_multi_pod": "DEFINE NAMESPACE test_multi_pod",
+            "test_relate": "DEFINE NAMESPACE test_relate",
+            "test_relation": "DEFINE NAMESPACE test_relation",
+            "test_schemaless": "DEFINE NAMESPACE test_schemaless",
+            "test_syntax2": "DEFINE NAMESPACE test_syntax2",
+            "test_temp": "DEFINE NAMESPACE test_temp"
+          },
+          "nodes": {
+            "ba7d10ea-5ce7-44dd-bcb2-f1e5a718df64": "NODE ba7d10ea-5ce7-44dd-bcb2-f1e5a718df64 SEEN 1767078371436 ACTIVE"
+          },
+          "users": {
+            "root": "DEFINE USER root ON ROOT PASSHASH '$argon2id$v=19$m=19456,t=2,p=1$BRHvBfihvzuGW7jkWHjB5w$hmHrzOcolIT8C1Ai6bAKGDatTU8It1PlmuMPBn44vXg' ROLES OWNER DURATION FOR TOKEN 1h, FOR SESSION NONE"
+          }
+        },
+        "namespace": {
+          "accesses": {},
+          "databases": {
+            "benchmark": "DEFINE DATABASE benchmark",
+            "default": "DEFINE DATABASE default",
+            "shamcleren": "DEFINE DATABASE shamcleren"
+          },
+          "users": {}
+        },
+        "database": {
+          "accesses": {},
+          "analyzers": {},
+          "configs": {},
+          "functions": {
+            "kv_block": "DEFINE FUNCTION fn::kv_block($dimensions: object, $created_at: int) {\nLET $entries = object::entries($dimensions);\nLET $sorted = array::sort($entries);\nLET $pairs = array::map($sorted, |$e: any| string::concat($e[0], '=', <string> $e[1]));\nLET $base = array::join($pairs, ',');\nRETURN string::concat($base, ',created_at=', <string> $created_at);\n} PERMISSIONS FULL",
+            "relation_id": "DEFINE FUNCTION fn::relation_id($from_id: record, $to_id: record) {\nLET $from_str = <string> $from_id;\nLET $to_str = <string> $to_id;\nLET $from_kv = string::split($from_str, ':')[1];\nLET $to_kv = string::split($to_str, ':')[1];\nLET $from_kv_clean = string::replace(string::replace($from_kv, '\u27e8', ''), '\u27e9', '');\nLET $to_kv_clean = string::replace(string::replace($to_kv, '\u27e8', ''), '\u27e9', '');\nRETURN string::concat($from_kv_clean, '|', $to_kv_clean);\n} PERMISSIONS FULL",
+            "upsert_apm_service": "DEFINE FUNCTION fn::upsert_apm_service($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM apm_service WHERE apm_application_name = $dimensions.apm_application_name AND apm_service_name = $dimensions.apm_service_name ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('apm_service', $id_str) CONTENT { apm_application_name: $dimensions.apm_application_name, apm_service_name: $dimensions.apm_service_name, created_at: $now, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_apm_service_instance": "DEFINE FUNCTION fn::upsert_apm_service_instance($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM apm_service_instance WHERE apm_application_name = $dimensions.apm_application_name AND apm_service_name = $dimensions.apm_service_name AND apm_service_instance_name = $dimensions.apm_service_instance_name ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('apm_service_instance', $id_str) CONTENT { apm_application_name: $dimensions.apm_application_name, apm_service_instance_name: $dimensions.apm_service_instance_name, apm_service_name: $dimensions.apm_service_name, created_at: $now, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_app_version": "DEFINE FUNCTION fn::upsert_app_version($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM app_version WHERE app_name = $dimensions.app_name AND version = $dimensions.version ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('app_version', $id_str) CONTENT { app_name: $dimensions.app_name, created_at: $now, updated_at: $now, version: $dimensions.version })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_biz": "DEFINE FUNCTION fn::upsert_biz($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM biz WHERE bk_biz_id = $dimensions.bk_biz_id ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('biz', $id_str) CONTENT { bk_biz_id: $dimensions.bk_biz_id, created_at: $now, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_bklogconfig": "DEFINE FUNCTION fn::upsert_bklogconfig($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM bklogconfig WHERE bklogconfig_namespace = $dimensions.bklogconfig_namespace AND bklogconfig_name = $dimensions.bklogconfig_name ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('bklogconfig', $id_str) CONTENT { bklogconfig_name: $dimensions.bklogconfig_name, bklogconfig_namespace: $dimensions.bklogconfig_namespace, created_at: $now, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_cluster": "DEFINE FUNCTION fn::upsert_cluster($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM cluster WHERE bcs_cluster_id = $dimensions.bcs_cluster_id ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('cluster', $id_str) CONTENT { bcs_cluster_id: $dimensions.bcs_cluster_id, created_at: $now, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_container": "DEFINE FUNCTION fn::upsert_container($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM container WHERE bcs_cluster_id = $dimensions.bcs_cluster_id AND namespace = $dimensions.namespace AND pod = $dimensions.pod AND container = $dimensions.container ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('container', $id_str) CONTENT { bcs_cluster_id: $dimensions.bcs_cluster_id, container: $dimensions.container, created_at: $now, namespace: $dimensions.namespace, pod: $dimensions.pod, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_daemonset": "DEFINE FUNCTION fn::upsert_daemonset($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM daemonset WHERE bcs_cluster_id = $dimensions.bcs_cluster_id AND namespace = $dimensions.namespace AND daemonset = $dimensions.daemonset ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('daemonset', $id_str) CONTENT { bcs_cluster_id: $dimensions.bcs_cluster_id, created_at: $now, daemonset: $dimensions.daemonset, namespace: $dimensions.namespace, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_datasource": "DEFINE FUNCTION fn::upsert_datasource($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM datasource WHERE bk_data_id = $dimensions.bk_data_id ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('datasource', $id_str) CONTENT { bk_data_id: $dimensions.bk_data_id, created_at: $now, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_deployment": "DEFINE FUNCTION fn::upsert_deployment($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM deployment WHERE bcs_cluster_id = $dimensions.bcs_cluster_id AND namespace = $dimensions.namespace AND deployment = $dimensions.deployment ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('deployment', $id_str) CONTENT { bcs_cluster_id: $dimensions.bcs_cluster_id, created_at: $now, deployment: $dimensions.deployment, namespace: $dimensions.namespace, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_domain": "DEFINE FUNCTION fn::upsert_domain($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM domain WHERE bcs_cluster_id = $dimensions.bcs_cluster_id AND domain = $dimensions.domain ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('domain', $id_str) CONTENT { bcs_cluster_id: $dimensions.bcs_cluster_id, created_at: $now, domain: $dimensions.domain, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_environment": "DEFINE FUNCTION fn::upsert_environment($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM environment WHERE environment = $dimensions.environment ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('environment', $id_str) CONTENT { created_at: $now, environment: $dimensions.environment, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_git_commit": "DEFINE FUNCTION fn::upsert_git_commit($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM git_commit WHERE git_repo = $dimensions.git_repo AND commit_id = $dimensions.commit_id ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('git_commit', $id_str) CONTENT { commit_id: $dimensions.commit_id, created_at: $now, git_repo: $dimensions.git_repo, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_host": "DEFINE FUNCTION fn::upsert_host($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM host WHERE bk_host_id = $dimensions.bk_host_id ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('host', $id_str) CONTENT { bk_host_id: $dimensions.bk_host_id, created_at: $now, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_ingress": "DEFINE FUNCTION fn::upsert_ingress($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM ingress WHERE bcs_cluster_id = $dimensions.bcs_cluster_id AND namespace = $dimensions.namespace AND ingress = $dimensions.ingress ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('ingress', $id_str) CONTENT { bcs_cluster_id: $dimensions.bcs_cluster_id, created_at: $now, ingress: $dimensions.ingress, namespace: $dimensions.namespace, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_job": "DEFINE FUNCTION fn::upsert_job($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM job WHERE bcs_cluster_id = $dimensions.bcs_cluster_id AND namespace = $dimensions.namespace AND job = $dimensions.job ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('job', $id_str) CONTENT { bcs_cluster_id: $dimensions.bcs_cluster_id, created_at: $now, job: $dimensions.job, namespace: $dimensions.namespace, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_k8s_address": "DEFINE FUNCTION fn::upsert_k8s_address($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM k8s_address WHERE bcs_cluster_id = $dimensions.bcs_cluster_id AND address = $dimensions.address ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('k8s_address', $id_str) CONTENT { address: $dimensions.address, bcs_cluster_id: $dimensions.bcs_cluster_id, created_at: $now, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_metric": "DEFINE FUNCTION fn::upsert_metric($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM metric WHERE metric_name = $dimensions.metric_name ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now, metric_type = $dimensions.metric_type, unit = $dimensions.unit, description = $dimensions.description)[0] ELSE {\nLET $id_str = fn::kv_block({ metric_name: $dimensions.metric_name }, $now);\n(CREATE type::thing('metric', $id_str) CONTENT { created_at: $now, description: $dimensions.description, metric_name: $dimensions.metric_name, metric_type: $dimensions.metric_type, unit: $dimensions.unit, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_module": "DEFINE FUNCTION fn::upsert_module($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM module WHERE bk_module_id = $dimensions.bk_module_id ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('module', $id_str) CONTENT { bk_module_id: $dimensions.bk_module_id, created_at: $now, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_namespace": "DEFINE FUNCTION fn::upsert_namespace($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM namespace WHERE bcs_cluster_id = $dimensions.bcs_cluster_id AND namespace = $dimensions.namespace ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('namespace', $id_str) CONTENT { bcs_cluster_id: $dimensions.bcs_cluster_id, created_at: $now, namespace: $dimensions.namespace, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_node": "DEFINE FUNCTION fn::upsert_node($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM node WHERE bcs_cluster_id = $dimensions.bcs_cluster_id AND node = $dimensions.node ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('node', $id_str) CONTENT { bcs_cluster_id: $dimensions.bcs_cluster_id, created_at: $now, node: $dimensions.node, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_pod": "DEFINE FUNCTION fn::upsert_pod($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM pod WHERE bcs_cluster_id = $dimensions.bcs_cluster_id AND namespace = $dimensions.namespace AND pod = $dimensions.pod ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('pod', $id_str) CONTENT { bcs_cluster_id: $dimensions.bcs_cluster_id, created_at: $now, namespace: $dimensions.namespace, pod: $dimensions.pod, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_relation": "DEFINE FUNCTION fn::upsert_relation($relation_table: string, $from_id: record, $to_id: record, $now: int) {\nLET $rel_id = fn::relation_id($from_id, $to_id);\nLET $full_id = type::thing($relation_table, $rel_id);\nLET $rel_table = type::table($relation_table);\nLET $existing = (SELECT * FROM type::table($relation_table) WHERE id = $full_id LIMIT 1)[0];\nRETURN IF $existing != NONE THEN (UPDATE $existing.id SET updated_at = $now)[0] ELSE (RELATE $from_id -> $rel_table -> $to_id SET id = $full_id, created_at = $now, updated_at = $now)[0] END;\n} PERMISSIONS FULL",
+            "upsert_replicaset": "DEFINE FUNCTION fn::upsert_replicaset($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM replicaset WHERE bcs_cluster_id = $dimensions.bcs_cluster_id AND namespace = $dimensions.namespace AND replicaset = $dimensions.replicaset ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('replicaset', $id_str) CONTENT { bcs_cluster_id: $dimensions.bcs_cluster_id, created_at: $now, namespace: $dimensions.namespace, replicaset: $dimensions.replicaset, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_service": "DEFINE FUNCTION fn::upsert_service($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM service WHERE bcs_cluster_id = $dimensions.bcs_cluster_id AND namespace = $dimensions.namespace AND service = $dimensions.service ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('service', $id_str) CONTENT { bcs_cluster_id: $dimensions.bcs_cluster_id, created_at: $now, namespace: $dimensions.namespace, service: $dimensions.service, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_set": "DEFINE FUNCTION fn::upsert_set($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM set WHERE bk_set_id = $dimensions.bk_set_id ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('set', $id_str) CONTENT { bk_set_id: $dimensions.bk_set_id, created_at: $now, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_statefulset": "DEFINE FUNCTION fn::upsert_statefulset($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM statefulset WHERE bcs_cluster_id = $dimensions.bcs_cluster_id AND namespace = $dimensions.namespace AND statefulset = $dimensions.statefulset ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('statefulset', $id_str) CONTENT { bcs_cluster_id: $dimensions.bcs_cluster_id, created_at: $now, namespace: $dimensions.namespace, statefulset: $dimensions.statefulset, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_system": "DEFINE FUNCTION fn::upsert_system($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM system WHERE bk_cloud_id = $dimensions.bk_cloud_id AND bk_target_ip = $dimensions.bk_target_ip ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('system', $id_str) CONTENT { bk_cloud_id: $dimensions.bk_cloud_id, bk_target_ip: $dimensions.bk_target_ip, created_at: $now, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL"
+          },
+          "models": {},
+          "params": {},
+          "tables": {
+            "apm_service": "DEFINE TABLE apm_service TYPE NORMAL SCHEMAFULL PERMISSIONS NONE",
+            "apm_service_instance": "DEFINE TABLE apm_service_instance TYPE NORMAL SCHEMAFULL PERMISSIONS NONE",
+            "apm_service_instance_with_pod": "DEFINE TABLE apm_service_instance_with_pod TYPE RELATION IN apm_service_instance OUT pod SCHEMAFULL PERMISSIONS NONE",
+            "apm_service_instance_with_system": "DEFINE TABLE apm_service_instance_with_system TYPE RELATION IN apm_service_instance OUT system SCHEMAFULL PERMISSIONS NONE",
+            "apm_service_with_apm_service_instance": "DEFINE TABLE apm_service_with_apm_service_instance TYPE RELATION IN apm_service OUT apm_service_instance SCHEMAFULL PERMISSIONS NONE",
+            "app_version": "DEFINE TABLE app_version TYPE NORMAL SCHEMAFULL PERMISSIONS NONE",
+            "app_version_with_container": "DEFINE TABLE app_version_with_container TYPE RELATION IN app_version OUT container SCHEMAFULL PERMISSIONS NONE",
+            "app_version_with_git_commit": "DEFINE TABLE app_version_with_git_commit TYPE RELATION IN app_version OUT git_commit SCHEMAFULL PERMISSIONS NONE",
+            "app_version_with_system": "DEFINE TABLE app_version_with_system TYPE RELATION IN app_version OUT system SCHEMAFULL PERMISSIONS NONE",
+            "biz": "DEFINE TABLE biz TYPE NORMAL SCHEMAFULL PERMISSIONS NONE",
+            "biz_with_set": "DEFINE TABLE biz_with_set TYPE RELATION IN biz OUT set SCHEMAFULL PERMISSIONS NONE",
+            "bklogconfig": "DEFINE TABLE bklogconfig TYPE NORMAL SCHEMAFULL PERMISSIONS NONE",
+            "bklogconfig_with_datasource": "DEFINE TABLE bklogconfig_with_datasource TYPE RELATION IN bklogconfig OUT datasource SCHEMAFULL PERMISSIONS NONE",
+            "cluster": "DEFINE TABLE cluster TYPE NORMAL SCHEMAFULL PERMISSIONS NONE",
+            "container": "DEFINE TABLE container TYPE NORMAL SCHEMAFULL PERMISSIONS NONE",
+            "container_with_environment": "DEFINE TABLE container_with_environment TYPE RELATION IN container OUT environment SCHEMAFULL PERMISSIONS NONE",
+            "container_with_pod": "DEFINE TABLE container_with_pod TYPE RELATION IN container OUT pod SCHEMAFULL PERMISSIONS NONE",
+            "daemonset": "DEFINE TABLE daemonset TYPE NORMAL SCHEMAFULL PERMISSIONS NONE",
+            "daemonset_with_pod": "DEFINE TABLE daemonset_with_pod TYPE RELATION IN daemonset OUT pod SCHEMAFULL PERMISSIONS NONE",
+            "datasource": "DEFINE TABLE datasource TYPE NORMAL SCHEMAFULL PERMISSIONS NONE",
+            "datasource_with_node": "DEFINE TABLE datasource_with_node TYPE RELATION IN datasource OUT node SCHEMAFULL PERMISSIONS NONE",
+            "datasource_with_pod": "DEFINE TABLE datasource_with_pod TYPE RELATION IN datasource OUT pod SCHEMAFULL PERMISSIONS NONE",
+            "deployment": "DEFINE TABLE deployment TYPE NORMAL SCHEMAFULL PERMISSIONS NONE",
+            "deployment_with_replicaset": "DEFINE TABLE deployment_with_replicaset TYPE RELATION IN deployment OUT replicaset SCHEMAFULL PERMISSIONS NONE",
+            "domain": "DEFINE TABLE domain TYPE NORMAL SCHEMAFULL PERMISSIONS NONE",
+            "domain_with_service": "DEFINE TABLE domain_with_service TYPE RELATION IN domain OUT service SCHEMAFULL PERMISSIONS NONE",
+            "environment": "DEFINE TABLE environment TYPE NORMAL SCHEMAFULL PERMISSIONS NONE",
+            "environment_with_system": "DEFINE TABLE environment_with_system TYPE RELATION IN environment OUT system SCHEMAFULL PERMISSIONS NONE",
+            "git_commit": "DEFINE TABLE git_commit TYPE NORMAL SCHEMAFULL PERMISSIONS NONE",
+            "host": "DEFINE TABLE host TYPE NORMAL SCHEMAFULL PERMISSIONS NONE",
+            "host_with_module": "DEFINE TABLE host_with_module TYPE RELATION IN host OUT module SCHEMAFULL PERMISSIONS NONE",
+            "host_with_system": "DEFINE TABLE host_with_system TYPE RELATION IN host OUT system SCHEMAFULL PERMISSIONS NONE",
+            "ingress": "DEFINE TABLE ingress TYPE NORMAL SCHEMAFULL PERMISSIONS NONE",
+            "ingress_with_service": "DEFINE TABLE ingress_with_service TYPE RELATION IN ingress OUT service SCHEMAFULL PERMISSIONS NONE",
+            "job": "DEFINE TABLE job TYPE NORMAL SCHEMAFULL PERMISSIONS NONE",
+            "job_with_pod": "DEFINE TABLE job_with_pod TYPE RELATION IN job OUT pod SCHEMAFULL PERMISSIONS NONE",
+            "k8s_address": "DEFINE TABLE k8s_address TYPE NORMAL SCHEMAFULL PERMISSIONS NONE",
+            "k8s_address_with_service": "DEFINE TABLE k8s_address_with_service TYPE RELATION IN k8s_address OUT service SCHEMAFULL PERMISSIONS NONE",
+            "metric": "DEFINE TABLE metric TYPE NORMAL SCHEMAFULL PERMISSIONS NONE",
+            "module": "DEFINE TABLE module TYPE NORMAL SCHEMAFULL PERMISSIONS NONE",
+            "module_with_set": "DEFINE TABLE module_with_set TYPE RELATION IN module OUT set SCHEMAFULL PERMISSIONS NONE",
+            "namespace": "DEFINE TABLE namespace TYPE NORMAL SCHEMAFULL PERMISSIONS NONE",
+            "node": "DEFINE TABLE node TYPE NORMAL SCHEMAFULL PERMISSIONS NONE",
+            "node_has_metric": "DEFINE TABLE node_has_metric TYPE RELATION IN pod OUT metric SCHEMAFULL PERMISSIONS NONE",
+            "node_with_pod": "DEFINE TABLE node_with_pod TYPE RELATION IN node OUT pod SCHEMAFULL PERMISSIONS NONE",
+            "node_with_system": "DEFINE TABLE node_with_system TYPE RELATION IN node OUT system SCHEMAFULL PERMISSIONS NONE",
+            "pod": "DEFINE TABLE pod TYPE NORMAL SCHEMAFULL PERMISSIONS NONE",
+            "pod_to_pod": "DEFINE TABLE pod_to_pod TYPE RELATION IN pod OUT pod SCHEMAFULL PERMISSIONS NONE",
+            "pod_to_system": "DEFINE TABLE pod_to_system TYPE RELATION IN pod OUT system SCHEMAFULL PERMISSIONS NONE",
+            "pod_with_replicaset": "DEFINE TABLE pod_with_replicaset TYPE RELATION IN pod OUT replicaset SCHEMAFULL PERMISSIONS NONE",
+            "pod_with_service": "DEFINE TABLE pod_with_service TYPE RELATION IN pod OUT service SCHEMAFULL PERMISSIONS NONE",
+            "pod_with_statefulset": "DEFINE TABLE pod_with_statefulset TYPE RELATION IN pod OUT statefulset SCHEMAFULL PERMISSIONS NONE",
+            "relation_has_metric": "DEFINE TABLE relation_has_metric TYPE RELATION IN pod_to_pod OUT metric SCHEMAFULL PERMISSIONS NONE",
+            "replicaset": "DEFINE TABLE replicaset TYPE NORMAL SCHEMAFULL PERMISSIONS NONE",
+            "service": "DEFINE TABLE service TYPE NORMAL SCHEMAFULL PERMISSIONS NONE",
+            "service_to_service": "DEFINE TABLE service_to_service TYPE RELATION IN service OUT service SCHEMAFULL PERMISSIONS NONE",
+            "set": "DEFINE TABLE set TYPE NORMAL SCHEMAFULL PERMISSIONS NONE",
+            "statefulset": "DEFINE TABLE statefulset TYPE NORMAL SCHEMAFULL PERMISSIONS NONE",
+            "system": "DEFINE TABLE system TYPE NORMAL SCHEMAFULL PERMISSIONS NONE",
+            "system_to_pod": "DEFINE TABLE system_to_pod TYPE RELATION IN system OUT pod SCHEMAFULL PERMISSIONS NONE",
+            "system_to_system": "DEFINE TABLE system_to_system TYPE RELATION IN system OUT system SCHEMAFULL PERMISSIONS NONE"
+          },
+          "users": {}
+        },
+        "tables": {
+          "apm_service": {
+            "events": {},
+            "fields": {
+              "apm_application_name": "DEFINE FIELD apm_application_name ON apm_service TYPE string PERMISSIONS FULL",
+              "apm_service_name": "DEFINE FIELD apm_service_name ON apm_service TYPE string PERMISSIONS FULL",
+              "created_at": "DEFINE FIELD created_at ON apm_service TYPE int PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON apm_service TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "apm_service_instance": {
+            "events": {},
+            "fields": {
+              "apm_application_name": "DEFINE FIELD apm_application_name ON apm_service_instance TYPE string PERMISSIONS FULL",
+              "apm_service_instance_name": "DEFINE FIELD apm_service_instance_name ON apm_service_instance TYPE string PERMISSIONS FULL",
+              "apm_service_name": "DEFINE FIELD apm_service_name ON apm_service_instance TYPE string PERMISSIONS FULL",
+              "created_at": "DEFINE FIELD created_at ON apm_service_instance TYPE int PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON apm_service_instance TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "apm_service_instance_with_pod": {
+            "events": {},
+            "fields": {
+              "created_at": "DEFINE FIELD created_at ON apm_service_instance_with_pod TYPE int PERMISSIONS FULL",
+              "in": "DEFINE FIELD in ON apm_service_instance_with_pod TYPE record<apm_service_instance> PERMISSIONS FULL",
+              "out": "DEFINE FIELD out ON apm_service_instance_with_pod TYPE record<pod> PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON apm_service_instance_with_pod TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "apm_service_instance_with_system": {
+            "events": {},
+            "fields": {
+              "created_at": "DEFINE FIELD created_at ON apm_service_instance_with_system TYPE int PERMISSIONS FULL",
+              "in": "DEFINE FIELD in ON apm_service_instance_with_system TYPE record<apm_service_instance> PERMISSIONS FULL",
+              "out": "DEFINE FIELD out ON apm_service_instance_with_system TYPE record<system> PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON apm_service_instance_with_system TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "apm_service_with_apm_service_instance": {
+            "events": {},
+            "fields": {
+              "created_at": "DEFINE FIELD created_at ON apm_service_with_apm_service_instance TYPE int PERMISSIONS FULL",
+              "in": "DEFINE FIELD in ON apm_service_with_apm_service_instance TYPE record<apm_service> PERMISSIONS FULL",
+              "out": "DEFINE FIELD out ON apm_service_with_apm_service_instance TYPE record<apm_service_instance> PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON apm_service_with_apm_service_instance TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "app_version": {
+            "events": {},
+            "fields": {
+              "app_name": "DEFINE FIELD app_name ON app_version TYPE string PERMISSIONS FULL",
+              "created_at": "DEFINE FIELD created_at ON app_version TYPE int PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON app_version TYPE int PERMISSIONS FULL",
+              "version": "DEFINE FIELD version ON app_version TYPE string PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "app_version_with_container": {
+            "events": {},
+            "fields": {
+              "created_at": "DEFINE FIELD created_at ON app_version_with_container TYPE int PERMISSIONS FULL",
+              "in": "DEFINE FIELD in ON app_version_with_container TYPE record<app_version> PERMISSIONS FULL",
+              "out": "DEFINE FIELD out ON app_version_with_container TYPE record<container> PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON app_version_with_container TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "app_version_with_git_commit": {
+            "events": {},
+            "fields": {
+              "created_at": "DEFINE FIELD created_at ON app_version_with_git_commit TYPE int PERMISSIONS FULL",
+              "in": "DEFINE FIELD in ON app_version_with_git_commit TYPE record<app_version> PERMISSIONS FULL",
+              "out": "DEFINE FIELD out ON app_version_with_git_commit TYPE record<git_commit> PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON app_version_with_git_commit TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "app_version_with_system": {
+            "events": {},
+            "fields": {
+              "created_at": "DEFINE FIELD created_at ON app_version_with_system TYPE int PERMISSIONS FULL",
+              "in": "DEFINE FIELD in ON app_version_with_system TYPE record<app_version> PERMISSIONS FULL",
+              "out": "DEFINE FIELD out ON app_version_with_system TYPE record<system> PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON app_version_with_system TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "biz": {
+            "events": {},
+            "fields": {
+              "bk_biz_id": "DEFINE FIELD bk_biz_id ON biz TYPE string PERMISSIONS FULL",
+              "created_at": "DEFINE FIELD created_at ON biz TYPE int PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON biz TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "biz_with_set": {
+            "events": {},
+            "fields": {
+              "created_at": "DEFINE FIELD created_at ON biz_with_set TYPE int PERMISSIONS FULL",
+              "in": "DEFINE FIELD in ON biz_with_set TYPE record<biz> PERMISSIONS FULL",
+              "out": "DEFINE FIELD out ON biz_with_set TYPE record<set> PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON biz_with_set TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "bklogconfig": {
+            "events": {},
+            "fields": {
+              "bklogconfig_name": "DEFINE FIELD bklogconfig_name ON bklogconfig TYPE string PERMISSIONS FULL",
+              "bklogconfig_namespace": "DEFINE FIELD bklogconfig_namespace ON bklogconfig TYPE string PERMISSIONS FULL",
+              "created_at": "DEFINE FIELD created_at ON bklogconfig TYPE int PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON bklogconfig TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "bklogconfig_with_datasource": {
+            "events": {},
+            "fields": {
+              "created_at": "DEFINE FIELD created_at ON bklogconfig_with_datasource TYPE int PERMISSIONS FULL",
+              "in": "DEFINE FIELD in ON bklogconfig_with_datasource TYPE record<bklogconfig> PERMISSIONS FULL",
+              "out": "DEFINE FIELD out ON bklogconfig_with_datasource TYPE record<datasource> PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON bklogconfig_with_datasource TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "cluster": {
+            "events": {},
+            "fields": {
+              "bcs_cluster_id": "DEFINE FIELD bcs_cluster_id ON cluster TYPE string PERMISSIONS FULL",
+              "created_at": "DEFINE FIELD created_at ON cluster TYPE int PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON cluster TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "container": {
+            "events": {},
+            "fields": {
+              "bcs_cluster_id": "DEFINE FIELD bcs_cluster_id ON container TYPE string PERMISSIONS FULL",
+              "container": "DEFINE FIELD container ON container TYPE string PERMISSIONS FULL",
+              "created_at": "DEFINE FIELD created_at ON container TYPE int PERMISSIONS FULL",
+              "namespace": "DEFINE FIELD namespace ON container TYPE string PERMISSIONS FULL",
+              "pod": "DEFINE FIELD pod ON container TYPE string PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON container TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "container_with_environment": {
+            "events": {},
+            "fields": {
+              "created_at": "DEFINE FIELD created_at ON container_with_environment TYPE int PERMISSIONS FULL",
+              "in": "DEFINE FIELD in ON container_with_environment TYPE record<container> PERMISSIONS FULL",
+              "out": "DEFINE FIELD out ON container_with_environment TYPE record<environment> PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON container_with_environment TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "container_with_pod": {
+            "events": {},
+            "fields": {
+              "created_at": "DEFINE FIELD created_at ON container_with_pod TYPE int PERMISSIONS FULL",
+              "in": "DEFINE FIELD in ON container_with_pod TYPE record<container> PERMISSIONS FULL",
+              "out": "DEFINE FIELD out ON container_with_pod TYPE record<pod> PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON container_with_pod TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "daemonset": {
+            "events": {},
+            "fields": {
+              "bcs_cluster_id": "DEFINE FIELD bcs_cluster_id ON daemonset TYPE string PERMISSIONS FULL",
+              "created_at": "DEFINE FIELD created_at ON daemonset TYPE int PERMISSIONS FULL",
+              "daemonset": "DEFINE FIELD daemonset ON daemonset TYPE string PERMISSIONS FULL",
+              "namespace": "DEFINE FIELD namespace ON daemonset TYPE string PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON daemonset TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "daemonset_with_pod": {
+            "events": {},
+            "fields": {
+              "created_at": "DEFINE FIELD created_at ON daemonset_with_pod TYPE int PERMISSIONS FULL",
+              "in": "DEFINE FIELD in ON daemonset_with_pod TYPE record<daemonset> PERMISSIONS FULL",
+              "out": "DEFINE FIELD out ON daemonset_with_pod TYPE record<pod> PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON daemonset_with_pod TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "datasource": {
+            "events": {},
+            "fields": {
+              "bk_data_id": "DEFINE FIELD bk_data_id ON datasource TYPE string PERMISSIONS FULL",
+              "created_at": "DEFINE FIELD created_at ON datasource TYPE int PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON datasource TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "datasource_with_node": {
+            "events": {},
+            "fields": {
+              "created_at": "DEFINE FIELD created_at ON datasource_with_node TYPE int PERMISSIONS FULL",
+              "in": "DEFINE FIELD in ON datasource_with_node TYPE record<datasource> PERMISSIONS FULL",
+              "out": "DEFINE FIELD out ON datasource_with_node TYPE record<node> PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON datasource_with_node TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "datasource_with_pod": {
+            "events": {},
+            "fields": {
+              "created_at": "DEFINE FIELD created_at ON datasource_with_pod TYPE int PERMISSIONS FULL",
+              "in": "DEFINE FIELD in ON datasource_with_pod TYPE record<datasource> PERMISSIONS FULL",
+              "out": "DEFINE FIELD out ON datasource_with_pod TYPE record<pod> PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON datasource_with_pod TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "deployment": {
+            "events": {},
+            "fields": {
+              "bcs_cluster_id": "DEFINE FIELD bcs_cluster_id ON deployment TYPE string PERMISSIONS FULL",
+              "created_at": "DEFINE FIELD created_at ON deployment TYPE int PERMISSIONS FULL",
+              "deployment": "DEFINE FIELD deployment ON deployment TYPE string PERMISSIONS FULL",
+              "namespace": "DEFINE FIELD namespace ON deployment TYPE string PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON deployment TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "deployment_with_replicaset": {
+            "events": {},
+            "fields": {
+              "created_at": "DEFINE FIELD created_at ON deployment_with_replicaset TYPE int PERMISSIONS FULL",
+              "in": "DEFINE FIELD in ON deployment_with_replicaset TYPE record<deployment> PERMISSIONS FULL",
+              "out": "DEFINE FIELD out ON deployment_with_replicaset TYPE record<replicaset> PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON deployment_with_replicaset TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "domain": {
+            "events": {},
+            "fields": {
+              "bcs_cluster_id": "DEFINE FIELD bcs_cluster_id ON domain TYPE string PERMISSIONS FULL",
+              "created_at": "DEFINE FIELD created_at ON domain TYPE int PERMISSIONS FULL",
+              "domain": "DEFINE FIELD domain ON domain TYPE string PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON domain TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "domain_with_service": {
+            "events": {},
+            "fields": {
+              "created_at": "DEFINE FIELD created_at ON domain_with_service TYPE int PERMISSIONS FULL",
+              "in": "DEFINE FIELD in ON domain_with_service TYPE record<domain> PERMISSIONS FULL",
+              "out": "DEFINE FIELD out ON domain_with_service TYPE record<service> PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON domain_with_service TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "environment": {
+            "events": {},
+            "fields": {
+              "created_at": "DEFINE FIELD created_at ON environment TYPE int PERMISSIONS FULL",
+              "environment": "DEFINE FIELD environment ON environment TYPE string PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON environment TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "environment_with_system": {
+            "events": {},
+            "fields": {
+              "created_at": "DEFINE FIELD created_at ON environment_with_system TYPE int PERMISSIONS FULL",
+              "in": "DEFINE FIELD in ON environment_with_system TYPE record<environment> PERMISSIONS FULL",
+              "out": "DEFINE FIELD out ON environment_with_system TYPE record<system> PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON environment_with_system TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "git_commit": {
+            "events": {},
+            "fields": {
+              "commit_id": "DEFINE FIELD commit_id ON git_commit TYPE string PERMISSIONS FULL",
+              "created_at": "DEFINE FIELD created_at ON git_commit TYPE int PERMISSIONS FULL",
+              "git_repo": "DEFINE FIELD git_repo ON git_commit TYPE string PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON git_commit TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "host": {
+            "events": {},
+            "fields": {
+              "bk_host_id": "DEFINE FIELD bk_host_id ON host TYPE string PERMISSIONS FULL",
+              "created_at": "DEFINE FIELD created_at ON host TYPE int PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON host TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "host_with_module": {
+            "events": {},
+            "fields": {
+              "created_at": "DEFINE FIELD created_at ON host_with_module TYPE int PERMISSIONS FULL",
+              "in": "DEFINE FIELD in ON host_with_module TYPE record<host> PERMISSIONS FULL",
+              "out": "DEFINE FIELD out ON host_with_module TYPE record<module> PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON host_with_module TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "host_with_system": {
+            "events": {},
+            "fields": {
+              "created_at": "DEFINE FIELD created_at ON host_with_system TYPE int PERMISSIONS FULL",
+              "in": "DEFINE FIELD in ON host_with_system TYPE record<host> PERMISSIONS FULL",
+              "out": "DEFINE FIELD out ON host_with_system TYPE record<system> PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON host_with_system TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "ingress": {
+            "events": {},
+            "fields": {
+              "bcs_cluster_id": "DEFINE FIELD bcs_cluster_id ON ingress TYPE string PERMISSIONS FULL",
+              "created_at": "DEFINE FIELD created_at ON ingress TYPE int PERMISSIONS FULL",
+              "ingress": "DEFINE FIELD ingress ON ingress TYPE string PERMISSIONS FULL",
+              "namespace": "DEFINE FIELD namespace ON ingress TYPE string PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON ingress TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "ingress_with_service": {
+            "events": {},
+            "fields": {
+              "created_at": "DEFINE FIELD created_at ON ingress_with_service TYPE int PERMISSIONS FULL",
+              "in": "DEFINE FIELD in ON ingress_with_service TYPE record<ingress> PERMISSIONS FULL",
+              "out": "DEFINE FIELD out ON ingress_with_service TYPE record<service> PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON ingress_with_service TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "job": {
+            "events": {},
+            "fields": {
+              "bcs_cluster_id": "DEFINE FIELD bcs_cluster_id ON job TYPE string PERMISSIONS FULL",
+              "created_at": "DEFINE FIELD created_at ON job TYPE int PERMISSIONS FULL",
+              "job": "DEFINE FIELD job ON job TYPE string PERMISSIONS FULL",
+              "namespace": "DEFINE FIELD namespace ON job TYPE string PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON job TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "job_with_pod": {
+            "events": {},
+            "fields": {
+              "created_at": "DEFINE FIELD created_at ON job_with_pod TYPE int PERMISSIONS FULL",
+              "in": "DEFINE FIELD in ON job_with_pod TYPE record<job> PERMISSIONS FULL",
+              "out": "DEFINE FIELD out ON job_with_pod TYPE record<pod> PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON job_with_pod TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "k8s_address": {
+            "events": {},
+            "fields": {
+              "address": "DEFINE FIELD address ON k8s_address TYPE string PERMISSIONS FULL",
+              "bcs_cluster_id": "DEFINE FIELD bcs_cluster_id ON k8s_address TYPE string PERMISSIONS FULL",
+              "created_at": "DEFINE FIELD created_at ON k8s_address TYPE int PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON k8s_address TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "k8s_address_with_service": {
+            "events": {},
+            "fields": {
+              "created_at": "DEFINE FIELD created_at ON k8s_address_with_service TYPE int PERMISSIONS FULL",
+              "in": "DEFINE FIELD in ON k8s_address_with_service TYPE record<k8s_address> PERMISSIONS FULL",
+              "out": "DEFINE FIELD out ON k8s_address_with_service TYPE record<service> PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON k8s_address_with_service TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "metric": {
+            "events": {},
+            "fields": {
+              "created_at": "DEFINE FIELD created_at ON metric TYPE int PERMISSIONS FULL",
+              "description": "DEFINE FIELD description ON metric TYPE string PERMISSIONS FULL",
+              "metric_name": "DEFINE FIELD metric_name ON metric TYPE string PERMISSIONS FULL",
+              "metric_type": "DEFINE FIELD metric_type ON metric TYPE string PERMISSIONS FULL",
+              "unit": "DEFINE FIELD unit ON metric TYPE string PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON metric TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "module": {
+            "events": {},
+            "fields": {
+              "bk_module_id": "DEFINE FIELD bk_module_id ON module TYPE string PERMISSIONS FULL",
+              "created_at": "DEFINE FIELD created_at ON module TYPE int PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON module TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "module_with_set": {
+            "events": {},
+            "fields": {
+              "created_at": "DEFINE FIELD created_at ON module_with_set TYPE int PERMISSIONS FULL",
+              "in": "DEFINE FIELD in ON module_with_set TYPE record<module> PERMISSIONS FULL",
+              "out": "DEFINE FIELD out ON module_with_set TYPE record<set> PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON module_with_set TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "namespace": {
+            "events": {},
+            "fields": {
+              "bcs_cluster_id": "DEFINE FIELD bcs_cluster_id ON namespace TYPE string PERMISSIONS FULL",
+              "created_at": "DEFINE FIELD created_at ON namespace TYPE int PERMISSIONS FULL",
+              "namespace": "DEFINE FIELD namespace ON namespace TYPE string PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON namespace TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "node": {
+            "events": {},
+            "fields": {
+              "bcs_cluster_id": "DEFINE FIELD bcs_cluster_id ON node TYPE string PERMISSIONS FULL",
+              "created_at": "DEFINE FIELD created_at ON node TYPE int PERMISSIONS FULL",
+              "node": "DEFINE FIELD node ON node TYPE string PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON node TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "node_has_metric": {
+            "events": {},
+            "fields": {
+              "created_at": "DEFINE FIELD created_at ON node_has_metric TYPE int PERMISSIONS FULL",
+              "in": "DEFINE FIELD in ON node_has_metric TYPE record<pod> PERMISSIONS FULL",
+              "out": "DEFINE FIELD out ON node_has_metric TYPE record<metric> PERMISSIONS FULL",
+              "result_table_id": "DEFINE FIELD result_table_id ON node_has_metric TYPE string PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON node_has_metric TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "node_with_pod": {
+            "events": {},
+            "fields": {
+              "created_at": "DEFINE FIELD created_at ON node_with_pod TYPE int PERMISSIONS FULL",
+              "in": "DEFINE FIELD in ON node_with_pod TYPE record<node> PERMISSIONS FULL",
+              "out": "DEFINE FIELD out ON node_with_pod TYPE record<pod> PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON node_with_pod TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "node_with_system": {
+            "events": {},
+            "fields": {
+              "created_at": "DEFINE FIELD created_at ON node_with_system TYPE int PERMISSIONS FULL",
+              "in": "DEFINE FIELD in ON node_with_system TYPE record<node> PERMISSIONS FULL",
+              "out": "DEFINE FIELD out ON node_with_system TYPE record<system> PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON node_with_system TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "pod": {
+            "events": {},
+            "fields": {
+              "bcs_cluster_id": "DEFINE FIELD bcs_cluster_id ON pod TYPE string PERMISSIONS FULL",
+              "created_at": "DEFINE FIELD created_at ON pod TYPE int PERMISSIONS FULL",
+              "namespace": "DEFINE FIELD namespace ON pod TYPE string PERMISSIONS FULL",
+              "pod": "DEFINE FIELD pod ON pod TYPE string PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON pod TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "pod_to_pod": {
+            "events": {},
+            "fields": {
+              "created_at": "DEFINE FIELD created_at ON pod_to_pod TYPE int PERMISSIONS FULL",
+              "in": "DEFINE FIELD in ON pod_to_pod TYPE record<pod> PERMISSIONS FULL",
+              "out": "DEFINE FIELD out ON pod_to_pod TYPE record<pod> PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON pod_to_pod TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "pod_to_system": {
+            "events": {},
+            "fields": {
+              "created_at": "DEFINE FIELD created_at ON pod_to_system TYPE int PERMISSIONS FULL",
+              "in": "DEFINE FIELD in ON pod_to_system TYPE record<pod> PERMISSIONS FULL",
+              "out": "DEFINE FIELD out ON pod_to_system TYPE record<system> PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON pod_to_system TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "pod_with_replicaset": {
+            "events": {},
+            "fields": {
+              "created_at": "DEFINE FIELD created_at ON pod_with_replicaset TYPE int PERMISSIONS FULL",
+              "in": "DEFINE FIELD in ON pod_with_replicaset TYPE record<pod> PERMISSIONS FULL",
+              "out": "DEFINE FIELD out ON pod_with_replicaset TYPE record<replicaset> PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON pod_with_replicaset TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "pod_with_service": {
+            "events": {},
+            "fields": {
+              "created_at": "DEFINE FIELD created_at ON pod_with_service TYPE int PERMISSIONS FULL",
+              "in": "DEFINE FIELD in ON pod_with_service TYPE record<pod> PERMISSIONS FULL",
+              "out": "DEFINE FIELD out ON pod_with_service TYPE record<service> PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON pod_with_service TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "pod_with_statefulset": {
+            "events": {},
+            "fields": {
+              "created_at": "DEFINE FIELD created_at ON pod_with_statefulset TYPE int PERMISSIONS FULL",
+              "in": "DEFINE FIELD in ON pod_with_statefulset TYPE record<pod> PERMISSIONS FULL",
+              "out": "DEFINE FIELD out ON pod_with_statefulset TYPE record<statefulset> PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON pod_with_statefulset TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "relation_has_metric": {
+            "events": {},
+            "fields": {
+              "created_at": "DEFINE FIELD created_at ON relation_has_metric TYPE int PERMISSIONS FULL",
+              "in": "DEFINE FIELD in ON relation_has_metric TYPE record<pod_to_pod> PERMISSIONS FULL",
+              "out": "DEFINE FIELD out ON relation_has_metric TYPE record<metric> PERMISSIONS FULL",
+              "result_table_id": "DEFINE FIELD result_table_id ON relation_has_metric TYPE string PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON relation_has_metric TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "replicaset": {
+            "events": {},
+            "fields": {
+              "bcs_cluster_id": "DEFINE FIELD bcs_cluster_id ON replicaset TYPE string PERMISSIONS FULL",
+              "created_at": "DEFINE FIELD created_at ON replicaset TYPE int PERMISSIONS FULL",
+              "namespace": "DEFINE FIELD namespace ON replicaset TYPE string PERMISSIONS FULL",
+              "replicaset": "DEFINE FIELD replicaset ON replicaset TYPE string PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON replicaset TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "service": {
+            "events": {},
+            "fields": {
+              "bcs_cluster_id": "DEFINE FIELD bcs_cluster_id ON service TYPE string PERMISSIONS FULL",
+              "created_at": "DEFINE FIELD created_at ON service TYPE int PERMISSIONS FULL",
+              "namespace": "DEFINE FIELD namespace ON service TYPE string PERMISSIONS FULL",
+              "service": "DEFINE FIELD service ON service TYPE string PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON service TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "service_to_service": {
+            "events": {},
+            "fields": {
+              "created_at": "DEFINE FIELD created_at ON service_to_service TYPE int PERMISSIONS FULL",
+              "in": "DEFINE FIELD in ON service_to_service TYPE record<service> PERMISSIONS FULL",
+              "out": "DEFINE FIELD out ON service_to_service TYPE record<service> PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON service_to_service TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "set": {
+            "events": {},
+            "fields": {
+              "bk_set_id": "DEFINE FIELD bk_set_id ON set TYPE string PERMISSIONS FULL",
+              "created_at": "DEFINE FIELD created_at ON set TYPE int PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON set TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "statefulset": {
+            "events": {},
+            "fields": {
+              "bcs_cluster_id": "DEFINE FIELD bcs_cluster_id ON statefulset TYPE string PERMISSIONS FULL",
+              "created_at": "DEFINE FIELD created_at ON statefulset TYPE int PERMISSIONS FULL",
+              "namespace": "DEFINE FIELD namespace ON statefulset TYPE string PERMISSIONS FULL",
+              "statefulset": "DEFINE FIELD statefulset ON statefulset TYPE string PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON statefulset TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "system": {
+            "events": {},
+            "fields": {
+              "bk_cloud_id": "DEFINE FIELD bk_cloud_id ON system TYPE string PERMISSIONS FULL",
+              "bk_target_ip": "DEFINE FIELD bk_target_ip ON system TYPE string PERMISSIONS FULL",
+              "created_at": "DEFINE FIELD created_at ON system TYPE int PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON system TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "system_to_pod": {
+            "events": {},
+            "fields": {
+              "created_at": "DEFINE FIELD created_at ON system_to_pod TYPE int PERMISSIONS FULL",
+              "in": "DEFINE FIELD in ON system_to_pod TYPE record<system> PERMISSIONS FULL",
+              "out": "DEFINE FIELD out ON system_to_pod TYPE record<pod> PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON system_to_pod TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          },
+          "system_to_system": {
+            "events": {},
+            "fields": {
+              "created_at": "DEFINE FIELD created_at ON system_to_system TYPE int PERMISSIONS FULL",
+              "in": "DEFINE FIELD in ON system_to_system TYPE record<system> PERMISSIONS FULL",
+              "out": "DEFINE FIELD out ON system_to_system TYPE record<system> PERMISSIONS FULL",
+              "updated_at": "DEFINE FIELD updated_at ON system_to_system TYPE int PERMISSIONS FULL"
+            },
+            "indexes": {},
+            "lives": {},
+            "tables": {}
+          }
+        }
+      },
+      "table_counts": {
+        "pod": 11019,
+        "service": 3769,
+        "pod_with_service": 12782
+      }
+    },
+    "changes": {
+      "pod": {
+        "before": 10721,
+        "after": 11019,
+        "diff": 298
+      },
+      "service": {
+        "before": 3567,
+        "after": 3769,
+        "diff": 202
+      },
+      "pod_with_service": {
+        "before": 12782,
+        "after": 12782,
+        "diff": 0
+      }
+    }
+  }
+}

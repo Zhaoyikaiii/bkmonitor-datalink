@@ -8,8 +8,8 @@ surreal_db:
   url: "http://9.134.9.112:8000"
   username: "root"
   password: "gXZio8YhegwJnNKN"
-  namespace: "test_20251229"
-  database: "test_20251229"
+  namespace: "default"
+  database: "benchmark"
 
 # Unify-Query API 配置
 unify_query:
