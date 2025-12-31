@@ -7,7 +7,7 @@
 surreal_db:
   url: "http://9.134.9.112:8000"
   username: "root"
-  password: "gXZio8YhegwJnNKN"
+  password: "root"
   namespace: "default"
   database: "benchmark"
 

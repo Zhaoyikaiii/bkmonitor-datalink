@@ -1,31 +1,36 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Import Real Data from Unify-Query
+Import Benchmark Data for Plan 00: created_at
 
-从 unify-query 接口批量获取真实的 pod_with_service_relation 数据，
-导入到 SurrealDB 进行基准测试。
+为 Plan 00 (created_at) 方案导入基准测试数据。
+支持两种数据源：
+1. 生成模拟数据（用于基准测试，默认）
+2. 从 unify-query API 获取真实数据
 
 使用与 002.mock_full_resource_graph.py 一致的 upsert 逻辑，
 通过 SurrealDB 的 fn::upsert_* 函数自动处理 ID 生成和更新逻辑。
 
-支持两种数据获取方式：
-1. /query/ts/info/series - 直接获取所有维度组合（推荐）
-2. /query/ts - 通过时序查询获取数据
-
 Usage:
-    python 004.import_real_data.py              # 完整导入流程
-    python 004.import_real_data.py --init       # 仅初始化 schema (使用 schema.sql)
-    python 004.import_real_data.py --verify     # 仅验证导入结果
+    python 004.import_real_data.py                    # 完整导入流程（模拟数据）
+    python 004.import_real_data.py --init             # 仅初始化 schema
+    python 004.import_real_data.py --verify           # 仅验证导入结果
+    python 004.import_real_data.py --count 10000      # 指定 Pod 数量
+    python 004.import_real_data.py --real             # 从 unify-query 获取真实数据
 """
 
 import json
 import os
+import random
 import time
 from datetime import datetime
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Tuple
 
 import requests
+
+# Disable SSL warnings
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # ============================================================================
 # Configuration
@@ -76,6 +81,54 @@ UNIFY_QUERY_HEADERS = {
 # 导入配置 (脚本内部常量)
 TIME_RANGE = 86400          # 查询时间范围（秒）
 TOLERANCE_TIME_MS = 600000  # 生命周期容忍时间（毫秒）
+BATCH_SIZE = 100            # 批量插入大小
+
+
+# ============================================================================
+# Mock Data Configuration (与 002.mock_full_resource_graph.py 一致)
+# ============================================================================
+
+class MockConfig:
+    """Mock data generation configuration"""
+    # 集群配置
+    BCS_CLUSTER_IDS = [f"BCS-K8S-{i:05d}" for i in range(1, 6)]  # 5个集群
+    NAMESPACES = ["default", "kube-system", "monitoring", "logging", "app-prod", "app-dev"]
+    SERVICE_LIST = ["api", "web", "worker", "gateway", "scheduler"]
+    
+    # 数量配置 (按 --count 参数动态调整)
+    NUM_PODS = 10000
+    NUM_SERVICES = 50
+    NUM_NODES = 100
+
+
+def generate_mock_pods(num_pods: int) -> List[Dict[str, str]]:
+    """生成模拟 Pod 数据"""
+    pods = []
+    for i in range(num_pods):
+        cluster = random.choice(MockConfig.BCS_CLUSTER_IDS)
+        namespace = random.choice(MockConfig.NAMESPACES)
+        service = random.choice(MockConfig.SERVICE_LIST)
+        pod_name = f"{service}-{random.randint(1000, 9999)}-{i:05d}"
+        pods.append({
+            'bcs_cluster_id': cluster,
+            'namespace': namespace,
+            'pod': pod_name
+        })
+    return pods
+
+
+def generate_mock_services() -> List[Dict[str, str]]:
+    """生成模拟 Service 数据"""
+    services = []
+    for cluster in MockConfig.BCS_CLUSTER_IDS:
+        for namespace in MockConfig.NAMESPACES:
+            for svc in MockConfig.SERVICE_LIST:
+                services.append({
+                    'bcs_cluster_id': cluster,
+                    'namespace': namespace,
+                    'service': svc
+                })
+    return services
 
 
 # ============================================================================
@@ -212,6 +265,25 @@ class SurrealDBClient:
         
         # Step 3: Upsert 关系
         return self.call_upsert_relation(relation_type, from_id, to_id, now_ms)
+
+    def batch_upsert_resources(
+        self,
+        resource_type: str,
+        resources: List[Dict[str, Any]],
+        now_ms: int,
+        batch_size: int = BATCH_SIZE
+    ) -> int:
+        """
+        批量 upsert 资源
+        """
+        success_count = 0
+        for i in range(0, len(resources), batch_size):
+            batch = resources[i:i + batch_size]
+            for res in batch:
+                result = self.call_upsert_resource(resource_type, res, now_ms, TOLERANCE_TIME_MS)
+                if result:
+                    success_count += 1
+        return success_count
 
 
 # ============================================================================
@@ -440,6 +512,81 @@ def import_relations(client: SurrealDBClient, relations: List[Dict]):
     print(f"导入完成! 成功: {success_count}, 失败: {error_count}")
 
 
+def import_mock_data(client: SurrealDBClient, num_pods: int = 10000):
+    """导入模拟数据"""
+    print(f"\n开始导入模拟数据 (Pod 数量: {num_pods})...")
+    
+    now_ms = client.datetime_to_ms(datetime.utcnow())
+    
+    # 1. 生成数据
+    print("\n生成模拟数据...")
+    pods = generate_mock_pods(num_pods)
+    services = generate_mock_services()
+    
+    print(f"  Pods: {len(pods)}")
+    print(f"  Services: {len(services)}")
+    
+    # 2. 导入节点资源
+    print("\n导入节点资源...")
+    
+    # Pods (批量)
+    print(f"  导入 {len(pods)} 个 Pod...")
+    start_time = time.time()
+    count = client.batch_upsert_resources('pod', pods, now_ms)
+    elapsed = time.time() - start_time
+    print(f"    完成: {count} 条, 耗时: {elapsed:.2f}s, QPS: {count/elapsed:.1f}")
+    
+    # Services
+    print(f"  导入 {len(services)} 个 Service...")
+    count = client.batch_upsert_resources('service', services, now_ms)
+    print(f"    完成: {count} 条")
+    
+    # 3. 导入关系
+    print("\n导入关系...")
+    
+    # pod_with_service: 每个 Pod 关联一个 Service
+    print(f"  导入 pod_with_service 关系...")
+    start_time = time.time()
+    relation_count = 0
+    for i, pod in enumerate(pods):
+        service = services[i % len(services)]
+        # 构建 service 数据 (与 pod 同集群同命名空间)
+        service_data = {
+            'bcs_cluster_id': pod['bcs_cluster_id'],
+            'namespace': pod['namespace'],
+            'service': service['service']
+        }
+        client.upsert_static_relation(
+            'pod_with_service',
+            'pod', pod,
+            'service', service_data,
+            now_ms
+        )
+        relation_count += 1
+        if (i + 1) % 1000 == 0:
+            elapsed = time.time() - start_time
+            print(f"    进度: {i+1}/{len(pods)}, 耗时: {elapsed:.2f}s")
+    
+    elapsed = time.time() - start_time
+    print(f"    完成: {relation_count} 条关系, 耗时: {elapsed:.2f}s")
+    
+    print("\n模拟数据导入完成!")
+
+
+def import_real_data(client: SurrealDBClient):
+    """从 unify-query 获取真实数据并导入"""
+    print("\n获取真实数据...")
+    relations = fetch_all_data()
+    print(f"共获取 {len(relations)} 条唯一关系")
+    
+    if not relations:
+        print("未获取到数据")
+        return
+    
+    print("\n导入数据...")
+    import_relations(client, relations)
+
+
 # ============================================================================
 # 验证
 # ============================================================================
@@ -480,38 +627,41 @@ def verify_import(client: SurrealDBClient):
 # ============================================================================
 
 if __name__ == '__main__':
-    import sys
+    import argparse
+    
+    parser = argparse.ArgumentParser(description='Import benchmark data for Plan 00: created_at')
+    parser.add_argument('--init', action='store_true', help='仅初始化 schema')
+    parser.add_argument('--verify', action='store_true', help='仅验证导入结果')
+    parser.add_argument('--real', action='store_true', help='从 unify-query 获取真实数据')
+    parser.add_argument('--count', type=int, default=10000, help='Pod 数量 (默认 10000)')
+    
+    args = parser.parse_args()
     
     client = SurrealDBClient()
     
-    if len(sys.argv) > 1 and sys.argv[1] == '--init':
+    if args.init:
         init_schema_from_file(client)
-    elif len(sys.argv) > 1 and sys.argv[1] == '--verify':
+    elif args.verify:
+        verify_import(client)
+    elif args.real:
+        print("=" * 70)
+        print("从 unify-query 获取真实数据并导入 SurrealDB (Plan 00: created_at)")
+        print("=" * 70)
+        
+        init_schema_from_file(client)
+        import_real_data(client)
         verify_import(client)
     else:
         print("=" * 70)
-        print("从 unify-query 获取真实数据并导入 SurrealDB")
+        print(f"导入模拟数据到 SurrealDB (Plan 00: created_at)")
+        print(f"Pod 数量: {args.count}")
         print("=" * 70)
         
         # 1. 初始化 schema
         init_schema_from_file(client)
         
-        # 2. 获取数据
-        print("\n" + "=" * 70)
-        print("获取数据...")
-        print("=" * 70)
-        relations = fetch_all_data()
-        print(f"共获取 {len(relations)} 条唯一关系")
+        # 2. 导入模拟数据
+        import_mock_data(client, args.count)
         
-        if not relations:
-            print("未获取到数据，退出")
-            sys.exit(1)
-        
-        # 3. 导入数据
-        print("\n" + "=" * 70)
-        print("导入数据...")
-        print("=" * 70)
-        import_relations(client, relations)
-        
-        # 4. 验证
+        # 3. 验证
         verify_import(client)
