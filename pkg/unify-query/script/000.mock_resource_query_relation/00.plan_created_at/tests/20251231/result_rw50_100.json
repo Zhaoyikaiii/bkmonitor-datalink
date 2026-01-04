@@ -1,131 +1,143 @@
 {
-  "timestamp": "2025-12-31T17:47:22.039002",
+  "timestamp": "2025-12-31T19:05:54.556486",
   "environment": {
-    "url": "http://9.134.9.112:8000",
+    "url": "https://21.214.199.225/surrealdb",
     "namespace": "default",
     "database": "benchmark"
   },
   "data_pool": {
-    "pods": 147,
-    "services": 146,
-    "namespaces": 2
+    "pods": 10000,
+    "services": 1083,
+    "namespaces": 19
   },
   "summary": {
-    "total_time_sec": 63.02,
-    "total_ops": 1855,
-    "qps": 29.44,
-    "success_rate": -389.38
+    "total_time_sec": 62.64,
+    "total_ops": 3516,
+    "qps": 56.13,
+    "success_rate": 100.0
   },
   "operations": {
-    "read_single": 530,
-    "read_batch": 399,
-    "read_relation": 390,
-    "write_heartbeat": 442,
-    "write_new": 94,
-    "total_reads": 1319,
-    "total_writes": 536,
-    "total_ops": 1855,
-    "errors": 9078
+    "read_single": 700,
+    "read_batch": 469,
+    "read_relation": 525,
+    "write_heartbeat": 1434,
+    "write_new": 388,
+    "total_reads": 1694,
+    "total_writes": 1822,
+    "total_ops": 3516,
+    "errors": 0
   },
   "latency": {
     "overall": {
-      "p50": 2786.1220659688115,
-      "p95": 3983.9973500929773,
-      "p99": 4570.3497510403395,
-      "avg": 2734.7391557907363,
-      "min": 35.26760404929519,
-      "max": 4681.97458377108
+      "p50": 1675.8603700436652,
+      "p95": 3055.2228670567274,
+      "p99": 3617.508228868246,
+      "avg": 1744.9272767136317,
+      "min": 84.9004928022623,
+      "max": 5255.094876978546
     },
     "read": {
-      "p50": 2784.1747971251607,
-      "p95": 4000.0780927948654,
-      "p99": 4564.433292020112,
-      "avg": 2738.9704139615105,
-      "min": 60.9869509935379,
-      "max": 4674.3190488778055
+      "p50": 1378.99410398677,
+      "p95": 2338.4089339524508,
+      "p99": 2818.8119218684733,
+      "avg": 1408.9468236737187,
+      "min": 93.06961903348565,
+      "max": 3867.468507029116
     },
     "write": {
-      "p50": 2876.377153210342,
-      "p95": 4002.6209908537567,
-      "p99": 4588.493693154305,
-      "avg": 2872.566013101568,
-      "min": 182.12997075170279,
-      "max": 4588.493693154305
+      "p50": 1906.420853920281,
+      "p95": 3189.2663119360805,
+      "p99": 3893.5944391414523,
+      "avg": 1904.3948781477363,
+      "min": 125.18765637651086,
+      "max": 4370.066314004362
     },
     "heartbeat": {
-      "p50": 2747.540070209652,
-      "p95": 3905.247389804572,
-      "p99": 4575.803370214999,
-      "avg": 2692.8007980656903,
-      "min": 35.26760404929519,
-      "max": 4681.97458377108
+      "p50": 2145.401917863637,
+      "p95": 3296.626470051706,
+      "p99": 3779.060955159366,
+      "avg": 2098.6772474899076,
+      "min": 84.9004928022623,
+      "max": 5255.094876978546
     }
   },
   "health_checks": [
     {
-      "timestamp": "2025-12-31T17:46:16.958924",
+      "timestamp": "2025-12-31T19:04:49.649749",
       "status": "ok",
-      "latency_ms": 3.23,
+      "latency_ms": 9.32,
       "error": null
     },
     {
-      "timestamp": "2025-12-31T17:46:16.962904",
+      "timestamp": "2025-12-31T19:04:49.659679",
       "status": "ok",
-      "latency_ms": 4.39,
+      "latency_ms": 4.5,
       "error": null
     },
     {
-      "timestamp": "2025-12-31T17:46:21.967516",
+      "timestamp": "2025-12-31T19:04:54.669130",
       "status": "ok",
-      "latency_ms": 2734.63,
+      "latency_ms": 1379.07,
       "error": null
     },
     {
-      "timestamp": "2025-12-31T17:46:29.702447",
+      "timestamp": "2025-12-31T19:05:01.048677",
       "status": "ok",
-      "latency_ms": 3955.72,
+      "latency_ms": 1807.41,
       "error": null
     },
     {
-      "timestamp": "2025-12-31T17:46:38.658453",
+      "timestamp": "2025-12-31T19:05:07.857733",
       "status": "ok",
-      "latency_ms": 2553.1,
+      "latency_ms": 774.25,
       "error": null
     },
     {
-      "timestamp": "2025-12-31T17:46:46.211828",
+      "timestamp": "2025-12-31T19:05:13.632921",
       "status": "ok",
-      "latency_ms": 2320.78,
+      "latency_ms": 461.5,
       "error": null
     },
     {
-      "timestamp": "2025-12-31T17:46:53.532884",
+      "timestamp": "2025-12-31T19:05:19.094841",
       "status": "ok",
-      "latency_ms": 3546.63,
+      "latency_ms": 2179.91,
       "error": null
     },
     {
-      "timestamp": "2025-12-31T17:47:02.079807",
-      "status": "error",
-      "latency_ms": 1014.11,
-      "error": "HTTP 502"
-    },
-    {
-      "timestamp": "2025-12-31T17:47:08.230155",
-      "status": "error",
-      "latency_ms": 21.62,
-      "error": "HTTP 502"
-    },
-    {
-      "timestamp": "2025-12-31T17:47:13.261770",
-      "status": "error",
-      "latency_ms": 41.56,
-      "error": "HTTP 502"
-    },
-    {
-      "timestamp": "2025-12-31T17:47:19.978509",
+      "timestamp": "2025-12-31T19:05:26.275214",
       "status": "ok",
-      "latency_ms": 2.85,
+      "latency_ms": 385.05,
+      "error": null
+    },
+    {
+      "timestamp": "2025-12-31T19:05:31.661956",
+      "status": "ok",
+      "latency_ms": 746.81,
+      "error": null
+    },
+    {
+      "timestamp": "2025-12-31T19:05:37.410543",
+      "status": "ok",
+      "latency_ms": 1231.6,
+      "error": null
+    },
+    {
+      "timestamp": "2025-12-31T19:05:43.643120",
+      "status": "ok",
+      "latency_ms": 1220.7,
+      "error": null
+    },
+    {
+      "timestamp": "2025-12-31T19:05:49.868845",
+      "status": "ok",
+      "latency_ms": 979.08,
+      "error": null
+    },
+    {
+      "timestamp": "2025-12-31T19:05:52.294868",
+      "status": "ok",
+      "latency_ms": 2.67,
       "error": null
     }
   ],
@@ -135,13 +147,28 @@
         "root": {
           "accesses": {},
           "namespaces": {
-            "default": "DEFINE NAMESPACE default"
+            "default": "DEFINE NAMESPACE default",
+            "test": "DEFINE NAMESPACE test",
+            "test_20251223": "DEFINE NAMESPACE test_20251223"
           },
           "nodes": {
-            "676232cf-9269-4525-b6bd-14de3ab27078": "NODE 676232cf-9269-4525-b6bd-14de3ab27078 SEEN 1767174374772 ACTIVE"
+            "8b5b5194-e2e2-4398-bb90-46ca0fe54323": "NODE 8b5b5194-e2e2-4398-bb90-46ca0fe54323 SEEN 1767179085826 ACTIVE"
+          },
+          "system": {
+            "available_parallelism": 32,
+            "cpu_usage": 194.54299926757812,
+            "load_average": [
+              6.45,
+              8.37,
+              10.65
+            ],
+            "memory_allocated": 182931051,
+            "memory_usage": 332886016,
+            "physical_cores": 32,
+            "threads": 65
           },
           "users": {
-            "root": "DEFINE USER root ON ROOT PASSHASH '$argon2id$v=19$m=19456,t=2,p=1$t/5T2DR+4Ga7la8HKXOo4A$jH5uPxcCyHPPQ/rfqpK93A4mCTbEICN1CxlL9EAodzU' ROLES OWNER DURATION FOR TOKEN 1h, FOR SESSION NONE"
+            "root": "DEFINE USER root ON ROOT PASSHASH '$argon2id$v=19$m=19456,t=2,p=1$2MHRbydpVhdWbPtIL/HZ+Q$3BhLxWzmShmZIUhJh/nehGu8neK09PhzjUxXDHuWtIo' ROLES OWNER DURATION FOR TOKEN 1h, FOR SESSION NONE"
           }
         },
         "namespace": {
@@ -155,38 +182,39 @@
         "database": {
           "accesses": {},
           "analyzers": {},
+          "apis": {},
           "configs": {},
           "functions": {
             "kv_block": "DEFINE FUNCTION fn::kv_block($dimensions: object, $created_at: int) {\nLET $entries = object::entries($dimensions);\nLET $sorted = array::sort($entries);\nLET $pairs = array::map($sorted, |$e: any| string::concat($e[0], '=', <string> $e[1]));\nLET $base = array::join($pairs, ',');\nRETURN string::concat($base, ',created_at=', <string> $created_at);\n} PERMISSIONS FULL",
             "relation_id": "DEFINE FUNCTION fn::relation_id($from_id: record, $to_id: record) {\nLET $from_str = <string> $from_id;\nLET $to_str = <string> $to_id;\nLET $from_kv = string::split($from_str, ':')[1];\nLET $to_kv = string::split($to_str, ':')[1];\nLET $from_kv_clean = string::replace(string::replace($from_kv, '\u27e8', ''), '\u27e9', '');\nLET $to_kv_clean = string::replace(string::replace($to_kv, '\u27e8', ''), '\u27e9', '');\nRETURN string::concat($from_kv_clean, '|', $to_kv_clean);\n} PERMISSIONS FULL",
-            "upsert_apm_service": "DEFINE FUNCTION fn::upsert_apm_service($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM apm_service WHERE apm_application_name = $dimensions.apm_application_name AND apm_service_name = $dimensions.apm_service_name ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('apm_service', $id_str) CONTENT { apm_application_name: $dimensions.apm_application_name, apm_service_name: $dimensions.apm_service_name, created_at: $now, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
-            "upsert_apm_service_instance": "DEFINE FUNCTION fn::upsert_apm_service_instance($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM apm_service_instance WHERE apm_application_name = $dimensions.apm_application_name AND apm_service_name = $dimensions.apm_service_name AND apm_service_instance_name = $dimensions.apm_service_instance_name ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('apm_service_instance', $id_str) CONTENT { apm_application_name: $dimensions.apm_application_name, apm_service_instance_name: $dimensions.apm_service_instance_name, apm_service_name: $dimensions.apm_service_name, created_at: $now, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
-            "upsert_app_version": "DEFINE FUNCTION fn::upsert_app_version($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM app_version WHERE app_name = $dimensions.app_name AND version = $dimensions.version ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('app_version', $id_str) CONTENT { app_name: $dimensions.app_name, created_at: $now, updated_at: $now, version: $dimensions.version })[0];\n} END;\n} PERMISSIONS FULL",
-            "upsert_biz": "DEFINE FUNCTION fn::upsert_biz($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM biz WHERE bk_biz_id = $dimensions.bk_biz_id ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('biz', $id_str) CONTENT { bk_biz_id: $dimensions.bk_biz_id, created_at: $now, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
-            "upsert_bklogconfig": "DEFINE FUNCTION fn::upsert_bklogconfig($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM bklogconfig WHERE bklogconfig_namespace = $dimensions.bklogconfig_namespace AND bklogconfig_name = $dimensions.bklogconfig_name ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('bklogconfig', $id_str) CONTENT { bklogconfig_name: $dimensions.bklogconfig_name, bklogconfig_namespace: $dimensions.bklogconfig_namespace, created_at: $now, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
-            "upsert_cluster": "DEFINE FUNCTION fn::upsert_cluster($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM cluster WHERE bcs_cluster_id = $dimensions.bcs_cluster_id ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('cluster', $id_str) CONTENT { bcs_cluster_id: $dimensions.bcs_cluster_id, created_at: $now, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
-            "upsert_container": "DEFINE FUNCTION fn::upsert_container($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM container WHERE bcs_cluster_id = $dimensions.bcs_cluster_id AND namespace = $dimensions.namespace AND pod = $dimensions.pod AND container = $dimensions.container ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('container', $id_str) CONTENT { bcs_cluster_id: $dimensions.bcs_cluster_id, container: $dimensions.container, created_at: $now, namespace: $dimensions.namespace, pod: $dimensions.pod, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
-            "upsert_daemonset": "DEFINE FUNCTION fn::upsert_daemonset($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM daemonset WHERE bcs_cluster_id = $dimensions.bcs_cluster_id AND namespace = $dimensions.namespace AND daemonset = $dimensions.daemonset ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('daemonset', $id_str) CONTENT { bcs_cluster_id: $dimensions.bcs_cluster_id, created_at: $now, daemonset: $dimensions.daemonset, namespace: $dimensions.namespace, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
-            "upsert_datasource": "DEFINE FUNCTION fn::upsert_datasource($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM datasource WHERE bk_data_id = $dimensions.bk_data_id ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('datasource', $id_str) CONTENT { bk_data_id: $dimensions.bk_data_id, created_at: $now, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
-            "upsert_deployment": "DEFINE FUNCTION fn::upsert_deployment($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM deployment WHERE bcs_cluster_id = $dimensions.bcs_cluster_id AND namespace = $dimensions.namespace AND deployment = $dimensions.deployment ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('deployment', $id_str) CONTENT { bcs_cluster_id: $dimensions.bcs_cluster_id, created_at: $now, deployment: $dimensions.deployment, namespace: $dimensions.namespace, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
-            "upsert_domain": "DEFINE FUNCTION fn::upsert_domain($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM domain WHERE bcs_cluster_id = $dimensions.bcs_cluster_id AND domain = $dimensions.domain ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('domain', $id_str) CONTENT { bcs_cluster_id: $dimensions.bcs_cluster_id, created_at: $now, domain: $dimensions.domain, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
-            "upsert_environment": "DEFINE FUNCTION fn::upsert_environment($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM environment WHERE environment = $dimensions.environment ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('environment', $id_str) CONTENT { created_at: $now, environment: $dimensions.environment, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
-            "upsert_git_commit": "DEFINE FUNCTION fn::upsert_git_commit($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM git_commit WHERE git_repo = $dimensions.git_repo AND commit_id = $dimensions.commit_id ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('git_commit', $id_str) CONTENT { commit_id: $dimensions.commit_id, created_at: $now, git_repo: $dimensions.git_repo, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
-            "upsert_host": "DEFINE FUNCTION fn::upsert_host($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM host WHERE bk_host_id = $dimensions.bk_host_id ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('host', $id_str) CONTENT { bk_host_id: $dimensions.bk_host_id, created_at: $now, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
-            "upsert_ingress": "DEFINE FUNCTION fn::upsert_ingress($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM ingress WHERE bcs_cluster_id = $dimensions.bcs_cluster_id AND namespace = $dimensions.namespace AND ingress = $dimensions.ingress ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('ingress', $id_str) CONTENT { bcs_cluster_id: $dimensions.bcs_cluster_id, created_at: $now, ingress: $dimensions.ingress, namespace: $dimensions.namespace, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
-            "upsert_job": "DEFINE FUNCTION fn::upsert_job($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM job WHERE bcs_cluster_id = $dimensions.bcs_cluster_id AND namespace = $dimensions.namespace AND job = $dimensions.job ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('job', $id_str) CONTENT { bcs_cluster_id: $dimensions.bcs_cluster_id, created_at: $now, job: $dimensions.job, namespace: $dimensions.namespace, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
-            "upsert_k8s_address": "DEFINE FUNCTION fn::upsert_k8s_address($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM k8s_address WHERE bcs_cluster_id = $dimensions.bcs_cluster_id AND address = $dimensions.address ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('k8s_address', $id_str) CONTENT { address: $dimensions.address, bcs_cluster_id: $dimensions.bcs_cluster_id, created_at: $now, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
-            "upsert_metric": "DEFINE FUNCTION fn::upsert_metric($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM metric WHERE metric_name = $dimensions.metric_name ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now, metric_type = $dimensions.metric_type, unit = $dimensions.unit, description = $dimensions.description)[0] ELSE {\nLET $id_str = fn::kv_block({ metric_name: $dimensions.metric_name }, $now);\n(CREATE type::thing('metric', $id_str) CONTENT { created_at: $now, description: $dimensions.description, metric_name: $dimensions.metric_name, metric_type: $dimensions.metric_type, unit: $dimensions.unit, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
-            "upsert_module": "DEFINE FUNCTION fn::upsert_module($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM module WHERE bk_module_id = $dimensions.bk_module_id ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('module', $id_str) CONTENT { bk_module_id: $dimensions.bk_module_id, created_at: $now, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
-            "upsert_namespace": "DEFINE FUNCTION fn::upsert_namespace($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM namespace WHERE bcs_cluster_id = $dimensions.bcs_cluster_id AND namespace = $dimensions.namespace ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('namespace', $id_str) CONTENT { bcs_cluster_id: $dimensions.bcs_cluster_id, created_at: $now, namespace: $dimensions.namespace, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
-            "upsert_node": "DEFINE FUNCTION fn::upsert_node($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM node WHERE bcs_cluster_id = $dimensions.bcs_cluster_id AND node = $dimensions.node ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('node', $id_str) CONTENT { bcs_cluster_id: $dimensions.bcs_cluster_id, created_at: $now, node: $dimensions.node, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
-            "upsert_pod": "DEFINE FUNCTION fn::upsert_pod($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM pod WHERE bcs_cluster_id = $dimensions.bcs_cluster_id AND namespace = $dimensions.namespace AND pod = $dimensions.pod ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('pod', $id_str) CONTENT { bcs_cluster_id: $dimensions.bcs_cluster_id, created_at: $now, namespace: $dimensions.namespace, pod: $dimensions.pod, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_apm_service": "DEFINE FUNCTION fn::upsert_apm_service($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM apm_service WHERE apm_application_name = $dimensions.apm_application_name AND apm_service_name = $dimensions.apm_service_name ORDER BY created_at DESC\n LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('apm_service', $id_str) CONTENT { apm_application_name: $dimensions.apm_application_name, apm_service_name: $dimensions.apm_service_name, created_at: $now, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_apm_service_instance": "DEFINE FUNCTION fn::upsert_apm_service_instance($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM apm_service_instance WHERE apm_application_name = $dimensions.apm_application_name AND apm_service_name = $dimensions.apm_service_name AND apm_service_instance_name = $dimensions.apm_service_instance_name ORDER BY created_at DESC\n LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('apm_service_instance', $id_str) CONTENT { apm_application_name: $dimensions.apm_application_name, apm_service_instance_name: $dimensions.apm_service_instance_name, apm_service_name: $dimensions.apm_service_name, created_at: $now, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_app_version": "DEFINE FUNCTION fn::upsert_app_version($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM app_version WHERE app_name = $dimensions.app_name AND version = $dimensions.version ORDER BY created_at DESC\n LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('app_version', $id_str) CONTENT { app_name: $dimensions.app_name, created_at: $now, updated_at: $now, version: $dimensions.version })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_biz": "DEFINE FUNCTION fn::upsert_biz($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM biz WHERE bk_biz_id = $dimensions.bk_biz_id ORDER BY created_at DESC\n LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('biz', $id_str) CONTENT { bk_biz_id: $dimensions.bk_biz_id, created_at: $now, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_bklogconfig": "DEFINE FUNCTION fn::upsert_bklogconfig($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM bklogconfig WHERE bklogconfig_namespace = $dimensions.bklogconfig_namespace AND bklogconfig_name = $dimensions.bklogconfig_name ORDER BY created_at DESC\n LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('bklogconfig', $id_str) CONTENT { bklogconfig_name: $dimensions.bklogconfig_name, bklogconfig_namespace: $dimensions.bklogconfig_namespace, created_at: $now, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_cluster": "DEFINE FUNCTION fn::upsert_cluster($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM cluster WHERE bcs_cluster_id = $dimensions.bcs_cluster_id ORDER BY created_at DESC\n LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('cluster', $id_str) CONTENT { bcs_cluster_id: $dimensions.bcs_cluster_id, created_at: $now, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_container": "DEFINE FUNCTION fn::upsert_container($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM container WHERE bcs_cluster_id = $dimensions.bcs_cluster_id AND namespace = $dimensions.namespace AND pod = $dimensions.pod AND container = $dimensions.container ORDER BY created_at DESC\n LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('container', $id_str) CONTENT { bcs_cluster_id: $dimensions.bcs_cluster_id, container: $dimensions.container, created_at: $now, namespace: $dimensions.namespace, pod: $dimensions.pod, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_daemonset": "DEFINE FUNCTION fn::upsert_daemonset($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM daemonset WHERE bcs_cluster_id = $dimensions.bcs_cluster_id AND namespace = $dimensions.namespace AND daemonset = $dimensions.daemonset ORDER BY created_at DESC\n LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('daemonset', $id_str) CONTENT { bcs_cluster_id: $dimensions.bcs_cluster_id, created_at: $now, daemonset: $dimensions.daemonset, namespace: $dimensions.namespace, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_datasource": "DEFINE FUNCTION fn::upsert_datasource($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM datasource WHERE bk_data_id = $dimensions.bk_data_id ORDER BY created_at DESC\n LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('datasource', $id_str) CONTENT { bk_data_id: $dimensions.bk_data_id, created_at: $now, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_deployment": "DEFINE FUNCTION fn::upsert_deployment($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM deployment WHERE bcs_cluster_id = $dimensions.bcs_cluster_id AND namespace = $dimensions.namespace AND deployment = $dimensions.deployment ORDER BY created_at DESC\n LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('deployment', $id_str) CONTENT { bcs_cluster_id: $dimensions.bcs_cluster_id, created_at: $now, deployment: $dimensions.deployment, namespace: $dimensions.namespace, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_domain": "DEFINE FUNCTION fn::upsert_domain($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM domain WHERE bcs_cluster_id = $dimensions.bcs_cluster_id AND domain = $dimensions.domain ORDER BY created_at DESC\n LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('domain', $id_str) CONTENT { bcs_cluster_id: $dimensions.bcs_cluster_id, created_at: $now, domain: $dimensions.domain, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_environment": "DEFINE FUNCTION fn::upsert_environment($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM environment WHERE environment = $dimensions.environment ORDER BY created_at DESC\n LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('environment', $id_str) CONTENT { created_at: $now, environment: $dimensions.environment, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_git_commit": "DEFINE FUNCTION fn::upsert_git_commit($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM git_commit WHERE git_repo = $dimensions.git_repo AND commit_id = $dimensions.commit_id ORDER BY created_at DESC\n LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('git_commit', $id_str) CONTENT { commit_id: $dimensions.commit_id, created_at: $now, git_repo: $dimensions.git_repo, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_host": "DEFINE FUNCTION fn::upsert_host($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM host WHERE bk_host_id = $dimensions.bk_host_id ORDER BY created_at DESC\n LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('host', $id_str) CONTENT { bk_host_id: $dimensions.bk_host_id, created_at: $now, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_ingress": "DEFINE FUNCTION fn::upsert_ingress($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM ingress WHERE bcs_cluster_id = $dimensions.bcs_cluster_id AND namespace = $dimensions.namespace AND ingress = $dimensions.ingress ORDER BY created_at DESC\n LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('ingress', $id_str) CONTENT { bcs_cluster_id: $dimensions.bcs_cluster_id, created_at: $now, ingress: $dimensions.ingress, namespace: $dimensions.namespace, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_job": "DEFINE FUNCTION fn::upsert_job($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM job WHERE bcs_cluster_id = $dimensions.bcs_cluster_id AND namespace = $dimensions.namespace AND job = $dimensions.job ORDER BY created_at DESC\n LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('job', $id_str) CONTENT { bcs_cluster_id: $dimensions.bcs_cluster_id, created_at: $now, job: $dimensions.job, namespace: $dimensions.namespace, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_k8s_address": "DEFINE FUNCTION fn::upsert_k8s_address($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM k8s_address WHERE bcs_cluster_id = $dimensions.bcs_cluster_id AND address = $dimensions.address ORDER BY created_at DESC\n LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('k8s_address', $id_str) CONTENT { address: $dimensions.address, bcs_cluster_id: $dimensions.bcs_cluster_id, created_at: $now, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_metric": "DEFINE FUNCTION fn::upsert_metric($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM metric WHERE metric_name = $dimensions.metric_name ORDER BY created_at DESC\n LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now, metric_type = $dimensions.metric_type, unit = $dimensions.unit, description = $dimensions.description)[0] ELSE {\nLET $id_str = fn::kv_block({ metric_name: $dimensions.metric_name }, $now);\n(CREATE type::thing('metric', $id_str) CONTENT { created_at: $now, description: $dimensions.description, metric_name: $dimensions.metric_name, metric_type: $dimensions.metric_type, unit: $dimensions.unit, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_module": "DEFINE FUNCTION fn::upsert_module($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM module WHERE bk_module_id = $dimensions.bk_module_id ORDER BY created_at DESC\n LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('module', $id_str) CONTENT { bk_module_id: $dimensions.bk_module_id, created_at: $now, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_namespace": "DEFINE FUNCTION fn::upsert_namespace($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM namespace WHERE bcs_cluster_id = $dimensions.bcs_cluster_id AND namespace = $dimensions.namespace ORDER BY created_at DESC\n LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('namespace', $id_str) CONTENT { bcs_cluster_id: $dimensions.bcs_cluster_id, created_at: $now, namespace: $dimensions.namespace, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_node": "DEFINE FUNCTION fn::upsert_node($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM node WHERE bcs_cluster_id = $dimensions.bcs_cluster_id AND node = $dimensions.node ORDER BY created_at DESC\n LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('node', $id_str) CONTENT { bcs_cluster_id: $dimensions.bcs_cluster_id, created_at: $now, node: $dimensions.node, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_pod": "DEFINE FUNCTION fn::upsert_pod($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM pod WHERE bcs_cluster_id = $dimensions.bcs_cluster_id AND namespace = $dimensions.namespace AND pod = $dimensions.pod ORDER BY created_at DESC\n LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('pod', $id_str) CONTENT { bcs_cluster_id: $dimensions.bcs_cluster_id, created_at: $now, namespace: $dimensions.namespace, pod: $dimensions.pod, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
             "upsert_relation": "DEFINE FUNCTION fn::upsert_relation($relation_table: string, $from_id: record, $to_id: record, $now: int) {\nLET $rel_id = fn::relation_id($from_id, $to_id);\nLET $full_id = type::thing($relation_table, $rel_id);\nLET $rel_table = type::table($relation_table);\nLET $existing = (SELECT * FROM type::table($relation_table) WHERE id = $full_id LIMIT 1)[0];\nRETURN IF $existing != NONE THEN (UPDATE $existing.id SET updated_at = $now)[0] ELSE (RELATE $from_id -> $rel_table -> $to_id SET id = $full_id, created_at = $now, updated_at = $now)[0] END;\n} PERMISSIONS FULL",
-            "upsert_replicaset": "DEFINE FUNCTION fn::upsert_replicaset($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM replicaset WHERE bcs_cluster_id = $dimensions.bcs_cluster_id AND namespace = $dimensions.namespace AND replicaset = $dimensions.replicaset ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('replicaset', $id_str) CONTENT { bcs_cluster_id: $dimensions.bcs_cluster_id, created_at: $now, namespace: $dimensions.namespace, replicaset: $dimensions.replicaset, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
-            "upsert_service": "DEFINE FUNCTION fn::upsert_service($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM service WHERE bcs_cluster_id = $dimensions.bcs_cluster_id AND namespace = $dimensions.namespace AND service = $dimensions.service ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('service', $id_str) CONTENT { bcs_cluster_id: $dimensions.bcs_cluster_id, created_at: $now, namespace: $dimensions.namespace, service: $dimensions.service, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
-            "upsert_set": "DEFINE FUNCTION fn::upsert_set($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM set WHERE bk_set_id = $dimensions.bk_set_id ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('set', $id_str) CONTENT { bk_set_id: $dimensions.bk_set_id, created_at: $now, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
-            "upsert_statefulset": "DEFINE FUNCTION fn::upsert_statefulset($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM statefulset WHERE bcs_cluster_id = $dimensions.bcs_cluster_id AND namespace = $dimensions.namespace AND statefulset = $dimensions.statefulset ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('statefulset', $id_str) CONTENT { bcs_cluster_id: $dimensions.bcs_cluster_id, created_at: $now, namespace: $dimensions.namespace, statefulset: $dimensions.statefulset, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
-            "upsert_system": "DEFINE FUNCTION fn::upsert_system($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM system WHERE bk_cloud_id = $dimensions.bk_cloud_id AND bk_target_ip = $dimensions.bk_target_ip ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('system', $id_str) CONTENT { bk_cloud_id: $dimensions.bk_cloud_id, bk_target_ip: $dimensions.bk_target_ip, created_at: $now, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL"
+            "upsert_replicaset": "DEFINE FUNCTION fn::upsert_replicaset($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM replicaset WHERE bcs_cluster_id = $dimensions.bcs_cluster_id AND namespace = $dimensions.namespace AND replicaset = $dimensions.replicaset ORDER BY created_at DESC\n LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('replicaset', $id_str) CONTENT { bcs_cluster_id: $dimensions.bcs_cluster_id, created_at: $now, namespace: $dimensions.namespace, replicaset: $dimensions.replicaset, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_service": "DEFINE FUNCTION fn::upsert_service($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM service WHERE bcs_cluster_id = $dimensions.bcs_cluster_id AND namespace = $dimensions.namespace AND service = $dimensions.service ORDER BY created_at DESC\n LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('service', $id_str) CONTENT { bcs_cluster_id: $dimensions.bcs_cluster_id, created_at: $now, namespace: $dimensions.namespace, service: $dimensions.service, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_set": "DEFINE FUNCTION fn::upsert_set($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM set WHERE bk_set_id = $dimensions.bk_set_id ORDER BY created_at DESC\n LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('set', $id_str) CONTENT { bk_set_id: $dimensions.bk_set_id, created_at: $now, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_statefulset": "DEFINE FUNCTION fn::upsert_statefulset($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM statefulset WHERE bcs_cluster_id = $dimensions.bcs_cluster_id AND namespace = $dimensions.namespace AND statefulset = $dimensions.statefulset ORDER BY created_at DESC\n LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('statefulset', $id_str) CONTENT { bcs_cluster_id: $dimensions.bcs_cluster_id, created_at: $now, namespace: $dimensions.namespace, statefulset: $dimensions.statefulset, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_system": "DEFINE FUNCTION fn::upsert_system($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM system WHERE bk_cloud_id = $dimensions.bk_cloud_id AND bk_target_ip = $dimensions.bk_target_ip ORDER BY created_at DESC\n LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('system', $id_str) CONTENT { bk_cloud_id: $dimensions.bk_cloud_id, bk_target_ip: $dimensions.bk_target_ip, created_at: $now, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL"
           },
           "models": {},
           "params": {},
@@ -237,15 +265,15 @@
             "node_has_metric": "DEFINE TABLE node_has_metric TYPE RELATION IN pod OUT metric SCHEMAFULL PERMISSIONS NONE",
             "node_with_pod": "DEFINE TABLE node_with_pod TYPE RELATION IN node OUT pod SCHEMAFULL PERMISSIONS NONE",
             "node_with_system": "DEFINE TABLE node_with_system TYPE RELATION IN node OUT system SCHEMAFULL PERMISSIONS NONE",
-            "pod": "DEFINE TABLE pod TYPE NORMAL SCHEMAFULL PERMISSIONS NONE",
+            "pod": "DEFINE TABLE pod TYPE ANY SCHEMALESS PERMISSIONS NONE",
             "pod_to_pod": "DEFINE TABLE pod_to_pod TYPE RELATION IN pod OUT pod SCHEMAFULL PERMISSIONS NONE",
             "pod_to_system": "DEFINE TABLE pod_to_system TYPE RELATION IN pod OUT system SCHEMAFULL PERMISSIONS NONE",
             "pod_with_replicaset": "DEFINE TABLE pod_with_replicaset TYPE RELATION IN pod OUT replicaset SCHEMAFULL PERMISSIONS NONE",
-            "pod_with_service": "DEFINE TABLE pod_with_service TYPE RELATION IN pod OUT service SCHEMAFULL PERMISSIONS NONE",
+            "pod_with_service": "DEFINE TABLE pod_with_service TYPE ANY SCHEMALESS PERMISSIONS NONE",
             "pod_with_statefulset": "DEFINE TABLE pod_with_statefulset TYPE RELATION IN pod OUT statefulset SCHEMAFULL PERMISSIONS NONE",
             "relation_has_metric": "DEFINE TABLE relation_has_metric TYPE RELATION IN pod_to_pod OUT metric SCHEMAFULL PERMISSIONS NONE",
             "replicaset": "DEFINE TABLE replicaset TYPE NORMAL SCHEMAFULL PERMISSIONS NONE",
-            "service": "DEFINE TABLE service TYPE NORMAL SCHEMAFULL PERMISSIONS NONE",
+            "service": "DEFINE TABLE service TYPE ANY SCHEMALESS PERMISSIONS NONE",
             "service_to_service": "DEFINE TABLE service_to_service TYPE RELATION IN service OUT service SCHEMAFULL PERMISSIONS NONE",
             "set": "DEFINE TABLE set TYPE NORMAL SCHEMAFULL PERMISSIONS NONE",
             "statefulset": "DEFINE TABLE statefulset TYPE NORMAL SCHEMAFULL PERMISSIONS NONE",
@@ -865,8 +893,6 @@
             "events": {},
             "fields": {
               "created_at": "DEFINE FIELD created_at ON pod_with_service TYPE int PERMISSIONS FULL",
-              "in": "DEFINE FIELD in ON pod_with_service TYPE record<pod> PERMISSIONS FULL",
-              "out": "DEFINE FIELD out ON pod_with_service TYPE record<service> PERMISSIONS FULL",
               "updated_at": "DEFINE FIELD updated_at ON pod_with_service TYPE int PERMISSIONS FULL"
             },
             "indexes": {},
@@ -999,9 +1025,9 @@
         }
       },
       "table_counts": {
-        "pod": 147,
-        "service": 146,
-        "pod_with_service": 10
+        "pod": 17093,
+        "service": 1083,
+        "pod_with_service": 5064
       }
     },
     "after": {
@@ -1009,13 +1035,28 @@
         "root": {
           "accesses": {},
           "namespaces": {
-            "default": "DEFINE NAMESPACE default"
+            "default": "DEFINE NAMESPACE default",
+            "test": "DEFINE NAMESPACE test",
+            "test_20251223": "DEFINE NAMESPACE test_20251223"
           },
           "nodes": {
-            "676232cf-9269-4525-b6bd-14de3ab27078": "NODE 676232cf-9269-4525-b6bd-14de3ab27078 SEEN 1767174437763 ACTIVE"
+            "8b5b5194-e2e2-4398-bb90-46ca0fe54323": "NODE 8b5b5194-e2e2-4398-bb90-46ca0fe54323 SEEN 1767179150092 ACTIVE"
+          },
+          "system": {
+            "available_parallelism": 32,
+            "cpu_usage": 3143.30126953125,
+            "load_average": [
+              24.52,
+              13.27,
+              12.19
+            ],
+            "memory_allocated": 240297747,
+            "memory_usage": 380841984,
+            "physical_cores": 32,
+            "threads": 68
           },
           "users": {
-            "root": "DEFINE USER root ON ROOT PASSHASH '$argon2id$v=19$m=19456,t=2,p=1$t/5T2DR+4Ga7la8HKXOo4A$jH5uPxcCyHPPQ/rfqpK93A4mCTbEICN1CxlL9EAodzU' ROLES OWNER DURATION FOR TOKEN 1h, FOR SESSION NONE"
+            "root": "DEFINE USER root ON ROOT PASSHASH '$argon2id$v=19$m=19456,t=2,p=1$2MHRbydpVhdWbPtIL/HZ+Q$3BhLxWzmShmZIUhJh/nehGu8neK09PhzjUxXDHuWtIo' ROLES OWNER DURATION FOR TOKEN 1h, FOR SESSION NONE"
           }
         },
         "namespace": {
@@ -1029,38 +1070,39 @@
         "database": {
           "accesses": {},
           "analyzers": {},
+          "apis": {},
           "configs": {},
           "functions": {
             "kv_block": "DEFINE FUNCTION fn::kv_block($dimensions: object, $created_at: int) {\nLET $entries = object::entries($dimensions);\nLET $sorted = array::sort($entries);\nLET $pairs = array::map($sorted, |$e: any| string::concat($e[0], '=', <string> $e[1]));\nLET $base = array::join($pairs, ',');\nRETURN string::concat($base, ',created_at=', <string> $created_at);\n} PERMISSIONS FULL",
             "relation_id": "DEFINE FUNCTION fn::relation_id($from_id: record, $to_id: record) {\nLET $from_str = <string> $from_id;\nLET $to_str = <string> $to_id;\nLET $from_kv = string::split($from_str, ':')[1];\nLET $to_kv = string::split($to_str, ':')[1];\nLET $from_kv_clean = string::replace(string::replace($from_kv, '\u27e8', ''), '\u27e9', '');\nLET $to_kv_clean = string::replace(string::replace($to_kv, '\u27e8', ''), '\u27e9', '');\nRETURN string::concat($from_kv_clean, '|', $to_kv_clean);\n} PERMISSIONS FULL",
-            "upsert_apm_service": "DEFINE FUNCTION fn::upsert_apm_service($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM apm_service WHERE apm_application_name = $dimensions.apm_application_name AND apm_service_name = $dimensions.apm_service_name ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('apm_service', $id_str) CONTENT { apm_application_name: $dimensions.apm_application_name, apm_service_name: $dimensions.apm_service_name, created_at: $now, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
-            "upsert_apm_service_instance": "DEFINE FUNCTION fn::upsert_apm_service_instance($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM apm_service_instance WHERE apm_application_name = $dimensions.apm_application_name AND apm_service_name = $dimensions.apm_service_name AND apm_service_instance_name = $dimensions.apm_service_instance_name ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('apm_service_instance', $id_str) CONTENT { apm_application_name: $dimensions.apm_application_name, apm_service_instance_name: $dimensions.apm_service_instance_name, apm_service_name: $dimensions.apm_service_name, created_at: $now, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
-            "upsert_app_version": "DEFINE FUNCTION fn::upsert_app_version($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM app_version WHERE app_name = $dimensions.app_name AND version = $dimensions.version ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('app_version', $id_str) CONTENT { app_name: $dimensions.app_name, created_at: $now, updated_at: $now, version: $dimensions.version })[0];\n} END;\n} PERMISSIONS FULL",
-            "upsert_biz": "DEFINE FUNCTION fn::upsert_biz($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM biz WHERE bk_biz_id = $dimensions.bk_biz_id ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('biz', $id_str) CONTENT { bk_biz_id: $dimensions.bk_biz_id, created_at: $now, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
-            "upsert_bklogconfig": "DEFINE FUNCTION fn::upsert_bklogconfig($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM bklogconfig WHERE bklogconfig_namespace = $dimensions.bklogconfig_namespace AND bklogconfig_name = $dimensions.bklogconfig_name ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('bklogconfig', $id_str) CONTENT { bklogconfig_name: $dimensions.bklogconfig_name, bklogconfig_namespace: $dimensions.bklogconfig_namespace, created_at: $now, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
-            "upsert_cluster": "DEFINE FUNCTION fn::upsert_cluster($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM cluster WHERE bcs_cluster_id = $dimensions.bcs_cluster_id ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('cluster', $id_str) CONTENT { bcs_cluster_id: $dimensions.bcs_cluster_id, created_at: $now, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
-            "upsert_container": "DEFINE FUNCTION fn::upsert_container($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM container WHERE bcs_cluster_id = $dimensions.bcs_cluster_id AND namespace = $dimensions.namespace AND pod = $dimensions.pod AND container = $dimensions.container ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('container', $id_str) CONTENT { bcs_cluster_id: $dimensions.bcs_cluster_id, container: $dimensions.container, created_at: $now, namespace: $dimensions.namespace, pod: $dimensions.pod, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
-            "upsert_daemonset": "DEFINE FUNCTION fn::upsert_daemonset($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM daemonset WHERE bcs_cluster_id = $dimensions.bcs_cluster_id AND namespace = $dimensions.namespace AND daemonset = $dimensions.daemonset ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('daemonset', $id_str) CONTENT { bcs_cluster_id: $dimensions.bcs_cluster_id, created_at: $now, daemonset: $dimensions.daemonset, namespace: $dimensions.namespace, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
-            "upsert_datasource": "DEFINE FUNCTION fn::upsert_datasource($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM datasource WHERE bk_data_id = $dimensions.bk_data_id ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('datasource', $id_str) CONTENT { bk_data_id: $dimensions.bk_data_id, created_at: $now, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
-            "upsert_deployment": "DEFINE FUNCTION fn::upsert_deployment($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM deployment WHERE bcs_cluster_id = $dimensions.bcs_cluster_id AND namespace = $dimensions.namespace AND deployment = $dimensions.deployment ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('deployment', $id_str) CONTENT { bcs_cluster_id: $dimensions.bcs_cluster_id, created_at: $now, deployment: $dimensions.deployment, namespace: $dimensions.namespace, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
-            "upsert_domain": "DEFINE FUNCTION fn::upsert_domain($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM domain WHERE bcs_cluster_id = $dimensions.bcs_cluster_id AND domain = $dimensions.domain ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('domain', $id_str) CONTENT { bcs_cluster_id: $dimensions.bcs_cluster_id, created_at: $now, domain: $dimensions.domain, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
-            "upsert_environment": "DEFINE FUNCTION fn::upsert_environment($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM environment WHERE environment = $dimensions.environment ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('environment', $id_str) CONTENT { created_at: $now, environment: $dimensions.environment, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
-            "upsert_git_commit": "DEFINE FUNCTION fn::upsert_git_commit($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM git_commit WHERE git_repo = $dimensions.git_repo AND commit_id = $dimensions.commit_id ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('git_commit', $id_str) CONTENT { commit_id: $dimensions.commit_id, created_at: $now, git_repo: $dimensions.git_repo, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
-            "upsert_host": "DEFINE FUNCTION fn::upsert_host($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM host WHERE bk_host_id = $dimensions.bk_host_id ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('host', $id_str) CONTENT { bk_host_id: $dimensions.bk_host_id, created_at: $now, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
-            "upsert_ingress": "DEFINE FUNCTION fn::upsert_ingress($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM ingress WHERE bcs_cluster_id = $dimensions.bcs_cluster_id AND namespace = $dimensions.namespace AND ingress = $dimensions.ingress ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('ingress', $id_str) CONTENT { bcs_cluster_id: $dimensions.bcs_cluster_id, created_at: $now, ingress: $dimensions.ingress, namespace: $dimensions.namespace, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
-            "upsert_job": "DEFINE FUNCTION fn::upsert_job($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM job WHERE bcs_cluster_id = $dimensions.bcs_cluster_id AND namespace = $dimensions.namespace AND job = $dimensions.job ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('job', $id_str) CONTENT { bcs_cluster_id: $dimensions.bcs_cluster_id, created_at: $now, job: $dimensions.job, namespace: $dimensions.namespace, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
-            "upsert_k8s_address": "DEFINE FUNCTION fn::upsert_k8s_address($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM k8s_address WHERE bcs_cluster_id = $dimensions.bcs_cluster_id AND address = $dimensions.address ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('k8s_address', $id_str) CONTENT { address: $dimensions.address, bcs_cluster_id: $dimensions.bcs_cluster_id, created_at: $now, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
-            "upsert_metric": "DEFINE FUNCTION fn::upsert_metric($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM metric WHERE metric_name = $dimensions.metric_name ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now, metric_type = $dimensions.metric_type, unit = $dimensions.unit, description = $dimensions.description)[0] ELSE {\nLET $id_str = fn::kv_block({ metric_name: $dimensions.metric_name }, $now);\n(CREATE type::thing('metric', $id_str) CONTENT { created_at: $now, description: $dimensions.description, metric_name: $dimensions.metric_name, metric_type: $dimensions.metric_type, unit: $dimensions.unit, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
-            "upsert_module": "DEFINE FUNCTION fn::upsert_module($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM module WHERE bk_module_id = $dimensions.bk_module_id ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('module', $id_str) CONTENT { bk_module_id: $dimensions.bk_module_id, created_at: $now, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
-            "upsert_namespace": "DEFINE FUNCTION fn::upsert_namespace($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM namespace WHERE bcs_cluster_id = $dimensions.bcs_cluster_id AND namespace = $dimensions.namespace ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('namespace', $id_str) CONTENT { bcs_cluster_id: $dimensions.bcs_cluster_id, created_at: $now, namespace: $dimensions.namespace, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
-            "upsert_node": "DEFINE FUNCTION fn::upsert_node($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM node WHERE bcs_cluster_id = $dimensions.bcs_cluster_id AND node = $dimensions.node ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('node', $id_str) CONTENT { bcs_cluster_id: $dimensions.bcs_cluster_id, created_at: $now, node: $dimensions.node, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
-            "upsert_pod": "DEFINE FUNCTION fn::upsert_pod($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM pod WHERE bcs_cluster_id = $dimensions.bcs_cluster_id AND namespace = $dimensions.namespace AND pod = $dimensions.pod ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('pod', $id_str) CONTENT { bcs_cluster_id: $dimensions.bcs_cluster_id, created_at: $now, namespace: $dimensions.namespace, pod: $dimensions.pod, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_apm_service": "DEFINE FUNCTION fn::upsert_apm_service($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM apm_service WHERE apm_application_name = $dimensions.apm_application_name AND apm_service_name = $dimensions.apm_service_name ORDER BY created_at DESC\n LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('apm_service', $id_str) CONTENT { apm_application_name: $dimensions.apm_application_name, apm_service_name: $dimensions.apm_service_name, created_at: $now, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_apm_service_instance": "DEFINE FUNCTION fn::upsert_apm_service_instance($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM apm_service_instance WHERE apm_application_name = $dimensions.apm_application_name AND apm_service_name = $dimensions.apm_service_name AND apm_service_instance_name = $dimensions.apm_service_instance_name ORDER BY created_at DESC\n LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('apm_service_instance', $id_str) CONTENT { apm_application_name: $dimensions.apm_application_name, apm_service_instance_name: $dimensions.apm_service_instance_name, apm_service_name: $dimensions.apm_service_name, created_at: $now, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_app_version": "DEFINE FUNCTION fn::upsert_app_version($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM app_version WHERE app_name = $dimensions.app_name AND version = $dimensions.version ORDER BY created_at DESC\n LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('app_version', $id_str) CONTENT { app_name: $dimensions.app_name, created_at: $now, updated_at: $now, version: $dimensions.version })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_biz": "DEFINE FUNCTION fn::upsert_biz($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM biz WHERE bk_biz_id = $dimensions.bk_biz_id ORDER BY created_at DESC\n LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('biz', $id_str) CONTENT { bk_biz_id: $dimensions.bk_biz_id, created_at: $now, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_bklogconfig": "DEFINE FUNCTION fn::upsert_bklogconfig($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM bklogconfig WHERE bklogconfig_namespace = $dimensions.bklogconfig_namespace AND bklogconfig_name = $dimensions.bklogconfig_name ORDER BY created_at DESC\n LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('bklogconfig', $id_str) CONTENT { bklogconfig_name: $dimensions.bklogconfig_name, bklogconfig_namespace: $dimensions.bklogconfig_namespace, created_at: $now, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_cluster": "DEFINE FUNCTION fn::upsert_cluster($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM cluster WHERE bcs_cluster_id = $dimensions.bcs_cluster_id ORDER BY created_at DESC\n LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('cluster', $id_str) CONTENT { bcs_cluster_id: $dimensions.bcs_cluster_id, created_at: $now, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_container": "DEFINE FUNCTION fn::upsert_container($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM container WHERE bcs_cluster_id = $dimensions.bcs_cluster_id AND namespace = $dimensions.namespace AND pod = $dimensions.pod AND container = $dimensions.container ORDER BY created_at DESC\n LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('container', $id_str) CONTENT { bcs_cluster_id: $dimensions.bcs_cluster_id, container: $dimensions.container, created_at: $now, namespace: $dimensions.namespace, pod: $dimensions.pod, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_daemonset": "DEFINE FUNCTION fn::upsert_daemonset($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM daemonset WHERE bcs_cluster_id = $dimensions.bcs_cluster_id AND namespace = $dimensions.namespace AND daemonset = $dimensions.daemonset ORDER BY created_at DESC\n LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('daemonset', $id_str) CONTENT { bcs_cluster_id: $dimensions.bcs_cluster_id, created_at: $now, daemonset: $dimensions.daemonset, namespace: $dimensions.namespace, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_datasource": "DEFINE FUNCTION fn::upsert_datasource($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM datasource WHERE bk_data_id = $dimensions.bk_data_id ORDER BY created_at DESC\n LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('datasource', $id_str) CONTENT { bk_data_id: $dimensions.bk_data_id, created_at: $now, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_deployment": "DEFINE FUNCTION fn::upsert_deployment($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM deployment WHERE bcs_cluster_id = $dimensions.bcs_cluster_id AND namespace = $dimensions.namespace AND deployment = $dimensions.deployment ORDER BY created_at DESC\n LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('deployment', $id_str) CONTENT { bcs_cluster_id: $dimensions.bcs_cluster_id, created_at: $now, deployment: $dimensions.deployment, namespace: $dimensions.namespace, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_domain": "DEFINE FUNCTION fn::upsert_domain($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM domain WHERE bcs_cluster_id = $dimensions.bcs_cluster_id AND domain = $dimensions.domain ORDER BY created_at DESC\n LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('domain', $id_str) CONTENT { bcs_cluster_id: $dimensions.bcs_cluster_id, created_at: $now, domain: $dimensions.domain, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_environment": "DEFINE FUNCTION fn::upsert_environment($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM environment WHERE environment = $dimensions.environment ORDER BY created_at DESC\n LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('environment', $id_str) CONTENT { created_at: $now, environment: $dimensions.environment, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_git_commit": "DEFINE FUNCTION fn::upsert_git_commit($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM git_commit WHERE git_repo = $dimensions.git_repo AND commit_id = $dimensions.commit_id ORDER BY created_at DESC\n LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('git_commit', $id_str) CONTENT { commit_id: $dimensions.commit_id, created_at: $now, git_repo: $dimensions.git_repo, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_host": "DEFINE FUNCTION fn::upsert_host($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM host WHERE bk_host_id = $dimensions.bk_host_id ORDER BY created_at DESC\n LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('host', $id_str) CONTENT { bk_host_id: $dimensions.bk_host_id, created_at: $now, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_ingress": "DEFINE FUNCTION fn::upsert_ingress($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM ingress WHERE bcs_cluster_id = $dimensions.bcs_cluster_id AND namespace = $dimensions.namespace AND ingress = $dimensions.ingress ORDER BY created_at DESC\n LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('ingress', $id_str) CONTENT { bcs_cluster_id: $dimensions.bcs_cluster_id, created_at: $now, ingress: $dimensions.ingress, namespace: $dimensions.namespace, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_job": "DEFINE FUNCTION fn::upsert_job($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM job WHERE bcs_cluster_id = $dimensions.bcs_cluster_id AND namespace = $dimensions.namespace AND job = $dimensions.job ORDER BY created_at DESC\n LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('job', $id_str) CONTENT { bcs_cluster_id: $dimensions.bcs_cluster_id, created_at: $now, job: $dimensions.job, namespace: $dimensions.namespace, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_k8s_address": "DEFINE FUNCTION fn::upsert_k8s_address($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM k8s_address WHERE bcs_cluster_id = $dimensions.bcs_cluster_id AND address = $dimensions.address ORDER BY created_at DESC\n LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('k8s_address', $id_str) CONTENT { address: $dimensions.address, bcs_cluster_id: $dimensions.bcs_cluster_id, created_at: $now, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_metric": "DEFINE FUNCTION fn::upsert_metric($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM metric WHERE metric_name = $dimensions.metric_name ORDER BY created_at DESC\n LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now, metric_type = $dimensions.metric_type, unit = $dimensions.unit, description = $dimensions.description)[0] ELSE {\nLET $id_str = fn::kv_block({ metric_name: $dimensions.metric_name }, $now);\n(CREATE type::thing('metric', $id_str) CONTENT { created_at: $now, description: $dimensions.description, metric_name: $dimensions.metric_name, metric_type: $dimensions.metric_type, unit: $dimensions.unit, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_module": "DEFINE FUNCTION fn::upsert_module($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM module WHERE bk_module_id = $dimensions.bk_module_id ORDER BY created_at DESC\n LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('module', $id_str) CONTENT { bk_module_id: $dimensions.bk_module_id, created_at: $now, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_namespace": "DEFINE FUNCTION fn::upsert_namespace($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM namespace WHERE bcs_cluster_id = $dimensions.bcs_cluster_id AND namespace = $dimensions.namespace ORDER BY created_at DESC\n LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('namespace', $id_str) CONTENT { bcs_cluster_id: $dimensions.bcs_cluster_id, created_at: $now, namespace: $dimensions.namespace, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_node": "DEFINE FUNCTION fn::upsert_node($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM node WHERE bcs_cluster_id = $dimensions.bcs_cluster_id AND node = $dimensions.node ORDER BY created_at DESC\n LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('node', $id_str) CONTENT { bcs_cluster_id: $dimensions.bcs_cluster_id, created_at: $now, node: $dimensions.node, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_pod": "DEFINE FUNCTION fn::upsert_pod($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM pod WHERE bcs_cluster_id = $dimensions.bcs_cluster_id AND namespace = $dimensions.namespace AND pod = $dimensions.pod ORDER BY created_at DESC\n LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('pod', $id_str) CONTENT { bcs_cluster_id: $dimensions.bcs_cluster_id, created_at: $now, namespace: $dimensions.namespace, pod: $dimensions.pod, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
             "upsert_relation": "DEFINE FUNCTION fn::upsert_relation($relation_table: string, $from_id: record, $to_id: record, $now: int) {\nLET $rel_id = fn::relation_id($from_id, $to_id);\nLET $full_id = type::thing($relation_table, $rel_id);\nLET $rel_table = type::table($relation_table);\nLET $existing = (SELECT * FROM type::table($relation_table) WHERE id = $full_id LIMIT 1)[0];\nRETURN IF $existing != NONE THEN (UPDATE $existing.id SET updated_at = $now)[0] ELSE (RELATE $from_id -> $rel_table -> $to_id SET id = $full_id, created_at = $now, updated_at = $now)[0] END;\n} PERMISSIONS FULL",
-            "upsert_replicaset": "DEFINE FUNCTION fn::upsert_replicaset($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM replicaset WHERE bcs_cluster_id = $dimensions.bcs_cluster_id AND namespace = $dimensions.namespace AND replicaset = $dimensions.replicaset ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('replicaset', $id_str) CONTENT { bcs_cluster_id: $dimensions.bcs_cluster_id, created_at: $now, namespace: $dimensions.namespace, replicaset: $dimensions.replicaset, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
-            "upsert_service": "DEFINE FUNCTION fn::upsert_service($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM service WHERE bcs_cluster_id = $dimensions.bcs_cluster_id AND namespace = $dimensions.namespace AND service = $dimensions.service ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('service', $id_str) CONTENT { bcs_cluster_id: $dimensions.bcs_cluster_id, created_at: $now, namespace: $dimensions.namespace, service: $dimensions.service, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
-            "upsert_set": "DEFINE FUNCTION fn::upsert_set($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM set WHERE bk_set_id = $dimensions.bk_set_id ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('set', $id_str) CONTENT { bk_set_id: $dimensions.bk_set_id, created_at: $now, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
-            "upsert_statefulset": "DEFINE FUNCTION fn::upsert_statefulset($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM statefulset WHERE bcs_cluster_id = $dimensions.bcs_cluster_id AND namespace = $dimensions.namespace AND statefulset = $dimensions.statefulset ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('statefulset', $id_str) CONTENT { bcs_cluster_id: $dimensions.bcs_cluster_id, created_at: $now, namespace: $dimensions.namespace, statefulset: $dimensions.statefulset, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
-            "upsert_system": "DEFINE FUNCTION fn::upsert_system($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM system WHERE bk_cloud_id = $dimensions.bk_cloud_id AND bk_target_ip = $dimensions.bk_target_ip ORDER BY created_at DESC LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('system', $id_str) CONTENT { bk_cloud_id: $dimensions.bk_cloud_id, bk_target_ip: $dimensions.bk_target_ip, created_at: $now, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL"
+            "upsert_replicaset": "DEFINE FUNCTION fn::upsert_replicaset($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM replicaset WHERE bcs_cluster_id = $dimensions.bcs_cluster_id AND namespace = $dimensions.namespace AND replicaset = $dimensions.replicaset ORDER BY created_at DESC\n LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('replicaset', $id_str) CONTENT { bcs_cluster_id: $dimensions.bcs_cluster_id, created_at: $now, namespace: $dimensions.namespace, replicaset: $dimensions.replicaset, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_service": "DEFINE FUNCTION fn::upsert_service($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM service WHERE bcs_cluster_id = $dimensions.bcs_cluster_id AND namespace = $dimensions.namespace AND service = $dimensions.service ORDER BY created_at DESC\n LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('service', $id_str) CONTENT { bcs_cluster_id: $dimensions.bcs_cluster_id, created_at: $now, namespace: $dimensions.namespace, service: $dimensions.service, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_set": "DEFINE FUNCTION fn::upsert_set($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM set WHERE bk_set_id = $dimensions.bk_set_id ORDER BY created_at DESC\n LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('set', $id_str) CONTENT { bk_set_id: $dimensions.bk_set_id, created_at: $now, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_statefulset": "DEFINE FUNCTION fn::upsert_statefulset($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM statefulset WHERE bcs_cluster_id = $dimensions.bcs_cluster_id AND namespace = $dimensions.namespace AND statefulset = $dimensions.statefulset ORDER BY created_at DESC\n LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('statefulset', $id_str) CONTENT { bcs_cluster_id: $dimensions.bcs_cluster_id, created_at: $now, namespace: $dimensions.namespace, statefulset: $dimensions.statefulset, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL",
+            "upsert_system": "DEFINE FUNCTION fn::upsert_system($dimensions: object, $now: int, $tolerance: int) {\nLET $last_record = (SELECT * FROM system WHERE bk_cloud_id = $dimensions.bk_cloud_id AND bk_target_ip = $dimensions.bk_target_ip ORDER BY created_at DESC\n LIMIT 1)[0];\nRETURN IF $last_record != NONE AND ($now - $last_record.updated_at <= $tolerance) THEN (UPDATE $last_record.id SET updated_at = $now)[0] ELSE {\nLET $id_str = fn::kv_block($dimensions, $now);\n(CREATE type::thing('system', $id_str) CONTENT { bk_cloud_id: $dimensions.bk_cloud_id, bk_target_ip: $dimensions.bk_target_ip, created_at: $now, updated_at: $now })[0];\n} END;\n} PERMISSIONS FULL"
           },
           "models": {},
           "params": {},
@@ -1111,15 +1153,15 @@
             "node_has_metric": "DEFINE TABLE node_has_metric TYPE RELATION IN pod OUT metric SCHEMAFULL PERMISSIONS NONE",
             "node_with_pod": "DEFINE TABLE node_with_pod TYPE RELATION IN node OUT pod SCHEMAFULL PERMISSIONS NONE",
             "node_with_system": "DEFINE TABLE node_with_system TYPE RELATION IN node OUT system SCHEMAFULL PERMISSIONS NONE",
-            "pod": "DEFINE TABLE pod TYPE NORMAL SCHEMAFULL PERMISSIONS NONE",
+            "pod": "DEFINE TABLE pod TYPE ANY SCHEMALESS PERMISSIONS NONE",
             "pod_to_pod": "DEFINE TABLE pod_to_pod TYPE RELATION IN pod OUT pod SCHEMAFULL PERMISSIONS NONE",
             "pod_to_system": "DEFINE TABLE pod_to_system TYPE RELATION IN pod OUT system SCHEMAFULL PERMISSIONS NONE",
             "pod_with_replicaset": "DEFINE TABLE pod_with_replicaset TYPE RELATION IN pod OUT replicaset SCHEMAFULL PERMISSIONS NONE",
-            "pod_with_service": "DEFINE TABLE pod_with_service TYPE RELATION IN pod OUT service SCHEMAFULL PERMISSIONS NONE",
+            "pod_with_service": "DEFINE TABLE pod_with_service TYPE ANY SCHEMALESS PERMISSIONS NONE",
             "pod_with_statefulset": "DEFINE TABLE pod_with_statefulset TYPE RELATION IN pod OUT statefulset SCHEMAFULL PERMISSIONS NONE",
             "relation_has_metric": "DEFINE TABLE relation_has_metric TYPE RELATION IN pod_to_pod OUT metric SCHEMAFULL PERMISSIONS NONE",
             "replicaset": "DEFINE TABLE replicaset TYPE NORMAL SCHEMAFULL PERMISSIONS NONE",
-            "service": "DEFINE TABLE service TYPE NORMAL SCHEMAFULL PERMISSIONS NONE",
+            "service": "DEFINE TABLE service TYPE ANY SCHEMALESS PERMISSIONS NONE",
             "service_to_service": "DEFINE TABLE service_to_service TYPE RELATION IN service OUT service SCHEMAFULL PERMISSIONS NONE",
             "set": "DEFINE TABLE set TYPE NORMAL SCHEMAFULL PERMISSIONS NONE",
             "statefulset": "DEFINE TABLE statefulset TYPE NORMAL SCHEMAFULL PERMISSIONS NONE",
@@ -1739,8 +1781,6 @@
             "events": {},
             "fields": {
               "created_at": "DEFINE FIELD created_at ON pod_with_service TYPE int PERMISSIONS FULL",
-              "in": "DEFINE FIELD in ON pod_with_service TYPE record<pod> PERMISSIONS FULL",
-              "out": "DEFINE FIELD out ON pod_with_service TYPE record<service> PERMISSIONS FULL",
               "updated_at": "DEFINE FIELD updated_at ON pod_with_service TYPE int PERMISSIONS FULL"
             },
             "indexes": {},
@@ -1873,26 +1913,26 @@
         }
       },
       "table_counts": {
-        "pod": 194,
-        "service": 193,
-        "pod_with_service": 10
+        "pod": 18130,
+        "service": 1605,
+        "pod_with_service": 5100
       }
     },
     "changes": {
       "pod": {
-        "before": 147,
-        "after": 194,
-        "diff": 47
+        "before": 17093,
+        "after": 18130,
+        "diff": 1037
       },
       "service": {
-        "before": 146,
-        "after": 193,
-        "diff": 47
+        "before": 1083,
+        "after": 1605,
+        "diff": 522
       },
       "pod_with_service": {
-        "before": 10,
-        "after": 10,
-        "diff": 0
+        "before": 5064,
+        "after": 5100,
+        "diff": 36
       }
     }
   }

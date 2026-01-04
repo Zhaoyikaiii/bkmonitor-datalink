@@ -274,15 +274,44 @@ class SurrealDBClient:
         batch_size: int = BATCH_SIZE
     ) -> int:
         """
-        批量 upsert 资源
+        批量 upsert 资源 - 使用批量 SQL 提高性能
         """
+        if now_ms is None:
+            now_ms = self.datetime_to_ms(datetime.utcnow())
+        
         success_count = 0
-        for i in range(0, len(resources), batch_size):
-            batch = resources[i:i + batch_size]
-            for res in batch:
-                result = self.call_upsert_resource(resource_type, res, now_ms, TOLERANCE_TIME_MS)
-                if result:
-                    success_count += 1
+        
+        # 构建 SQL 语句列表
+        sql_parts = []
+        for res in resources:
+            # 构建 dimensions 对象字符串
+            dim_parts = []
+            for k, v in res.items():
+                if isinstance(v, (int, float)):
+                    dim_parts.append(f"{k}: {v}")
+                else:
+                    v_escaped = str(v).replace("'", "\\'")
+                    dim_parts.append(f"{k}: '{v_escaped}'")
+            dim_str = ", ".join(dim_parts)
+            
+            # 构建完整的 SQL 语句
+            func_name = f"fn::upsert_{resource_type}"
+            sql_parts.append(f"{func_name}({{ {dim_str} }}, {now_ms}, {TOLERANCE_TIME_MS});")
+        
+        # 分批执行
+        for i in range(0, len(sql_parts), batch_size):
+            batch_sql = "\n".join(sql_parts[i:i+batch_size])
+            try:
+                self.execute_sql(batch_sql)
+                success_count += min(batch_size, len(sql_parts) - i)
+                
+                # 每批次输出进度
+                batch_num = i // batch_size + 1
+                total_batches = (len(sql_parts) + batch_size - 1) // batch_size
+                print(f"    进度: {min(i+batch_size, len(sql_parts))}/{len(sql_parts)} (批次 {batch_num}/{total_batches})")
+            except Exception as e:
+                print(f"  batch upsert {resource_type} 失败 (batch {i//batch_size}): {e}")
+        
         return success_count
 
 

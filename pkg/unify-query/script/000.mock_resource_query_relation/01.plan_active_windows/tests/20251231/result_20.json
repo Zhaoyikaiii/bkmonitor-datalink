@@ -1,228 +1,240 @@
 {
   "plan": "01.plan_active_windows",
-  "timestamp": "2025-12-31T17:43:54.347024",
+  "timestamp": "2025-12-31T20:15:35.824011",
   "environment": {
-    "url": "http://9.134.9.112:8000",
+    "url": "https://21.214.199.225/surrealdb",
     "namespace": "default",
     "database": "benchmark_v2"
   },
   "data_pool": {
-    "pods": 10,
-    "services": 3,
+    "pods": 10000,
+    "services": 656,
     "namespaces": 1
   },
   "summary": {
-    "total_time_sec": 60.62,
-    "total_ops": 2186,
-    "qps": 36.06,
-    "success_rate": 100.0
+    "total_time_sec": 60.28,
+    "total_ops": 22324,
+    "qps": 370.36,
+    "success_rate": 99.96
   },
   "operations": {
-    "read_single": 633,
-    "read_batch": 479,
-    "read_relation": 456,
-    "write_heartbeat": 504,
-    "write_new": 114,
-    "total_reads": 1568,
-    "total_writes": 618,
-    "total_ops": 2186,
-    "errors": 0
+    "read_single": 6164,
+    "read_batch": 4638,
+    "read_relation": 4793,
+    "write_heartbeat": 5341,
+    "write_new": 1388,
+    "total_reads": 15595,
+    "total_writes": 6729,
+    "total_ops": 22324,
+    "errors": 8
   },
   "latency": {
     "overall": {
-      "p50": 576.51,
-      "p95": 622.02,
-      "p99": 675.62,
-      "avg": 552.05,
-      "min": 46.46,
-      "max": 711.77
+      "p50": 41.64,
+      "p95": 103.14,
+      "p99": 122.78,
+      "avg": 53.85,
+      "min": 30.64,
+      "max": 203.31
     },
     "read": {
-      "p50": 576.78,
-      "p95": 622.03,
-      "p99": 676.53,
-      "avg": 552.13,
-      "min": 46.46,
-      "max": 711.77
+      "p50": 43.62,
+      "p95": 107.25,
+      "p99": 126.81,
+      "avg": 59.39,
+      "min": 30.64,
+      "max": 203.31
     },
     "write": {
-      "p50": 574.24,
-      "p95": 614.04,
-      "p99": 644.01,
-      "avg": 540.94,
-      "min": 76.82,
-      "max": 682.72
+      "p50": 38.93,
+      "p95": 52.06,
+      "p99": 61.18,
+      "avg": 40.56,
+      "min": 31.94,
+      "max": 72.59
     },
     "heartbeat": {
-      "p50": 576.34,
-      "p95": 623.25,
-      "p99": 665.29,
-      "avg": 554.35,
-      "min": 74.31,
-      "max": 682.95
+      "p50": 39.17,
+      "p95": 53.2,
+      "p99": 66.14,
+      "avg": 41.11,
+      "min": 30.87,
+      "max": 136.67
     }
   },
   "health_checks": [
     {
-      "timestamp": "2025-12-31T17:42:53.380821",
+      "timestamp": "2025-12-31T20:14:35.153248",
       "status": "ok",
-      "latency_ms": 3.9,
+      "latency_ms": 2.58,
       "error": null
     },
     {
-      "timestamp": "2025-12-31T17:42:53.387204",
+      "timestamp": "2025-12-31T20:14:35.157001",
       "status": "ok",
-      "latency_ms": 4.04,
+      "latency_ms": 4.35,
       "error": null
     },
     {
-      "timestamp": "2025-12-31T17:42:58.392499",
+      "timestamp": "2025-12-31T20:14:40.161646",
       "status": "ok",
-      "latency_ms": 605.54,
+      "latency_ms": 9.31,
       "error": null
     },
     {
-      "timestamp": "2025-12-31T17:43:03.998315",
+      "timestamp": "2025-12-31T20:14:45.172543",
       "status": "ok",
-      "latency_ms": 590.34,
+      "latency_ms": 12.59,
       "error": null
     },
     {
-      "timestamp": "2025-12-31T17:43:09.588942",
+      "timestamp": "2025-12-31T20:14:50.185851",
       "status": "ok",
-      "latency_ms": 578.68,
+      "latency_ms": 8.74,
       "error": null
     },
     {
-      "timestamp": "2025-12-31T17:43:15.167882",
+      "timestamp": "2025-12-31T20:14:55.196998",
       "status": "ok",
-      "latency_ms": 512.51,
+      "latency_ms": 4.07,
       "error": null
     },
     {
-      "timestamp": "2025-12-31T17:43:20.680670",
+      "timestamp": "2025-12-31T20:15:00.203879",
       "status": "ok",
-      "latency_ms": 564.72,
+      "latency_ms": 15.33,
       "error": null
     },
     {
-      "timestamp": "2025-12-31T17:43:26.245649",
+      "timestamp": "2025-12-31T20:15:05.225549",
       "status": "ok",
-      "latency_ms": 513.43,
+      "latency_ms": 5.39,
       "error": null
     },
     {
-      "timestamp": "2025-12-31T17:43:31.759366",
+      "timestamp": "2025-12-31T20:15:10.231637",
       "status": "ok",
-      "latency_ms": 569.45,
+      "latency_ms": 6.95,
       "error": null
     },
     {
-      "timestamp": "2025-12-31T17:43:37.329069",
+      "timestamp": "2025-12-31T20:15:15.243669",
       "status": "ok",
-      "latency_ms": 577.67,
+      "latency_ms": 5.18,
       "error": null
     },
     {
-      "timestamp": "2025-12-31T17:43:42.908114",
+      "timestamp": "2025-12-31T20:15:20.251766",
       "status": "ok",
-      "latency_ms": 569.6,
+      "latency_ms": 4.77,
       "error": null
     },
     {
-      "timestamp": "2025-12-31T17:43:48.477997",
+      "timestamp": "2025-12-31T20:15:25.261298",
       "status": "ok",
-      "latency_ms": 565.66,
+      "latency_ms": 12.66,
       "error": null
     },
     {
-      "timestamp": "2025-12-31T17:43:54.007179",
+      "timestamp": "2025-12-31T20:15:30.274958",
       "status": "ok",
-      "latency_ms": 2.88,
+      "latency_ms": 5.4,
+      "error": null
+    },
+    {
+      "timestamp": "2025-12-31T20:15:35.280973",
+      "status": "ok",
+      "latency_ms": 5.9,
+      "error": null
+    },
+    {
+      "timestamp": "2025-12-31T20:15:35.432595",
+      "status": "ok",
+      "latency_ms": 2.29,
       "error": null
     }
   ],
   "table_counts": {
     "before": {
-      "pod": 10,
-      "service": 3,
-      "node": 3,
-      "deployment": 3,
-      "replicaset": 3,
-      "container": 20,
-      "pod_with_service": 0,
-      "node_with_pod": 0,
-      "deployment_with_replicaset": 0,
-      "pod_with_replicaset": 0,
-      "container_with_pod": 0
+      "pod": 10676,
+      "service": 656,
+      "node": 10,
+      "deployment": 5,
+      "replicaset": 5,
+      "container": 200,
+      "pod_with_service": 10000,
+      "node_with_pod": 10000,
+      "deployment_with_replicaset": 5,
+      "pod_with_replicaset": 10000,
+      "container_with_pod": 200
     },
     "after": {
-      "pod": 65,
-      "service": 62,
-      "node": 3,
-      "deployment": 3,
-      "replicaset": 3,
-      "container": 20,
-      "pod_with_service": 0,
-      "node_with_pod": 0,
-      "deployment_with_replicaset": 0,
-      "pod_with_replicaset": 0,
-      "container_with_pod": 0
+      "pod": 11402,
+      "service": 1318,
+      "node": 10,
+      "deployment": 5,
+      "replicaset": 5,
+      "container": 200,
+      "pod_with_service": 10000,
+      "node_with_pod": 10000,
+      "deployment_with_replicaset": 5,
+      "pod_with_replicaset": 10000,
+      "container_with_pod": 200
     },
     "changes": {
-      "pod": {
-        "before": 10,
-        "after": 65,
-        "diff": 55
-      },
-      "service": {
-        "before": 3,
-        "after": 62,
-        "diff": 59
-      },
-      "pod_with_replicaset": {
-        "before": 0,
-        "after": 0,
-        "diff": 0
-      },
       "pod_with_service": {
-        "before": 0,
-        "after": 0,
-        "diff": 0
-      },
-      "replicaset": {
-        "before": 3,
-        "after": 3,
-        "diff": 0
-      },
-      "container": {
-        "before": 20,
-        "after": 20,
-        "diff": 0
-      },
-      "node_with_pod": {
-        "before": 0,
-        "after": 0,
-        "diff": 0
-      },
-      "deployment": {
-        "before": 3,
-        "after": 3,
-        "diff": 0
-      },
-      "container_with_pod": {
-        "before": 0,
-        "after": 0,
-        "diff": 0
-      },
-      "deployment_with_replicaset": {
-        "before": 0,
-        "after": 0,
+        "before": 10000,
+        "after": 10000,
         "diff": 0
       },
       "node": {
-        "before": 3,
-        "after": 3,
+        "before": 10,
+        "after": 10,
+        "diff": 0
+      },
+      "deployment_with_replicaset": {
+        "before": 5,
+        "after": 5,
+        "diff": 0
+      },
+      "pod_with_replicaset": {
+        "before": 10000,
+        "after": 10000,
+        "diff": 0
+      },
+      "pod": {
+        "before": 10676,
+        "after": 11402,
+        "diff": 726
+      },
+      "node_with_pod": {
+        "before": 10000,
+        "after": 10000,
+        "diff": 0
+      },
+      "deployment": {
+        "before": 5,
+        "after": 5,
+        "diff": 0
+      },
+      "container": {
+        "before": 200,
+        "after": 200,
+        "diff": 0
+      },
+      "replicaset": {
+        "before": 5,
+        "after": 5,
+        "diff": 0
+      },
+      "service": {
+        "before": 656,
+        "after": 1318,
+        "diff": 662
+      },
+      "container_with_pod": {
+        "before": 200,
+        "after": 200,
         "diff": 0
       }
     }

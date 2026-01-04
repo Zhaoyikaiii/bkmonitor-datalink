@@ -1,0 +1,272 @@
+{
+  "plan": "01.plan_active_windows",
+  "timestamp": "2025-12-31T19:12:44.113953",
+  "environment": {
+    "url": "https://21.214.199.225/surrealdb",
+    "namespace": "default",
+    "database": "benchmark_v2"
+  },
+  "data_pool": {
+    "pods": 10000,
+    "services": 3946,
+    "namespaces": 1
+  },
+  "summary": {
+    "total_time_sec": 99.83,
+    "total_ops": 39776,
+    "qps": 398.44,
+    "success_rate": 99.97
+  },
+  "operations": {
+    "read_single": 7920,
+    "read_batch": 6043,
+    "read_relation": 5887,
+    "write_heartbeat": 15863,
+    "write_new": 4063,
+    "total_reads": 19850,
+    "total_writes": 19926,
+    "total_ops": 39776,
+    "errors": 12
+  },
+  "latency": {
+    "overall": {
+      "p50": 446.58,
+      "p95": 1836.45,
+      "p99": 2838.84,
+      "avg": 639.75,
+      "min": 35.15,
+      "max": 6580.74
+    },
+    "read": {
+      "p50": 444.6,
+      "p95": 1846.28,
+      "p99": 2839.09,
+      "avg": 639.09,
+      "min": 35.15,
+      "max": 5650.03
+    },
+    "write": {
+      "p50": 431.88,
+      "p95": 1860.75,
+      "p99": 2835.54,
+      "avg": 632.42,
+      "min": 39.3,
+      "max": 4524.37
+    },
+    "heartbeat": {
+      "p50": 451.52,
+      "p95": 1815.4,
+      "p99": 2840.36,
+      "avg": 642.46,
+      "min": 36.83,
+      "max": 6580.74
+    }
+  },
+  "health_checks": [
+    {
+      "timestamp": "2025-12-31T19:11:03.744946",
+      "status": "ok",
+      "latency_ms": 50.3,
+      "error": null
+    },
+    {
+      "timestamp": "2025-12-31T19:11:03.795833",
+      "status": "ok",
+      "latency_ms": 30.73,
+      "error": null
+    },
+    {
+      "timestamp": "2025-12-31T19:11:08.838128",
+      "status": "ok",
+      "latency_ms": 84.89,
+      "error": null
+    },
+    {
+      "timestamp": "2025-12-31T19:11:13.963979",
+      "status": "ok",
+      "latency_ms": 56.95,
+      "error": null
+    },
+    {
+      "timestamp": "2025-12-31T19:11:19.491273",
+      "status": "ok",
+      "latency_ms": 578.34,
+      "error": null
+    },
+    {
+      "timestamp": "2025-12-31T19:11:25.145677",
+      "status": "ok",
+      "latency_ms": 644.33,
+      "error": null
+    },
+    {
+      "timestamp": "2025-12-31T19:11:31.028227",
+      "status": "ok",
+      "latency_ms": 1400.37,
+      "error": null
+    },
+    {
+      "timestamp": "2025-12-31T19:11:37.697265",
+      "status": "ok",
+      "latency_ms": 1207.44,
+      "error": null
+    },
+    {
+      "timestamp": "2025-12-31T19:11:44.278822",
+      "status": "ok",
+      "latency_ms": 613.67,
+      "error": null
+    },
+    {
+      "timestamp": "2025-12-31T19:11:50.115515",
+      "status": "ok",
+      "latency_ms": 83.24,
+      "error": null
+    },
+    {
+      "timestamp": "2025-12-31T19:11:55.280012",
+      "status": "ok",
+      "latency_ms": 128.49,
+      "error": null
+    },
+    {
+      "timestamp": "2025-12-31T19:12:00.790408",
+      "status": "ok",
+      "latency_ms": 116.39,
+      "error": null
+    },
+    {
+      "timestamp": "2025-12-31T19:12:05.966860",
+      "status": "ok",
+      "latency_ms": 223.68,
+      "error": null
+    },
+    {
+      "timestamp": "2025-12-31T19:12:11.216225",
+      "status": "ok",
+      "latency_ms": 174.6,
+      "error": null
+    },
+    {
+      "timestamp": "2025-12-31T19:12:16.568017",
+      "status": "ok",
+      "latency_ms": 52.34,
+      "error": null
+    },
+    {
+      "timestamp": "2025-12-31T19:12:22.334861",
+      "status": "ok",
+      "latency_ms": 523.9,
+      "error": null
+    },
+    {
+      "timestamp": "2025-12-31T19:12:27.950362",
+      "status": "ok",
+      "latency_ms": 87.88,
+      "error": null
+    },
+    {
+      "timestamp": "2025-12-31T19:12:33.094200",
+      "status": "ok",
+      "latency_ms": 1422.91,
+      "error": null
+    },
+    {
+      "timestamp": "2025-12-31T19:12:39.593260",
+      "status": "ok",
+      "latency_ms": 199.48,
+      "error": null
+    },
+    {
+      "timestamp": "2025-12-31T19:12:43.624599",
+      "status": "ok",
+      "latency_ms": 47.06,
+      "error": null
+    }
+  ],
+  "table_counts": {
+    "before": {
+      "pod": 13726,
+      "service": 3946,
+      "node": 3,
+      "deployment": 3,
+      "replicaset": 3,
+      "container": 20,
+      "pod_with_service": 19,
+      "node_with_pod": 0,
+      "deployment_with_replicaset": 0,
+      "pod_with_replicaset": 3515,
+      "container_with_pod": 0
+    },
+    "after": {
+      "pod": 15728,
+      "service": 6007,
+      "node": 3,
+      "deployment": 3,
+      "replicaset": 3,
+      "container": 20,
+      "pod_with_service": 19,
+      "node_with_pod": 0,
+      "deployment_with_replicaset": 0,
+      "pod_with_replicaset": 3515,
+      "container_with_pod": 0
+    },
+    "changes": {
+      "pod": {
+        "before": 13726,
+        "after": 15728,
+        "diff": 2002
+      },
+      "service": {
+        "before": 3946,
+        "after": 6007,
+        "diff": 2061
+      },
+      "deployment": {
+        "before": 3,
+        "after": 3,
+        "diff": 0
+      },
+      "pod_with_replicaset": {
+        "before": 3515,
+        "after": 3515,
+        "diff": 0
+      },
+      "node": {
+        "before": 3,
+        "after": 3,
+        "diff": 0
+      },
+      "container": {
+        "before": 20,
+        "after": 20,
+        "diff": 0
+      },
+      "deployment_with_replicaset": {
+        "before": 0,
+        "after": 0,
+        "diff": 0
+      },
+      "pod_with_service": {
+        "before": 19,
+        "after": 19,
+        "diff": 0
+      },
+      "node_with_pod": {
+        "before": 0,
+        "after": 0,
+        "diff": 0
+      },
+      "container_with_pod": {
+        "before": 0,
+        "after": 0,
+        "diff": 0
+      },
+      "replicaset": {
+        "before": 3,
+        "after": 3,
+        "diff": 0
+      }
+    }
+  }
+}
