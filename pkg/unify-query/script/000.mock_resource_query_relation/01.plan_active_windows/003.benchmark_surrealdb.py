@@ -436,9 +436,8 @@ class UnifiedBenchmark:
         """
         Pod 心跳更新 - Active Windows 方案
         
-        使用简单的 UPSERT MERGE，Event 会自动管理 active_windows
+        使用简单的 UPSERT MERGE，Event 会自动管理 start_time, end_time, active_windows, windows_count
         """
-        now_ms = int(time.time() * 1000)
         record_id = self._build_record_id('pod', {
             'bcs_cluster_id': pod.get('bcs_cluster_id', ''),
             'namespace': pod.get('namespace', ''),
@@ -449,8 +448,7 @@ class UnifiedBenchmark:
         UPSERT {record_id} MERGE {{
             bcs_cluster_id: '{self._escape_string(pod.get('bcs_cluster_id', ''))}',
             namespace: '{self._escape_string(pod.get('namespace', ''))}',
-            pod: '{self._escape_string(pod.get('pod', ''))}',
-            updated_at: {now_ms}
+            pod: '{self._escape_string(pod.get('pod', ''))}'
         }};
         """
     
@@ -458,7 +456,6 @@ class UnifiedBenchmark:
         """
         Service 心跳更新 - Active Windows 方案
         """
-        now_ms = int(time.time() * 1000)
         record_id = self._build_record_id('service', {
             'bcs_cluster_id': service.get('bcs_cluster_id', ''),
             'namespace': service.get('namespace', ''),
@@ -469,14 +466,12 @@ class UnifiedBenchmark:
         UPSERT {record_id} MERGE {{
             bcs_cluster_id: '{self._escape_string(service.get('bcs_cluster_id', ''))}',
             namespace: '{self._escape_string(service.get('namespace', ''))}',
-            service: '{self._escape_string(service.get('service', ''))}',
-            updated_at: {now_ms}
+            service: '{self._escape_string(service.get('service', ''))}'
         }};
         """
     
     def _sql_write_new_pod(self, suffix: str) -> str:
         """写入新 pod - Active Windows 方案"""
-        now_ms = int(time.time() * 1000)
         record_id = self._build_record_id('pod', {
             'bcs_cluster_id': 'BENCH-NEW',
             'namespace': 'bench-new',
@@ -487,14 +482,12 @@ class UnifiedBenchmark:
         UPSERT {record_id} MERGE {{
             bcs_cluster_id: 'BENCH-NEW',
             namespace: 'bench-new',
-            pod: 'new-pod-{suffix}',
-            updated_at: {now_ms}
+            pod: 'new-pod-{suffix}'
         }};
         """
     
     def _sql_write_new_service(self, suffix: str) -> str:
         """写入新 service - Active Windows 方案"""
-        now_ms = int(time.time() * 1000)
         record_id = self._build_record_id('service', {
             'bcs_cluster_id': 'BENCH-NEW',
             'namespace': 'bench-new',
@@ -505,8 +498,7 @@ class UnifiedBenchmark:
         UPSERT {record_id} MERGE {{
             bcs_cluster_id: 'BENCH-NEW',
             namespace: 'bench-new',
-            service: 'new-svc-{suffix}',
-            updated_at: {now_ms}
+            service: 'new-svc-{suffix}'
         }};
         """
     

@@ -9,7 +9,7 @@ surreal_db:
   username: "root"
   password: "root"
   namespace: "default"
-  database: "benchmark_v2"  # 使用独立数据库，与方案一隔离
+  database: "benchmark_v4"  # 使用独立数据库，与方案一隔离
 
 # Unify-Query API 配置
 unify_query:

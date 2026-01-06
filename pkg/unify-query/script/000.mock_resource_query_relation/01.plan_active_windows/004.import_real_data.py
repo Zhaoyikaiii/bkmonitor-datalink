@@ -7,12 +7,17 @@ Import Benchmark Data for Plan 01: Active Windows
 与 00.plan_created_at 不同，此方案使用简单的 UPSERT MERGE 语法，
 由 SurrealDB Event 自动管理 active_windows 生命周期。
 
-Write Pattern (无需调用函数):
+Core Fields (由 Event 自动管理):
+    - start_time: 资源创建时间，首次插入后不变
+    - end_time: 资源最后活跃时间，随心跳更新
+    - active_windows: 心跳窗口数组
+    - windows_count: 窗口个数
+
+Write Pattern (无需传递时间戳，Event 使用 time::millis()):
     UPSERT pod:⟨bcs_cluster_id=X,namespace=N,pod=P⟩ MERGE {
         bcs_cluster_id: "X",
         namespace: "N", 
-        pod: "P",
-        updated_at: <timestamp_ms>
+        pod: "P"
     };
 
 支持两种数据源：
@@ -215,25 +220,21 @@ class SurrealDBClient:
     ) -> Dict[str, Any]:
         """
         Upsert a resource using simple UPSERT MERGE syntax.
-        Event will automatically manage active_windows.
+        Event will automatically manage start_time, end_time, active_windows, windows_count.
         
         Args:
             table: Table name (e.g., 'pod', 'service')
             dimensions: Dimension key-value pairs
-            now_ms: Current timestamp in milliseconds
+            now_ms: Ignored (Event uses time::millis() internally)
         
         Returns:
             The upserted record
         """
-        if now_ms is None:
-            now_ms = self.datetime_to_ms()
-        
         # Build record ID
         record_id = self._build_record_id(table, dimensions)
         
-        # Build SET clause
+        # Build SET clause (no timestamp needed, Event handles it)
         set_parts = [f"{k}: {self._escape_value(v)}" for k, v in dimensions.items()]
-        set_parts.append(f"updated_at: {now_ms}")
         set_clause = ", ".join(set_parts)
         
         sql = f"UPSERT {record_id} MERGE {{ {set_clause} }};"
@@ -261,6 +262,7 @@ class SurrealDBClient:
     ) -> Dict[str, Any]:
         """
         Upsert a relation between two resources using fn::upsert_relation function.
+        Event will automatically manage start_time, end_time, active_windows, windows_count.
         
         Args:
             relation_table: Relation table name (e.g., 'pod_with_service')
@@ -268,20 +270,17 @@ class SurrealDBClient:
             from_dimensions: Source resource dimensions
             to_table: Target table name
             to_dimensions: Target resource dimensions
-            now_ms: Current timestamp in milliseconds
+            now_ms: Ignored (Event uses time::millis() internally)
         
         Returns:
             The upserted relation record
         """
-        if now_ms is None:
-            now_ms = self.datetime_to_ms()
-        
         # Build endpoint record IDs
         from_id = self._build_record_id(from_table, from_dimensions)
         to_id = self._build_record_id(to_table, to_dimensions)
         
-        # Use fn::upsert_relation function - must use RETURN to get result
-        sql = f"RETURN fn::upsert_relation('{relation_table}', {from_id}, {to_id}, {now_ms});"
+        # Use fn::upsert_relation function (no timestamp needed)
+        sql = f"RETURN fn::upsert_relation('{relation_table}', {from_id}, {to_id});"
         
         try:
             result = self.execute_sql(sql)
@@ -333,20 +332,21 @@ class SurrealDBClient:
         """
         Batch upsert resources.
         
+        Args:
+            table: Table name
+            resources: List of dimension dictionaries
+            now_ms: Ignored (Event uses time::millis() internally)
+        
         Returns:
             Number of successfully upserted records
         """
-        if now_ms is None:
-            now_ms = self.datetime_to_ms()
-        
         success_count = 0
         
-        # Build batch SQL
+        # Build batch SQL (no timestamp needed)
         sql_parts = []
         for dimensions in resources:
             record_id = self._build_record_id(table, dimensions)
             set_parts = [f"{k}: {self._escape_value(v)}" for k, v in dimensions.items()]
-            set_parts.append(f"updated_at: {now_ms}")
             set_clause = ", ".join(set_parts)
             sql_parts.append(f"UPSERT {record_id} MERGE {{ {set_clause} }};")
         
