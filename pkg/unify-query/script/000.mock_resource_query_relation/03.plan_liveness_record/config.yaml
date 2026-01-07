@@ -1,0 +1,27 @@
+# ============================================================================
+# Plan 03: Liveness Record Configuration
+# ============================================================================
+# Connection configurations for different storage backends
+# Edit this file to change connection details for your environment
+
+surreal_db:
+  url: "https://21.214.199.225/surrealdb"
+  username: "root"
+  password: "root"
+  namespace: "default"
+  database: "benchmark_v7"  # 使用独立数据库，与方案三隔离
+
+# Unify-Query API 配置
+unify_query:
+  url: "http://bkapi.bkop.woa.com/api/bk-unify-query/prod/query/ts"
+  app_code: "bk_monitorv3"
+  app_secret: "684b6bef-519b-4108-ad39-d55b9c76c6b5"
+  username: "admin"
+  space_uid: "bkcc__7"
+
+bkbase:
+  api_url: ""
+  username: ""
+  app_code: ""
+  app_secret: ""
+  result_table_id: ""
