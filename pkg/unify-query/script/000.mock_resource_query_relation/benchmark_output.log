@@ -1,0 +1,871 @@
+SurrealDB client: https://21.214.199.225/surrealdb/default/benchmark
+======================================================================
+导入模拟数据到 SurrealDB (Plan 00: created_at)
+Pod 数量: 10000
+======================================================================
+从 schema.sql 初始化 SurrealDB schema...
+Schema 初始化完成
+
+开始导入模拟数据 (Pod 数量: 10000)...
+
+生成模拟数据...
+  Pods: 10000
+  Services: 150
+
+导入节点资源...
+  导入 10000 个 Pod...
+    进度: 100/10000 (批次 1/100)
+    进度: 200/10000 (批次 2/100)
+    进度: 300/10000 (批次 3/100)
+    进度: 400/10000 (批次 4/100)
+    进度: 500/10000 (批次 5/100)
+    进度: 600/10000 (批次 6/100)
+    进度: 700/10000 (批次 7/100)
+    进度: 800/10000 (批次 8/100)
+    进度: 900/10000 (批次 9/100)
+    进度: 1000/10000 (批次 10/100)
+    进度: 1100/10000 (批次 11/100)
+    进度: 1200/10000 (批次 12/100)
+    进度: 1300/10000 (批次 13/100)
+    进度: 1400/10000 (批次 14/100)
+    进度: 1500/10000 (批次 15/100)
+    进度: 1600/10000 (批次 16/100)
+    进度: 1700/10000 (批次 17/100)
+    进度: 1800/10000 (批次 18/100)
+    进度: 1900/10000 (批次 19/100)
+    进度: 2000/10000 (批次 20/100)
+    进度: 2100/10000 (批次 21/100)
+    进度: 2200/10000 (批次 22/100)
+    进度: 2300/10000 (批次 23/100)
+    进度: 2400/10000 (批次 24/100)
+    进度: 2500/10000 (批次 25/100)
+    进度: 2600/10000 (批次 26/100)
+    进度: 2700/10000 (批次 27/100)
+    进度: 2800/10000 (批次 28/100)
+    进度: 2900/10000 (批次 29/100)
+    进度: 3000/10000 (批次 30/100)
+    进度: 3100/10000 (批次 31/100)
+    进度: 3200/10000 (批次 32/100)
+    进度: 3300/10000 (批次 33/100)
+    进度: 3400/10000 (批次 34/100)
+    进度: 3500/10000 (批次 35/100)
+    进度: 3600/10000 (批次 36/100)
+    进度: 3700/10000 (批次 37/100)
+    进度: 3800/10000 (批次 38/100)
+    进度: 3900/10000 (批次 39/100)
+    进度: 4000/10000 (批次 40/100)
+    进度: 4100/10000 (批次 41/100)
+    进度: 4200/10000 (批次 42/100)
+    进度: 4300/10000 (批次 43/100)
+    进度: 4400/10000 (批次 44/100)
+    进度: 4500/10000 (批次 45/100)
+    进度: 4600/10000 (批次 46/100)
+    进度: 4700/10000 (批次 47/100)
+    进度: 4800/10000 (批次 48/100)
+    进度: 4900/10000 (批次 49/100)
+    进度: 5000/10000 (批次 50/100)
+    进度: 5100/10000 (批次 51/100)
+  batch upsert pod 失败 (batch 51): SQL error in statement 51: The function 'fn::kv_block' does not exist
+    进度: 5300/10000 (批次 53/100)
+    进度: 5400/10000 (批次 54/100)
+    进度: 5500/10000 (批次 55/100)
+    进度: 5600/10000 (批次 56/100)
+    进度: 5700/10000 (批次 57/100)
+    进度: 5800/10000 (批次 58/100)
+    进度: 5900/10000 (批次 59/100)
+    进度: 6000/10000 (批次 60/100)
+    进度: 6100/10000 (批次 61/100)
+    进度: 6200/10000 (批次 62/100)
+    进度: 6300/10000 (批次 63/100)
+    进度: 6400/10000 (批次 64/100)
+    进度: 6500/10000 (批次 65/100)
+    进度: 6600/10000 (批次 66/100)
+    进度: 6700/10000 (批次 67/100)
+    进度: 6800/10000 (批次 68/100)
+    进度: 6900/10000 (批次 69/100)
+    进度: 7000/10000 (批次 70/100)
+    进度: 7100/10000 (批次 71/100)
+    进度: 7200/10000 (批次 72/100)
+    进度: 7300/10000 (批次 73/100)
+    进度: 7400/10000 (批次 74/100)
+    进度: 7500/10000 (批次 75/100)
+    进度: 7600/10000 (批次 76/100)
+    进度: 7700/10000 (批次 77/100)
+    进度: 7800/10000 (批次 78/100)
+    进度: 7900/10000 (批次 79/100)
+    进度: 8000/10000 (批次 80/100)
+    进度: 8100/10000 (批次 81/100)
+    进度: 8200/10000 (批次 82/100)
+    进度: 8300/10000 (批次 83/100)
+    进度: 8400/10000 (批次 84/100)
+    进度: 8500/10000 (批次 85/100)
+    进度: 8600/10000 (批次 86/100)
+    进度: 8700/10000 (批次 87/100)
+    进度: 8800/10000 (批次 88/100)
+    进度: 8900/10000 (批次 89/100)
+    进度: 9000/10000 (批次 90/100)
+    进度: 9100/10000 (批次 91/100)
+    进度: 9200/10000 (批次 92/100)
+    进度: 9300/10000 (批次 93/100)
+    进度: 9400/10000 (批次 94/100)
+    进度: 9500/10000 (批次 95/100)
+    进度: 9600/10000 (批次 96/100)
+    进度: 9700/10000 (批次 97/100)
+    进度: 9800/10000 (批次 98/100)
+    进度: 9900/10000 (批次 99/100)
+    进度: 10000/10000 (批次 100/100)
+    完成: 9900 条, 耗时: 263.92s, QPS: 37.5
+  导入 150 个 Service...
+    进度: 100/150 (批次 1/2)
+    进度: 150/150 (批次 2/2)
+    完成: 150 条
+
+导入关系...
+  导入 pod_with_service 关系...
+    进度: 1000/10000, 耗时: 174.76s
+    进度: 2000/10000, 耗时: 375.74s
+    进度: 3000/10000, 耗时: 606.31s
+    进度: 4000/10000, 耗时: 861.02s
+    进度: 5000/10000, 耗时: 1131.61s
+    进度: 6000/10000, 耗时: 1417.54s
+    进度: 7000/10000, 耗时: 1719.68s
+    进度: 8000/10000, 耗时: 2029.88s
+    进度: 9000/10000, 耗时: 2349.63s
+    进度: 10000/10000, 耗时: 2683.94s
+    完成: 10000 条关系, 耗时: 2683.94s
+
+模拟数据导入完成!
+
+验证导入结果...
+  Pod: 20000
+  Service: 150
+  关系: 17399
+
+示例数据:
+  {'in': {'bcs_cluster_id': 'BCS-K8S-00001', 'namespace': 'app-dev', 'pod': 'api-1164-04469'}, 'out': {'service': 'scheduler'}}
+  {'in': {'bcs_cluster_id': 'BCS-K8S-00001', 'namespace': 'app-dev', 'pod': 'api-1191-07043'}, 'out': {'service': 'gateway'}}
+  {'in': {'bcs_cluster_id': 'BCS-K8S-00001', 'namespace': 'app-dev', 'pod': 'api-1214-00550'}, 'out': {'service': 'api'}}
+  {'in': {'bcs_cluster_id': 'BCS-K8S-00001', 'namespace': 'app-dev', 'pod': 'api-1318-00691'}, 'out': {'service': 'web'}}
+  {'in': {'bcs_cluster_id': 'BCS-K8S-00001', 'namespace': 'app-dev', 'pod': 'api-1395-05164'}, 'out': {'service': 'scheduler'}}
+SurrealDB client: https://21.214.199.225/surrealdb/default/benchmark_v4
+======================================================================
+导入模拟数据到 SurrealDB (Plan 01: Active Windows)
+Pod 数量: 10000
+======================================================================
+从 schema.sql 初始化 SurrealDB schema...
+Schema 初始化完成
+
+开始导入模拟数据 (Pod 数量: 10000)...
+
+生成模拟数据...
+  Pods: 10000
+  Services: 5
+  Nodes: 10
+  Deployments: 5
+  ReplicaSets: 5
+  Containers: 200
+  Systems: 20
+
+导入节点资源...
+  导入 10000 个 Pod...
+    完成: 10000 条, 耗时: 5.10s, QPS: 1960.6
+  导入 5 个 Service...
+    完成: 5 条
+  导入 10 个 Node...
+    完成: 10 条
+  导入 5 个 Deployment...
+    完成: 5 条
+  导入 5 个 ReplicaSet...
+    完成: 5 条
+  导入 200 个 Container...
+    完成: 200 条
+  导入 20 个 System...
+    完成: 20 条
+
+导入关系...
+  导入 pod_with_service 关系...
+    进度: 1000/10000
+    进度: 2000/10000
+    进度: 3000/10000
+    进度: 4000/10000
+    进度: 5000/10000
+    进度: 6000/10000
+    进度: 7000/10000
+    进度: 8000/10000
+    进度: 9000/10000
+    进度: 10000/10000
+    完成: 10000 条, 耗时: 1332.73s
+  导入 node_with_pod 关系...
+    进度: 1000/10000
+    进度: 2000/10000
+    进度: 3000/10000
+    进度: 4000/10000
+    进度: 5000/10000
+    进度: 6000/10000
+    进度: 7000/10000
+    进度: 8000/10000
+    进度: 9000/10000
+    进度: 10000/10000
+    完成: 10000 条, 耗时: 732.66s
+  导入 deployment_with_replicaset 关系...
+    完成: 5 条
+  导入 pod_with_replicaset 关系...
+    完成: 10000 条
+  导入 container_with_pod 关系...
+    完成: 200 条
+
+数据导入完成!
+
+验证导入结果...
+  pod                           :    10650
+  service                       :      689
+  node                          :       10
+  deployment                    :        5
+  replicaset                    :        5
+  container                     :      200
+  system                        :       20
+  pod_with_service              :     7988
+  node_with_pod                 :    10000
+  deployment_with_replicaset    :        5
+  pod_with_replicaset           :    10000
+  container_with_pod            :      200
+
+示例 Pod 数据:
+  {'active_windows': [{'end_time': 1767686808657, 'start_time': 1767686808657}], 'bcs_cluster_id': 'BCS-K8S-00002', 'end_time': 1767686808657, 'id': 'pod:⟨bcs_cluster_id=BCS-K8S-00002,namespace=bkop,pod=bkop-pod-00000⟩', 'namespace': 'bkop', 'pod': 'bkop-pod-00000', 'start_time': 1767686808657, 'windows_count': 1}
+  {'active_windows': [{'end_time': 1767686808658, 'start_time': 1767686808658}], 'bcs_cluster_id': 'BCS-K8S-00002', 'end_time': 1767686808658, 'id': 'pod:⟨bcs_cluster_id=BCS-K8S-00002,namespace=bkop,pod=bkop-pod-00001⟩', 'namespace': 'bkop', 'pod': 'bkop-pod-00001', 'start_time': 1767686808658, 'windows_count': 1}
+  {'active_windows': [{'end_time': 1767686808658, 'start_time': 1767686808658}], 'bcs_cluster_id': 'BCS-K8S-00002', 'end_time': 1767686808658, 'id': 'pod:⟨bcs_cluster_id=BCS-K8S-00002,namespace=bkop,pod=bkop-pod-00002⟩', 'namespace': 'bkop', 'pod': 'bkop-pod-00002', 'start_time': 1767686808658, 'windows_count': 1}
+
+示例 pod_with_service 关系:
+  {'active_windows': [{'end_time': 1767686814013, 'start_time': 1767686814013}], 'end_time': 1767686814013, 'id': 'pod_with_service:⟨bcs_cluster_id=BCS-K8S-00002,namespace=bkop,pod=bkop-pod-00000|bcs_cluster_id=BCS-K8S-00002,namespace=bkop,service=bkop-api⟩', 'in': 'pod:⟨bcs_cluster_id=BCS-K8S-00002,namespace=bkop,pod=bkop-pod-00000⟩', 'out': 'service:⟨bcs_cluster_id=BCS-K8S-00002,namespace=bkop,service=bkop-api⟩', 'start_time': 1767686814013, 'windows_count': 1}
+  {'active_windows': [{'end_time': 1767686814103, 'start_time': 1767686814103}], 'end_time': 1767686814103, 'id': 'pod_with_service:⟨bcs_cluster_id=BCS-K8S-00002,namespace=bkop,pod=bkop-pod-00001|bcs_cluster_id=BCS-K8S-00002,namespace=bkop,service=bkop-web⟩', 'in': 'pod:⟨bcs_cluster_id=BCS-K8S-00002,namespace=bkop,pod=bkop-pod-00001⟩', 'out': 'service:⟨bcs_cluster_id=BCS-K8S-00002,namespace=bkop,service=bkop-web⟩', 'start_time': 1767686814103, 'windows_count': 1}
+  {'active_windows': [{'end_time': 1767686814193, 'start_time': 1767686814193}], 'end_time': 1767686814193, 'id': 'pod_with_service:⟨bcs_cluster_id=BCS-K8S-00002,namespace=bkop,pod=bkop-pod-00002|bcs_cluster_id=BCS-K8S-00002,namespace=bkop,service=bkop-worker⟩', 'in': 'pod:⟨bcs_cluster_id=BCS-K8S-00002,namespace=bkop,pod=bkop-pod-00002⟩', 'out': 'service:⟨bcs_cluster_id=BCS-K8S-00002,namespace=bkop,service=bkop-worker⟩', 'start_time': 1767686814193, 'windows_count': 1}
+2026-01-06 16:35:45 - INFO - Connected to SurrealDB at https://21.214.199.225/surrealdb
+2026-01-06 16:35:45 - INFO - ============================================================
+2026-01-06 16:35:45 - INFO - SurrealDB Unified Mixed Load Benchmark
+2026-01-06 16:35:45 - INFO - ============================================================
+2026-01-06 16:35:45 - INFO - Configuration:
+2026-01-06 16:35:45 - INFO -   URL:              https://21.214.199.225/surrealdb
+2026-01-06 16:35:45 - INFO -   Concurrency:      20 workers
+2026-01-06 16:35:45 - INFO -   Duration:         60 seconds
+2026-01-06 16:35:45 - INFO -   Read Ratio:       70%
+2026-01-06 16:35:45 - INFO -   Heartbeat Ratio:  80% (of writes)
+2026-01-06 16:35:45 - INFO -   Health Interval:  5.0s
+2026-01-06 16:35:45 - INFO - 
+2026-01-06 16:35:45 - INFO - Collecting database info before benchmark...
+2026-01-06 16:35:47 - INFO - Loading existing data (limit=10000)...
+2026-01-06 16:35:47 - INFO -   Loaded 10000 pods
+2026-01-06 16:35:47 - INFO -   Loaded 401 services
+2026-01-06 16:35:47 - INFO -   Found 15 unique namespaces
+2026-01-06 16:35:47 - INFO - Initial health: ok (2.8ms)
+2026-01-06 16:35:47 - INFO - 
+Starting benchmark at 16:35:47...
+2026-01-06 16:35:47 - INFO - ------------------------------------------------------------
+2026-01-06 16:35:47 - INFO - Health check worker started (interval=5.0s)
+2026-01-06 16:35:47 - INFO - [0.0s] Health: ✓ ok (10.6ms)
+2026-01-06 16:35:52 - INFO - [5.0s] Health: ✓ ok (14.4ms)
+2026-01-06 16:35:57 - INFO - [10.0s] Health: ✓ ok (6.8ms)
+2026-01-06 16:36:02 - INFO - [15.0s] Health: ✓ ok (2.4ms)
+2026-01-06 16:36:07 - INFO - [20.1s] Health: ✓ ok (7.5ms)
+2026-01-06 16:36:12 - INFO - [25.1s] Health: ✓ ok (2.5ms)
+2026-01-06 16:36:17 - INFO - [30.1s] Health: ✓ ok (2.5ms)
+2026-01-06 16:36:22 - INFO - [35.1s] Health: ✓ ok (3.8ms)
+2026-01-06 16:36:27 - INFO - [40.1s] Health: ✓ ok (16.1ms)
+2026-01-06 16:36:32 - INFO - [45.1s] Health: ✓ ok (16.2ms)
+2026-01-06 16:36:37 - INFO - [50.1s] Health: ✓ ok (17.0ms)
+2026-01-06 16:36:42 - INFO - [55.1s] Health: ✓ ok (22.2ms)
+2026-01-06 16:36:47 - INFO - [60.1s] Health: ✓ ok (2.3ms)
+2026-01-06 16:36:47 - INFO - Health check worker stopped
+2026-01-06 16:36:47 - INFO - Collecting database info after benchmark...
+2026-01-06 16:36:49 - INFO - ------------------------------------------------------------
+2026-01-06 16:36:49 - INFO - Benchmark completed at 16:36:49
+
+======================================================================
+BENCHMARK RESULTS
+======================================================================
+
+──────────────────────────────────────────────────────────────────────
+OVERALL STATISTICS
+──────────────────────────────────────────────────────────────────────
+  Total Time:       60.55 seconds
+  Total Operations: 3,332
+  QPS:              55.0 ops/sec
+  Errors:           0
+  Success Rate:     100.00%
+
+──────────────────────────────────────────────────────────────────────
+OPERATION BREAKDOWN
+──────────────────────────────────────────────────────────────────────
+  Read Operations:  2,327 (69.8%)
+    - Single:       916
+    - Batch:        701
+    - Relation:     710
+  Write Operations: 1,005 (30.2%)
+    - Heartbeat:    798
+    - New:          207
+
+──────────────────────────────────────────────────────────────────────
+LATENCY STATISTICS (ms)
+──────────────────────────────────────────────────────────────────────
+  Overall (3,332 samples):
+    p50: 236.34  p95: 946.14  p99: 1000.03
+    avg: 362.27  min: 31.27  max: 1104.41
+  Read (2,327 samples):
+    p50: 226.43  p95: 567.78  p99: 596.44
+  Write (207 samples):
+    p50: 92.82  p95: 877.60  p99: 889.27
+  Heartbeat (798 samples):
+    p50: 877.42  p95: 995.99  p99: 1039.36
+
+──────────────────────────────────────────────────────────────────────
+HEALTH CHECK RECORDS
+──────────────────────────────────────────────────────────────────────
+  Total Checks:     15
+  OK:               15
+  Errors:           0
+  Avg Latency:      8.65ms
+
+──────────────────────────────────────────────────────────────────────
+DATABASE INFO (BEFORE)
+──────────────────────────────────────────────────────────────────────
+
+  [NAMESPACE: default]
+    Databases: 6
+      - benchmark
+      - benchmark_v2
+      - benchmark_v3
+      - benchmark_v4
+      - event_test
+    Users: 0
+
+  [DATABASE: benchmark]
+    Tables: 61
+      - apm_service: ? records
+      - apm_service_instance: ? records
+      - apm_service_instance_with_pod: ? records
+      - apm_service_instance_with_system: ? records
+      - apm_service_with_apm_service_instance: ? records
+      - app_version: ? records
+      - app_version_with_container: ? records
+      - app_version_with_git_commit: ? records
+      - app_version_with_system: ? records
+      - biz: ? records
+    Functions: 30
+      - kv_block
+      - relation_id
+      - upsert_apm_service
+      - upsert_apm_service_instance
+      - upsert_app_version
+      - upsert_biz
+      - upsert_bklogconfig
+      - upsert_cluster
+      - upsert_container
+      - upsert_daemonset
+
+  [TABLE DETAILS]
+    apm_service:
+      Fields: 4
+    apm_service_instance:
+      Fields: 5
+    apm_service_instance_with_pod:
+      Fields: 4
+    apm_service_instance_with_system:
+      Fields: 4
+    apm_service_with_apm_service_instance:
+      Fields: 4
+    app_version:
+      Fields: 4
+    app_version_with_container:
+      Fields: 4
+    app_version_with_git_commit:
+      Fields: 4
+    app_version_with_system:
+      Fields: 4
+    biz:
+      Fields: 3
+    biz_with_set:
+      Fields: 4
+    bklogconfig:
+      Fields: 4
+    bklogconfig_with_datasource:
+      Fields: 4
+    cluster:
+      Fields: 3
+    container:
+      Fields: 6
+    container_with_environment:
+      Fields: 4
+    container_with_pod:
+      Fields: 4
+    daemonset:
+      Fields: 5
+    daemonset_with_pod:
+      Fields: 4
+    datasource:
+      Fields: 3
+    datasource_with_node:
+      Fields: 4
+    datasource_with_pod:
+      Fields: 4
+    deployment:
+      Fields: 5
+    deployment_with_replicaset:
+      Fields: 4
+    domain:
+      Fields: 4
+    domain_with_service:
+      Fields: 4
+    environment:
+      Fields: 3
+    environment_with_system:
+      Fields: 4
+    git_commit:
+      Fields: 4
+    host:
+      Fields: 3
+    host_with_module:
+      Fields: 4
+    host_with_system:
+      Fields: 4
+    ingress:
+      Fields: 5
+    ingress_with_service:
+      Fields: 4
+    job:
+      Fields: 5
+    job_with_pod:
+      Fields: 4
+    k8s_address:
+      Fields: 4
+    k8s_address_with_service:
+      Fields: 4
+    metric:
+      Fields: 6
+    module:
+      Fields: 3
+    module_with_set:
+      Fields: 4
+    namespace:
+      Fields: 4
+    node:
+      Fields: 4
+    node_has_metric:
+      Fields: 5
+    node_with_pod:
+      Fields: 4
+    node_with_system:
+      Fields: 4
+    pod:
+      Fields: 5
+    pod_to_pod:
+      Fields: 4
+    pod_to_system:
+      Fields: 4
+    pod_with_replicaset:
+      Fields: 4
+    pod_with_service:
+      Fields: 4
+    pod_with_statefulset:
+      Fields: 4
+    relation_has_metric:
+      Fields: 5
+    replicaset:
+      Fields: 5
+    service:
+      Fields: 5
+    service_to_service:
+      Fields: 4
+    set:
+      Fields: 3
+    statefulset:
+      Fields: 5
+    system:
+      Fields: 4
+    system_to_pod:
+      Fields: 4
+    system_to_system:
+      Fields: 4
+
+──────────────────────────────────────────────────────────────────────
+DATABASE INFO (AFTER)
+──────────────────────────────────────────────────────────────────────
+
+  [NAMESPACE: default]
+    Databases: 6
+      - benchmark
+      - benchmark_v2
+      - benchmark_v3
+      - benchmark_v4
+      - event_test
+    Users: 0
+
+  [DATABASE: benchmark]
+    Tables: 61
+      - apm_service: ? records
+      - apm_service_instance: ? records
+      - apm_service_instance_with_pod: ? records
+      - apm_service_instance_with_system: ? records
+      - apm_service_with_apm_service_instance: ? records
+      - app_version: ? records
+      - app_version_with_container: ? records
+      - app_version_with_git_commit: ? records
+      - app_version_with_system: ? records
+      - biz: ? records
+    Functions: 30
+      - kv_block
+      - relation_id
+      - upsert_apm_service
+      - upsert_apm_service_instance
+      - upsert_app_version
+      - upsert_biz
+      - upsert_bklogconfig
+      - upsert_cluster
+      - upsert_container
+      - upsert_daemonset
+
+  [TABLE DETAILS]
+    apm_service:
+      Fields: 4
+    apm_service_instance:
+      Fields: 5
+    apm_service_instance_with_pod:
+      Fields: 4
+    apm_service_instance_with_system:
+      Fields: 4
+    apm_service_with_apm_service_instance:
+      Fields: 4
+    app_version:
+      Fields: 4
+    app_version_with_container:
+      Fields: 4
+    app_version_with_git_commit:
+      Fields: 4
+    app_version_with_system:
+      Fields: 4
+    biz:
+      Fields: 3
+    biz_with_set:
+      Fields: 4
+    bklogconfig:
+      Fields: 4
+    bklogconfig_with_datasource:
+      Fields: 4
+    cluster:
+      Fields: 3
+    container:
+2026-01-06 16:36:49 - INFO - Results exported to tests/20260106/result_20.json
+      Fields: 6
+    container_with_environment:
+      Fields: 4
+    container_with_pod:
+      Fields: 4
+    daemonset:
+      Fields: 5
+    daemonset_with_pod:
+      Fields: 4
+    datasource:
+      Fields: 3
+    datasource_with_node:
+      Fields: 4
+    datasource_with_pod:
+      Fields: 4
+    deployment:
+      Fields: 5
+    deployment_with_replicaset:
+      Fields: 4
+    domain:
+      Fields: 4
+    domain_with_service:
+      Fields: 4
+    environment:
+      Fields: 3
+    environment_with_system:
+      Fields: 4
+    git_commit:
+      Fields: 4
+    host:
+      Fields: 3
+    host_with_module:
+      Fields: 4
+    host_with_system:
+      Fields: 4
+    ingress:
+      Fields: 5
+    ingress_with_service:
+      Fields: 4
+    job:
+      Fields: 5
+    job_with_pod:
+      Fields: 4
+    k8s_address:
+      Fields: 4
+    k8s_address_with_service:
+      Fields: 4
+    metric:
+      Fields: 6
+    module:
+      Fields: 3
+    module_with_set:
+      Fields: 4
+    namespace:
+      Fields: 4
+    node:
+      Fields: 4
+    node_has_metric:
+      Fields: 5
+    node_with_pod:
+      Fields: 4
+    node_with_system:
+      Fields: 4
+    pod:
+      Fields: 5
+    pod_to_pod:
+      Fields: 4
+    pod_to_system:
+      Fields: 4
+    pod_with_replicaset:
+      Fields: 4
+    pod_with_service:
+      Fields: 4
+    pod_with_statefulset:
+      Fields: 4
+    relation_has_metric:
+      Fields: 5
+    replicaset:
+      Fields: 5
+    service:
+      Fields: 5
+    service_to_service:
+      Fields: 4
+    set:
+      Fields: 3
+    statefulset:
+      Fields: 5
+    system:
+      Fields: 4
+    system_to_pod:
+      Fields: 4
+    system_to_system:
+      Fields: 4
+
+──────────────────────────────────────────────────────────────────────
+TABLE RECORD CHANGES
+──────────────────────────────────────────────────────────────────────
+  pod: 20536 -> 21099 (+563)
+  service: 401 -> 692 (+291)
+  pod_with_service: 20000 -> 20000 (0)
+
+======================================================================
+2026-01-06 16:36:50 - INFO - Connected to SurrealDB at https://21.214.199.225/surrealdb
+2026-01-06 16:36:50 - INFO - ======================================================================
+2026-01-06 16:36:50 - INFO - SurrealDB Benchmark - Plan 01: Active Windows
+2026-01-06 16:36:50 - INFO - ======================================================================
+2026-01-06 16:36:50 - INFO - Configuration:
+2026-01-06 16:36:50 - INFO -   URL:              https://21.214.199.225/surrealdb
+2026-01-06 16:36:50 - INFO -   Namespace/DB:     default/benchmark_v4
+2026-01-06 16:36:50 - INFO -   Concurrency:      20 workers
+2026-01-06 16:36:50 - INFO -   Duration:         60 seconds
+2026-01-06 16:36:50 - INFO -   Read Ratio:       70%
+2026-01-06 16:36:50 - INFO -   Heartbeat Ratio:  80% (of writes)
+2026-01-06 16:36:50 - INFO -   Health Interval:  5.0s
+2026-01-06 16:36:50 - INFO - 
+2026-01-06 16:36:50 - INFO - Collecting table counts before benchmark...
+2026-01-06 16:36:50 - INFO -   container: 200
+2026-01-06 16:36:50 - INFO -   container_with_pod: 200
+2026-01-06 16:36:50 - INFO -   deployment: 5
+2026-01-06 16:36:50 - INFO -   deployment_with_replicaset: 5
+2026-01-06 16:36:50 - INFO -   node: 10
+2026-01-06 16:36:50 - INFO -   node_with_pod: 10000
+2026-01-06 16:36:50 - INFO -   pod: 10650
+2026-01-06 16:36:50 - INFO -   pod_with_replicaset: 10000
+2026-01-06 16:36:50 - INFO -   pod_with_service: 7988
+2026-01-06 16:36:50 - INFO -   replicaset: 5
+2026-01-06 16:36:50 - INFO -   service: 689
+2026-01-06 16:36:50 - INFO - Loading existing data (limit=10000)...
+2026-01-06 16:36:50 - INFO -   Loaded 10000 pods
+2026-01-06 16:36:50 - INFO -   Loaded 689 services
+2026-01-06 16:36:50 - INFO -   Found 1 unique namespaces
+2026-01-06 16:36:50 - INFO - Initial health: ok (2.7ms)
+2026-01-06 16:36:50 - INFO - 
+Starting benchmark at 16:36:50...
+2026-01-06 16:36:50 - INFO - ----------------------------------------------------------------------
+2026-01-06 16:36:50 - INFO - Health check worker started (interval=5.0s)
+2026-01-06 16:36:50 - INFO - [0.0s] Health: ✓ ok (10.6ms)
+2026-01-06 16:36:55 - INFO - [5.0s] Health: ✓ ok (18.7ms)
+2026-01-06 16:37:00 - INFO - [10.1s] Health: ✓ ok (25.9ms)
+2026-01-06 16:37:05 - INFO - [15.1s] Health: ✓ ok (10.1ms)
+2026-01-06 16:37:10 - INFO - [20.1s] Health: ✓ ok (11.0ms)
+2026-01-06 16:37:15 - INFO - [25.1s] Health: ✓ ok (6.2ms)
+2026-01-06 16:37:20 - INFO - [30.1s] Health: ✓ ok (7.7ms)
+2026-01-06 16:37:25 - INFO - [35.1s] Health: ✓ ok (4.7ms)
+2026-01-06 16:37:30 - INFO - [40.1s] Health: ✓ ok (5.0ms)
+2026-01-06 16:37:35 - INFO - [45.2s] Health: ✓ ok (13.0ms)
+2026-01-06 16:37:40 - INFO - [50.2s] Health: ✓ ok (13.1ms)
+2026-01-06 16:37:45 - INFO - [55.2s] Health: ✓ ok (11.9ms)
+2026-01-06 16:37:50 - INFO - [60.2s] Health: ✓ ok (6.2ms)
+2026-01-06 16:37:50 - INFO - Health check worker stopped
+2026-01-06 16:37:51 - INFO - Collecting table counts after benchmark...
+2026-01-06 16:37:51 - INFO - ----------------------------------------------------------------------
+2026-01-06 16:37:51 - INFO - Benchmark completed at 16:37:51
+2026-01-06 16:37:51 - INFO - Results exported to tests/20260106/result_20.json
+
+======================================================================
+BENCHMARK RESULTS - Plan 01: Active Windows
+======================================================================
+
+──────────────────────────────────────────────────────────────────────
+OVERALL STATISTICS
+──────────────────────────────────────────────────────────────────────
+  Total Time:       60.26 seconds
+  Total Operations: 22,432
+  QPS:              372.3 ops/sec
+  Errors:           0
+  Success Rate:     100.00%
+
+──────────────────────────────────────────────────────────────────────
+OPERATION BREAKDOWN
+──────────────────────────────────────────────────────────────────────
+  Read Operations:  15,782 (70.4%)
+    - Single:       6,260
+    - Batch:        4,760
+    - Relation:     4,762
+  Write Operations: 6,650 (29.6%)
+    - Heartbeat:    5,359
+    - New:          1,291
+
+──────────────────────────────────────────────────────────────────────
+LATENCY STATISTICS (ms)
+──────────────────────────────────────────────────────────────────────
+  Overall (22,432 samples):
+    p50: 43.31  p95: 98.26  p99: 113.18
+    avg: 53.59  min: 31.64  max: 184.55
+  Read (15,782 samples):
+    p50: 45.38  p95: 101.56  p99: 115.48
+  Heartbeat (5,359 samples):
+    p50: 40.51  p95: 54.18  p99: 63.96
+  Write New (1,291 samples):
+    p50: 40.76  p95: 54.76  p99: 66.13
+
+──────────────────────────────────────────────────────────────────────
+HEALTH CHECK RECORDS
+──────────────────────────────────────────────────────────────────────
+  Total Checks:     15
+  OK:               15
+  Errors:           0
+  Avg Latency:      9.95ms
+
+──────────────────────────────────────────────────────────────────────
+TABLE RECORD CHANGES
+──────────────────────────────────────────────────────────────────────
+  container                     :      200 ->      200 (0)
+  container_with_pod            :      200 ->      200 (0)
+  deployment                    :        5 ->        5 (0)
+  deployment_with_replicaset    :        5 ->        5 (0)
+  node                          :       10 ->       10 (0)
+  node_with_pod                 :    10000 ->    10000 (0)
+  pod                           :    10650 ->    11283 (+633)
+  pod_with_replicaset           :    10000 ->    10000 (0)
+  pod_with_service              :     7988 ->     7988 (0)
+  replicaset                    :        5 ->        5 (0)
+  service                       :      689 ->     1347 (+658)
+
+======================================================================
+
+############################################################
+# Initializing data for Plan 00
+# Pod count: 10000
+############################################################
+
+============================================================
+Running: python3 004.import_real_data.py --count 10000
+Working dir: 00.plan_created_at
+============================================================
+
+
+############################################################
+# Initializing data for Plan 01
+# Pod count: 10000
+############################################################
+
+============================================================
+Running: python3 004.import_real_data.py --count 10000
+Working dir: 01.plan_active_windows
+============================================================
+
+
+############################################################
+# Running Benchmark: Plan 00: created_at
+# Duration: 60s, Concurrency: 20
+# Read Ratio: 70%, Heartbeat Ratio: 80%
+# Output: 00.plan_created_at/tests/20260106/result_20.json
+############################################################
+
+============================================================
+Running: python3 003.benchmark_surrealdb.py --duration 60 --concurrency 20 --read-ratio 70 --heartbeat-ratio 80 --output tests/20260106/result_20.json
+Working dir: 00.plan_created_at
+============================================================
+
+
+############################################################
+# Running Benchmark: Plan 01: active_windows
+# Duration: 60s, Concurrency: 20
+# Read Ratio: 70%, Heartbeat Ratio: 80%
+# Output: 01.plan_active_windows/tests/20260106/result_20.json
+############################################################
+
+============================================================
+Running: python3 003.benchmark_surrealdb.py --duration 60 --concurrency 20 --read-ratio 70 --heartbeat-ratio 80 --output tests/20260106/result_20.json
+Working dir: 01.plan_active_windows
+============================================================
+
+
+Comparison report saved to: results/20260106/comparison_result_20.json
+
+======================================================================
+BENCHMARK COMPARISON SUMMARY
+======================================================================
+Plan 00: created_at (Function-based upsert)
+Plan 01: active_windows (UPSERT MERGE + Event)
+----------------------------------------------------------------------
+
+QPS (ops/sec):
+  Plan 00: 55.0
+  Plan 01: 372.3
+  Diff:    +317.2 (+576.5%)
+  Winner:  plan_01
+
+Overall Latency (ms):
+  Metric        Plan 00      Plan 01       Winner
+  -------- ------------ ------------ ------------
+  p50            236.34        43.31      plan_01
+  p95            946.14        98.26      plan_01
+  p99           1000.03       113.18      plan_01
+  avg            362.27        53.59      plan_01
+
+Heartbeat Latency (ms):
+  Metric        Plan 00      Plan 01       Winner
+  -------- ------------ ------------ ------------
+  p50            877.42        40.51      plan_01
+  p95            995.99        54.18      plan_01
+  p99           1039.36        63.96      plan_01
+
+Success Rate:
+  Plan 00: 100.00%
+  Plan 01: 100.00%
+
+Operations:
+  Type                 Plan 00      Plan 01
+  --------------- ------------ ------------
+  Total Ops              3,332       22,432
+  Total Reads            2,327       15,782
+  Total Writes           1,005        6,650
+  Errors                     0            0
+
+======================================================================
+
+============================================================
+BENCHMARK COMPLETED
+============================================================
+Date: 20260106
+  Plan 00: 00.plan_created_at/tests/20260106/result_20.json
+  Plan 01: 01.plan_active_windows/tests/20260106/result_20.json
+  Comparison: results/20260106/comparison_result_20.json
