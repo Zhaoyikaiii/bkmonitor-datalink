@@ -357,8 +357,8 @@ class SurrealDBClient:
         """Initialize database schema from external SQL file"""
         schema_sql = load_schema_sql(tolerance_time_ms)
         
-        # Split by semicolons and execute each statement
-        statements = [s.strip() for s in schema_sql.split(';') if s.strip()]
+        # Smart split: handle statements with {} blocks correctly
+        statements = self._split_sql_statements(schema_sql)
         
         logger.info(f"Executing {len(statements)} schema statements...")
         
@@ -372,6 +372,38 @@ class SurrealDBClient:
                     logger.warning(f"Statement {i} warning: {e}")
         
         logger.info("Schema initialization completed")
+
+    def _split_sql_statements(self, sql: str) -> list:
+        """Split SQL statements, handling {} blocks correctly"""
+        statements = []
+        current = []
+        brace_depth = 0
+        
+        for line in sql.split('\n'):
+            stripped = line.strip()
+            
+            # Skip empty lines and comments
+            if not stripped or stripped.startswith('--'):
+                continue
+            
+            # Count braces
+            brace_depth += stripped.count('{') - stripped.count('}')
+            current.append(line)
+            
+            # If we're at brace depth 0 and line ends with ;, it's end of statement
+            if brace_depth == 0 and stripped.endswith(';'):
+                stmt = '\n'.join(current).strip()
+                if stmt:
+                    statements.append(stmt.rstrip(';'))
+                current = []
+        
+        # Handle any remaining content
+        if current:
+            stmt = '\n'.join(current).strip()
+            if stmt:
+                statements.append(stmt.rstrip(';'))
+        
+        return statements
 
     # ========================================================================
     # Resource UPSERT Methods (Liveness Record Version)
@@ -479,16 +511,19 @@ class SurrealDBClient:
         results = self.execute_sql(sql)
         return results[0] if results else {}
 
-    def upsert_system(self, bk_target_ip: str, bk_target_cloud_id: str,
+    def upsert_system(self, bk_target_ip: str, bk_cloud_id: str,
                       updated_at: int = None) -> Dict[str, Any]:
-        """Upsert system - Event will manage liveness record"""
+        """Upsert system - Event will manage liveness record
+        
+        ID format: system:⟨bk_cloud_id=X,bk_target_ip=Y⟩
+        """
         if updated_at is None:
             updated_at = self.datetime_to_ms()
         
         sql = f'''
-        UPSERT system:⟨bk_target_ip={bk_target_ip},bk_target_cloud_id={bk_target_cloud_id}⟩ MERGE {{
+        UPSERT system:⟨bk_cloud_id={bk_cloud_id},bk_target_ip={bk_target_ip}⟩ MERGE {{
             bk_target_ip: "{bk_target_ip}",
-            bk_target_cloud_id: "{bk_target_cloud_id}",
+            bk_cloud_id: "{bk_cloud_id}",
             updated_at: {updated_at}
         }};
         '''
@@ -681,7 +716,7 @@ class MockDataGenerator:
             self.client.upsert_system(ip, MockConfig.CLOUD_ID, updated_at)
             self.systems.append({
                 'bk_target_ip': ip,
-                'bk_target_cloud_id': MockConfig.CLOUD_ID
+                'bk_cloud_id': MockConfig.CLOUD_ID
             })
         counts['systems'] = len(self.systems)
         
