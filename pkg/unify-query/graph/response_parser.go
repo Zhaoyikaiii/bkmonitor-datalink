@@ -9,104 +9,12 @@
 
 package graph
 
-import (
-	"time"
-)
-
-// ResponseParser 解析 SurrealDB 响应
+// ResponseParser 解析数据库响应
 type ResponseParser struct{}
 
 // NewResponseParser 创建响应解析器
 func NewResponseParser() *ResponseParser {
 	return &ResponseParser{}
-}
-
-// ParseResources 解析资源列表
-func (p *ResponseParser) ParseResources(result any) ([]*Resource, error) {
-	data, ok := result.([]any)
-	if !ok {
-		return []*Resource{}, nil
-	}
-
-	resources := make([]*Resource, 0, len(data))
-	for _, item := range data {
-		itemMap, ok := item.(map[string]any)
-		if !ok {
-			continue
-		}
-
-		resource := &Resource{
-			Labels: make(map[string]string),
-		}
-
-		if id, ok := itemMap[FieldID].(string); ok {
-			resource.ID = id
-			resourceType, labels, err := ParseResourceID(id)
-			if err == nil {
-				resource.Type = resourceType
-				resource.Labels = labels
-			}
-		}
-
-		if updatedAt, ok := itemMap[FieldUpdatedAt].(float64); ok {
-			t := time.UnixMilli(int64(updatedAt))
-			resource.UpdatedAt = t
-		}
-
-		if createdAt, ok := itemMap[FieldCreatedAt].(float64); ok {
-			t := time.UnixMilli(int64(createdAt))
-			resource.CreatedAt = &t
-		}
-
-		resources = append(resources, resource)
-	}
-
-	return resources, nil
-}
-
-// ParseRelations 解析关系列表
-func (p *ResponseParser) ParseRelations(result any) ([]*Relation, error) {
-	data, ok := result.([]any)
-	if !ok {
-		return []*Relation{}, nil
-	}
-
-	relations := make([]*Relation, 0, len(data))
-	for _, item := range data {
-		itemMap, ok := item.(map[string]any)
-		if !ok {
-			continue
-		}
-
-		relation := &Relation{}
-
-		if id, ok := itemMap[FieldID].(string); ok {
-			relation.ID = id
-		}
-
-		// SurrealDB 用 "in" 表示源端，"out" 表示目标端
-		if in, ok := itemMap[FieldIn].(string); ok {
-			relation.FromID = in
-		}
-
-		if out, ok := itemMap[FieldOut].(string); ok {
-			relation.ToID = out
-		}
-
-		if updatedAt, ok := itemMap[FieldUpdatedAt].(float64); ok {
-			t := time.UnixMilli(int64(updatedAt))
-			relation.UpdatedAt = t
-		}
-
-		if createdAt, ok := itemMap[FieldCreatedAt].(float64); ok {
-			t := time.UnixMilli(int64(createdAt))
-			relation.CreatedAt = &t
-		}
-
-		relations = append(relations, relation)
-	}
-
-	return relations, nil
 }
 
 // ParseLivenessRecords 解析存活记录列表
@@ -155,94 +63,97 @@ func (p *ResponseParser) ParseLivenessRecords(result any) ([]*LivenessRecord, er
 	return records, nil
 }
 
-// ParseSingleHopResponse 解析单跳查询响应
-func (p *ResponseParser) ParseSingleHopResponse(result any, req *HopQueryRequest) (*HopQueryResponse, error) {
-	resp := &HopQueryResponse{
-		Timestamp:  req.Timestamp,
-		SourceType: req.SourceType,
-		SourceInfo: req.SourceInfo,
-		TargetType: req.TargetType,
-		MaxHops:    req.MaxHops,
+// ParseRelatedResources 解析关系查询结果，返回边和目标节点列表
+// 边和目标节点一一对应
+func (p *ResponseParser) ParseRelatedResources(
+	result any,
+	relationType RelationType,
+	direction TraversalDirection,
+	queryStart, queryEnd int64,
+) ([]*EdgeLiveness, []*NodeLiveness, error) {
+	data, ok := result.([]any)
+	if !ok {
+		return nil, nil, nil
 	}
 
-	// Parse relations from result
-	relations, err := p.ParseRelations(result)
-	if err != nil {
-		return resp, err
-	}
+	// 按目标资源ID分组，合并同一资源的多个时间段
+	edgeMap := make(map[string]*EdgeLiveness)
+	nodeMap := make(map[string]*NodeLiveness)
 
-	// Build target list from relations
-	targetMap := make(map[string]*TargetResult)
-	sourceID := GenerateResourceID(req.SourceType, req.SourceInfo)
-
-	for _, rel := range relations {
-		// Determine target ID based on source
-		var targetID string
-		if rel.FromID == sourceID {
-			targetID = rel.ToID
-		} else {
-			targetID = rel.FromID
-		}
-
-		if targetID == "" {
+	for _, item := range data {
+		itemMap, ok := item.(map[string]any)
+		if !ok {
 			continue
 		}
 
-		// Create or get target result
-		target, ok := targetMap[targetID]
-		if !ok {
-			target = &TargetResult{
-				Paths: []*PathResult{},
+		// 解析关系记录
+		relationID, _ := itemMap["relation_id"].(string)
+		fromID, _ := itemMap["from_id"].(string)
+		toID, _ := itemMap["to_id"].(string)
+		periodStart, _ := itemMap[FieldPeriodStart].(float64)
+		periodEnd, _ := itemMap[FieldPeriodEnd].(float64)
+
+		if relationID == "" || toID == "" {
+			continue
+		}
+
+		// 裁剪时间段到查询范围
+		visibleStart := int64(periodStart)
+		if queryStart > visibleStart {
+			visibleStart = queryStart
+		}
+		visibleEnd := int64(periodEnd)
+		if queryEnd < visibleEnd {
+			visibleEnd = queryEnd
+		}
+		if visibleStart > visibleEnd {
+			continue // 无交集
+		}
+
+		period := &VisiblePeriod{Start: visibleStart, End: visibleEnd}
+
+		// 确定目标节点ID
+		var targetID string
+		if direction == DirectionOutbound {
+			targetID = toID
+		} else {
+			targetID = fromID
+		}
+
+		// 合并边的时间段
+		if edge, exists := edgeMap[relationID]; exists {
+			edge.RawPeriods = append(edge.RawPeriods, period)
+		} else {
+			edgeMap[relationID] = &EdgeLiveness{
+				RelationID:   relationID,
+				RelationType: relationType,
+				FromID:       fromID,
+				ToID:         toID,
+				RawPeriods:   []*VisiblePeriod{period},
 			}
-			targetMap[targetID] = target
 		}
 
-		// Parse target entity info
-		targetType, targetLabels, _ := ParseResourceID(targetID)
-
-		// Build path
-		path := &PathResult{
-			PathID: rel.ID,
-			Hops:   1,
-			Path: []*PathElement{
-				// Source entity
-				{
-					EntityID:   sourceID,
-					EntityType: req.SourceType,
-					EntityData: req.SourceInfo,
-				},
-				// Relation
-				{
-					RelationType: rel.Type,
-					RelationID:   rel.ID,
-					CreatedAt:    getTimestampMs(rel.CreatedAt),
-					UpdatedAt:    rel.UpdatedAt.UnixMilli(),
-				},
-				// Target entity
-				{
-					EntityID:   targetID,
-					EntityType: targetType,
-					EntityData: targetLabels,
-				},
-			},
+		// 合并目标节点的时间段（关系的 liveness 作为目标节点的初始 liveness）
+		if node, exists := nodeMap[targetID]; exists {
+			node.RawPeriods = append(node.RawPeriods, period)
+		} else {
+			nodeMap[targetID] = &NodeLiveness{
+				ResourceID: targetID,
+				RawPeriods: []*VisiblePeriod{period},
+			}
 		}
-
-		target.Paths = append(target.Paths, path)
 	}
 
-	// Convert map to slice
-	for _, target := range targetMap {
-		resp.TargetList = append(resp.TargetList, target)
+	// 转换为切片
+	edges := make([]*EdgeLiveness, 0, len(edgeMap))
+	nodes := make([]*NodeLiveness, 0, len(nodeMap))
+
+	for _, edge := range edgeMap {
+		edges = append(edges, edge)
+	}
+	for _, node := range nodeMap {
+		nodes = append(nodes, node)
 	}
 
-	resp.Total = int64(len(resp.TargetList))
-	return resp, nil
-}
-
-// getTimestampMs 将时间指针转换为毫秒时间戳
-func getTimestampMs(t *time.Time) int64 {
-	if t == nil {
-		return 0
-	}
-	return t.UnixMilli()
+	return edges, nodes, nil
 }

@@ -59,102 +59,416 @@ func newTestInstance(client Client) *Instance {
 	}
 }
 
-func TestInstance_QuerySingleHop(t *testing.T) {
-	client := &mockClient{
-		executeFunc: func(ctx context.Context, query string, vars map[string]any) (any, error) {
-			return []any{
-				map[string]any{
-					"id":         "node_with_pod:⟨bcs_cluster_id=BCS-K8S-001,node=node-0|bcs_cluster_id=BCS-K8S-001,namespace=default,pod=pod-0⟩",
-					"in":         "node:⟨bcs_cluster_id=BCS-K8S-001,node=node-0⟩",
-					"out":        "pod:⟨bcs_cluster_id=BCS-K8S-001,namespace=default,pod=pod-0⟩",
-					"updated_at": float64(time.Now().UnixMilli()),
-				},
-			}, nil
+// TestVisiblePeriod_Overlap 测试 VisiblePeriod 的交集计算
+func TestVisiblePeriod_Overlap(t *testing.T) {
+	tests := []struct {
+		name   string
+		p1     *VisiblePeriod
+		p2     *VisiblePeriod
+		expect *VisiblePeriod
+	}{
+		{
+			name:   "完全重叠",
+			p1:     &VisiblePeriod{Start: 100, End: 200},
+			p2:     &VisiblePeriod{Start: 100, End: 200},
+			expect: &VisiblePeriod{Start: 100, End: 200},
+		},
+		{
+			name:   "p1 包含 p2",
+			p1:     &VisiblePeriod{Start: 100, End: 300},
+			p2:     &VisiblePeriod{Start: 150, End: 250},
+			expect: &VisiblePeriod{Start: 150, End: 250},
+		},
+		{
+			name:   "p2 包含 p1",
+			p1:     &VisiblePeriod{Start: 150, End: 250},
+			p2:     &VisiblePeriod{Start: 100, End: 300},
+			expect: &VisiblePeriod{Start: 150, End: 250},
+		},
+		{
+			name:   "部分重叠-左侧",
+			p1:     &VisiblePeriod{Start: 100, End: 200},
+			p2:     &VisiblePeriod{Start: 150, End: 250},
+			expect: &VisiblePeriod{Start: 150, End: 200},
+		},
+		{
+			name:   "部分重叠-右侧",
+			p1:     &VisiblePeriod{Start: 150, End: 250},
+			p2:     &VisiblePeriod{Start: 100, End: 200},
+			expect: &VisiblePeriod{Start: 150, End: 200},
+		},
+		{
+			name:   "边界相接",
+			p1:     &VisiblePeriod{Start: 100, End: 200},
+			p2:     &VisiblePeriod{Start: 200, End: 300},
+			expect: &VisiblePeriod{Start: 200, End: 200},
+		},
+		{
+			name:   "无交集",
+			p1:     &VisiblePeriod{Start: 100, End: 200},
+			p2:     &VisiblePeriod{Start: 300, End: 400},
+			expect: nil,
 		},
 	}
 
-	instance := newTestInstance(client)
-
-	req := &HopQueryRequest{
-		Timestamp:  time.Now().UnixMilli(),
-		SourceType: ResourceTypeNode,
-		SourceInfo: map[string]string{
-			"bcs_cluster_id": "BCS-K8S-001",
-			"node":           "node-0",
-		},
-		TargetType:           ResourceTypePod,
-		AllowedRelationTypes: []RelationCategory{RelationCategoryStatic},
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.p1.Overlap(tt.p2)
+			if tt.expect == nil {
+				assert.Nil(t, result)
+			} else {
+				require.NotNil(t, result)
+				assert.Equal(t, tt.expect.Start, result.Start)
+				assert.Equal(t, tt.expect.End, result.End)
+			}
+		})
 	}
-
-	resp, err := instance.QuerySingleHop(context.Background(), req)
-	require.NoError(t, err)
-	assert.NotNil(t, resp)
-	assert.Equal(t, req.Timestamp, resp.Timestamp)
-	assert.Equal(t, req.SourceType, resp.SourceType)
-	assert.Equal(t, req.TargetType, resp.TargetType)
 }
 
-func TestInstance_QueryResources(t *testing.T) {
-	client := &mockClient{
-		executeFunc: func(ctx context.Context, query string, vars map[string]any) (any, error) {
-			return []any{
-				map[string]any{
-					"id":             "pod:⟨bcs_cluster_id=BCS-K8S-001,namespace=default,pod=pod-0⟩",
-					"bcs_cluster_id": "BCS-K8S-001",
-					"namespace":      "default",
-					"pod":            "pod-0",
-					"updated_at":     float64(time.Now().UnixMilli()),
+// TestLivenessGraph_ComputeEffectivePeriods 测试 LivenessGraph 的有效时间段计算
+// 场景：Pod -> Node 关联查询
+//
+// 时间线（查询范围 t0.5 - t3.5）:
+//
+//	t0    t0.5   t1    t1.5   t2    t2.5   t3    t3.5   t4
+//	|------|------|------|------|------|------|------|------|
+//	[====Pod-1====]                     [====Pod-1====]
+//	       ^                                   ^
+//	       |                                   |
+//	[=====Node-1======]               [=====Node-1=====]
+//	[===Relation===]                  [===Relation===]
+//
+// Pod-1 liveness:  [t0, t1], [t3, t4]
+// Node-1 liveness: [t0, t1.5], [t2.5, t4]
+// Relation liveness: [t0, t1], [t3, t4]
+//
+// 查询范围: [t0.5, t3.5]
+//
+// 预期结果：
+//   - Pod-1 RawPeriods: [t0.5, t1], [t3, t3.5]（裁剪到查询范围）
+//   - Node-1 RawPeriods: [t0.5, t1.5], [t2.5, t3.5]（裁剪到查询范围）
+//   - Relation RawPeriods: [t0.5, t1], [t3, t3.5]（裁剪到查询范围）
+//   - Relation EffectivePeriods: [t0.5, t1], [t3, t3.5]（三者交集）
+//   - Node-1 EffectivePeriods: [t0.5, t1], [t3, t3.5]（继承自边）
+func TestLivenessGraph_ComputeEffectivePeriods(t *testing.T) {
+	// 时间点定义（使用相对偏移，单位：小时）
+	t0 := int64(0)
+	t0_5 := int64(500)   // t0.5
+	t1 := int64(1000)    // t1
+	t1_5 := int64(1500)  // t1.5
+	t2_5 := int64(2500)  // t2.5
+	t3 := int64(3000)    // t3
+	t3_5 := int64(3500)  // t3.5
+	t4 := int64(4000)    // t4
+
+	tests := []struct {
+		name string
+		// 图结构
+		nodes []struct {
+			id         string
+			rawPeriods []*VisiblePeriod
+		}
+		edges []struct {
+			id         string
+			fromID     string
+			toID       string
+			rawPeriods []*VisiblePeriod
+		}
+		rootID string
+		// 预期结果
+		expectNodeEffective map[string][]*VisiblePeriod
+		expectEdgeEffective map[string][]*VisiblePeriod
+		description         string
+	}{
+		{
+			name: "单边：Pod -> Node",
+			nodes: []struct {
+				id         string
+				rawPeriods []*VisiblePeriod
+			}{
+				{
+					id: "pod:pod-1",
+					rawPeriods: []*VisiblePeriod{
+						{Start: t0_5, End: t1},   // [t0.5, t1]
+						{Start: t3, End: t3_5},   // [t3, t3.5]
+					},
 				},
-			}, nil
-		},
-	}
-
-	instance := newTestInstance(client)
-
-	req := &ResourceQueryRequest{
-		ResourceType: ResourceTypePod,
-		Labels: map[string]string{
-			"namespace": "default",
-		},
-		StartTime: time.Now().Add(-1 * time.Hour),
-		EndTime:   time.Now(),
-	}
-
-	resp, err := instance.QueryResources(context.Background(), req)
-	require.NoError(t, err)
-	assert.NotNil(t, resp)
-	assert.Len(t, resp.Resources, 1)
-	assert.Equal(t, ResourceTypePod, resp.Resources[0].Type)
-}
-
-func TestInstance_QueryRelations(t *testing.T) {
-	client := &mockClient{
-		executeFunc: func(ctx context.Context, query string, vars map[string]any) (any, error) {
-			return []any{
-				map[string]any{
-					"id":         "node_with_pod:⟨...|...⟩",
-					"in":         "node:⟨bcs_cluster_id=BCS-K8S-001,node=node-0⟩",
-					"out":        "pod:⟨bcs_cluster_id=BCS-K8S-001,namespace=default,pod=pod-0⟩",
-					"updated_at": float64(time.Now().UnixMilli()),
+				{
+					id: "node:node-1",
+					rawPeriods: []*VisiblePeriod{
+						{Start: t0_5, End: t1_5}, // [t0.5, t1.5]
+						{Start: t2_5, End: t3_5}, // [t2.5, t3.5]
+					},
 				},
-			}, nil
+			},
+			edges: []struct {
+				id         string
+				fromID     string
+				toID       string
+				rawPeriods []*VisiblePeriod
+			}{
+				{
+					id:     "node_with_pod:pod-1|node-1",
+					fromID: "pod:pod-1",
+					toID:   "node:node-1",
+					rawPeriods: []*VisiblePeriod{
+						{Start: t0_5, End: t1},   // [t0.5, t1]
+						{Start: t3, End: t3_5},   // [t3, t3.5]
+					},
+				},
+			},
+			rootID: "pod:pod-1",
+			expectNodeEffective: map[string][]*VisiblePeriod{
+				"pod:pod-1": {
+					{Start: t0_5, End: t1},   // 根节点 = RawPeriods
+					{Start: t3, End: t3_5},
+				},
+				"node:node-1": {
+					{Start: t0_5, End: t1},   // 边的有效时间段
+					{Start: t3, End: t3_5},
+				},
+			},
+			expectEdgeEffective: map[string][]*VisiblePeriod{
+				"node_with_pod:pod-1|node-1": {
+					{Start: t0_5, End: t1},   // Pod ∩ Node ∩ Relation
+					{Start: t3, End: t3_5},
+				},
+			},
+			description: "Pod-1 [t0.5-t1, t3-t3.5] -> Node-1 [t0.5-t1.5, t2.5-t3.5]，边 [t0.5-t1, t3-t3.5]",
+		},
+		{
+			name: "时间段收窄：父节点时间段限制子节点",
+			nodes: []struct {
+				id         string
+				rawPeriods []*VisiblePeriod
+			}{
+				{
+					id: "pod:pod-1",
+					rawPeriods: []*VisiblePeriod{
+						{Start: t0_5, End: t1}, // [t0.5, t1] - 父节点只有这一段
+					},
+				},
+				{
+					id: "node:node-1",
+					rawPeriods: []*VisiblePeriod{
+						{Start: t0, End: t4}, // [t0, t4] - 子节点覆盖全时间段
+					},
+				},
+			},
+			edges: []struct {
+				id         string
+				fromID     string
+				toID       string
+				rawPeriods []*VisiblePeriod
+			}{
+				{
+					id:     "node_with_pod:pod-1|node-1",
+					fromID: "pod:pod-1",
+					toID:   "node:node-1",
+					rawPeriods: []*VisiblePeriod{
+						{Start: t0, End: t4}, // 边覆盖全时间段
+					},
+				},
+			},
+			rootID: "pod:pod-1",
+			expectNodeEffective: map[string][]*VisiblePeriod{
+				"pod:pod-1": {
+					{Start: t0_5, End: t1},
+				},
+				"node:node-1": {
+					{Start: t0_5, End: t1}, // 被父节点限制到 [t0.5, t1]
+				},
+			},
+			expectEdgeEffective: map[string][]*VisiblePeriod{
+				"node_with_pod:pod-1|node-1": {
+					{Start: t0_5, End: t1}, // 被父节点限制
+				},
+			},
+			description: "父节点 [t0.5-t1] 限制子节点 [t0-t4] -> 有效 [t0.5-t1]",
+		},
+		{
+			name: "无交集：父子时间段不重叠",
+			nodes: []struct {
+				id         string
+				rawPeriods []*VisiblePeriod
+			}{
+				{
+					id: "pod:pod-1",
+					rawPeriods: []*VisiblePeriod{
+						{Start: t0_5, End: t1}, // [t0.5, t1]
+					},
+				},
+				{
+					id: "node:node-1",
+					rawPeriods: []*VisiblePeriod{
+						{Start: t2_5, End: t3_5}, // [t2.5, t3.5] - 与父节点无交集
+					},
+				},
+			},
+			edges: []struct {
+				id         string
+				fromID     string
+				toID       string
+				rawPeriods []*VisiblePeriod
+			}{
+				{
+					id:     "node_with_pod:pod-1|node-1",
+					fromID: "pod:pod-1",
+					toID:   "node:node-1",
+					rawPeriods: []*VisiblePeriod{
+						{Start: t0, End: t4},
+					},
+				},
+			},
+			rootID: "pod:pod-1",
+			expectNodeEffective: map[string][]*VisiblePeriod{
+				"pod:pod-1": {
+					{Start: t0_5, End: t1},
+				},
+				"node:node-1": nil, // 无交集
+			},
+			expectEdgeEffective: map[string][]*VisiblePeriod{
+				"node_with_pod:pod-1|node-1": nil, // 无交集
+			},
+			description: "父节点 [t0.5-t1] 与子节点 [t2.5-t3.5] 无交集",
+		},
+		{
+			name: "多层传递：Pod -> Node -> Service",
+			nodes: []struct {
+				id         string
+				rawPeriods []*VisiblePeriod
+			}{
+				{
+					id: "pod:pod-1",
+					rawPeriods: []*VisiblePeriod{
+						{Start: t0_5, End: t1_5}, // [t0.5, t1.5]
+					},
+				},
+				{
+					id: "node:node-1",
+					rawPeriods: []*VisiblePeriod{
+						{Start: t0_5, End: t3}, // [t0.5, t3]
+					},
+				},
+				{
+					id: "service:svc-1",
+					rawPeriods: []*VisiblePeriod{
+						{Start: t0, End: t4}, // [t0, t4]
+					},
+				},
+			},
+			edges: []struct {
+				id         string
+				fromID     string
+				toID       string
+				rawPeriods []*VisiblePeriod
+			}{
+				{
+					id:     "node_with_pod:pod-1|node-1",
+					fromID: "pod:pod-1",
+					toID:   "node:node-1",
+					rawPeriods: []*VisiblePeriod{
+						{Start: t0, End: t4},
+					},
+				},
+				{
+					id:     "pod_with_service:node-1|svc-1",
+					fromID: "node:node-1",
+					toID:   "service:svc-1",
+					rawPeriods: []*VisiblePeriod{
+						{Start: t0, End: t4},
+					},
+				},
+			},
+			rootID: "pod:pod-1",
+			expectNodeEffective: map[string][]*VisiblePeriod{
+				"pod:pod-1": {
+					{Start: t0_5, End: t1_5}, // 根节点
+				},
+				"node:node-1": {
+					{Start: t0_5, End: t1_5}, // Pod ∩ Node = [t0.5, t1.5]
+				},
+				"service:svc-1": {
+					{Start: t0_5, End: t1_5}, // Node.Effective ∩ Service = [t0.5, t1.5]
+				},
+			},
+			expectEdgeEffective: map[string][]*VisiblePeriod{
+				"node_with_pod:pod-1|node-1": {
+					{Start: t0_5, End: t1_5},
+				},
+				"pod_with_service:node-1|svc-1": {
+					{Start: t0_5, End: t1_5}, // 继承自 node-1 的有效时间段
+				},
+			},
+			description: "三层传递：Pod [t0.5-t1.5] -> Node [t0.5-t3] -> Service [t0-t4]，逐层收窄到 [t0.5-t1.5]",
 		},
 	}
 
-	instance := newTestInstance(client)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// 构建 LivenessGraph
+			g := NewLivenessGraph(t0_5, t3_5)
 
-	req := &RelationQueryRequest{
-		FromType:     ResourceTypeNode,
-		ToType:       ResourceTypePod,
-		RelationType: RelationNodeWithPod,
-		StartTime:    time.Now().Add(-1 * time.Hour),
-		EndTime:      time.Now(),
+			// 添加节点
+			for _, n := range tt.nodes {
+				g.AddNode(&NodeLiveness{
+					ResourceID: n.id,
+					RawPeriods: n.rawPeriods,
+				})
+			}
+
+			// 添加边
+			for _, e := range tt.edges {
+				g.AddEdge(&EdgeLiveness{
+					RelationID: e.id,
+					FromID:     e.fromID,
+					ToID:       e.toID,
+					RawPeriods: e.rawPeriods,
+				})
+			}
+
+			// 计算有效时间段
+			g.ComputeEffectivePeriods(tt.rootID)
+
+			// 验证节点有效时间段
+			for nodeID, expectPeriods := range tt.expectNodeEffective {
+				node := g.GetNode(nodeID)
+				require.NotNil(t, node, "Node %s should exist", nodeID)
+
+				if expectPeriods == nil {
+					assert.Empty(t, node.EffectivePeriods, "Node %s should have no effective periods", nodeID)
+				} else {
+					require.Len(t, node.EffectivePeriods, len(expectPeriods),
+						"Node %s effective periods count mismatch", nodeID)
+					for i, expect := range expectPeriods {
+						assert.Equal(t, expect.Start, node.EffectivePeriods[i].Start,
+							"Node %s period %d start mismatch", nodeID, i)
+						assert.Equal(t, expect.End, node.EffectivePeriods[i].End,
+							"Node %s period %d end mismatch", nodeID, i)
+					}
+				}
+			}
+
+			// 验证边有效时间段
+			for edgeID, expectPeriods := range tt.expectEdgeEffective {
+				edge := g.GetEdge(edgeID)
+				require.NotNil(t, edge, "Edge %s should exist", edgeID)
+
+				if expectPeriods == nil {
+					assert.Empty(t, edge.EffectivePeriods, "Edge %s should have no effective periods", edgeID)
+				} else {
+					require.Len(t, edge.EffectivePeriods, len(expectPeriods),
+						"Edge %s effective periods count mismatch", edgeID)
+					for i, expect := range expectPeriods {
+						assert.Equal(t, expect.Start, edge.EffectivePeriods[i].Start,
+							"Edge %s period %d start mismatch", edgeID, i)
+						assert.Equal(t, expect.End, edge.EffectivePeriods[i].End,
+							"Edge %s period %d end mismatch", edgeID, i)
+					}
+				}
+			}
+		})
 	}
-
-	resp, err := instance.QueryRelations(context.Background(), req)
-	require.NoError(t, err)
-	assert.NotNil(t, resp)
-	assert.Len(t, resp.Relations, 1)
 }
 
 // TestInstance_GetVisiblePeriods 测试获取资源在查询时间范围内的可见时间段
@@ -341,68 +655,4 @@ func TestInstance_GetVisiblePeriods(t *testing.T) {
 			}
 		})
 	}
-}
-
-func TestInstance_CheckLiveness(t *testing.T) {
-	// 简单测试：有记录返回 true，无记录返回 false
-	t.Run("有 liveness 记录返回 true", func(t *testing.T) {
-		client := &mockClient{
-			executeFunc: func(ctx context.Context, query string, vars map[string]any) (any, error) {
-				return []any{
-					map[string]any{
-						"id":           "liveness-1",
-						"period_start": float64(time.Now().Add(-1 * time.Hour).UnixMilli()),
-						"period_end":   float64(time.Now().UnixMilli()),
-						"is_active":    true,
-					},
-				}, nil
-			},
-		}
-
-		instance := newTestInstance(client)
-		alive, err := instance.CheckLiveness(
-			context.Background(),
-			"pod:⟨bcs_cluster_id=BCS-K8S-001,namespace=default,pod=pod-0⟩",
-			time.Now().Add(-30*time.Minute).UnixMilli(),
-			time.Now().UnixMilli(),
-		)
-
-		require.NoError(t, err)
-		assert.True(t, alive)
-	})
-
-	t.Run("无 liveness 记录返回 false", func(t *testing.T) {
-		client := &mockClient{
-			executeFunc: func(ctx context.Context, query string, vars map[string]any) (any, error) {
-				return []any{}, nil
-			},
-		}
-
-		instance := newTestInstance(client)
-		alive, err := instance.CheckLiveness(
-			context.Background(),
-			"pod:⟨bcs_cluster_id=BCS-K8S-001,namespace=default,pod=pod-0⟩",
-			time.Now().Add(-30*time.Minute).UnixMilli(),
-			time.Now().UnixMilli(),
-		)
-
-		require.NoError(t, err)
-		assert.False(t, alive)
-	})
-}
-
-func TestInstance_Health(t *testing.T) {
-	client := &mockClient{}
-	instance := newTestInstance(client)
-
-	err := instance.Health(context.Background())
-	assert.NoError(t, err)
-}
-
-func TestInstance_SetTolerance(t *testing.T) {
-	client := &mockClient{}
-	instance := newTestInstance(client)
-
-	instance.SetTolerance(5 * time.Minute)
-	assert.Equal(t, 5*time.Minute, instance.tolerance)
 }
