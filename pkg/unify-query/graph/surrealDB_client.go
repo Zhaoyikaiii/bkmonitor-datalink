@@ -16,6 +16,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 
 	"github.com/TencentBlueKing/bkmonitor-datalink/pkg/unify-query/service/tsdb"
 	"github.com/TencentBlueKing/bkmonitor-datalink/pkg/unify-query/trace"
@@ -25,6 +26,7 @@ import (
 type NativeClient struct {
 	config     *ClientConfig
 	httpClient *http.Client
+	timeout    time.Duration
 }
 
 // NewNativeClient 创建原生 SurrealDB 客户端
@@ -33,12 +35,20 @@ func NewNativeClient(cfg *ClientConfig) (*NativeClient, error) {
 		return nil, fmt.Errorf("address is required for native client")
 	}
 
+	timeout := tsdb.GraphTimeout
 	return &NativeClient{
 		config: cfg,
 		httpClient: &http.Client{
-			Timeout: tsdb.GraphTimeout,
+			Timeout: timeout,
 		},
+		timeout: timeout,
 	}, nil
+}
+
+// SetTimeout 设置查询超时时间
+func (c *NativeClient) SetTimeout(d time.Duration) {
+	c.timeout = d
+	c.httpClient.Timeout = d
 }
 
 // Connect 建立连接

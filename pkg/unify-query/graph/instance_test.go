@@ -11,6 +11,8 @@ package graph
 
 import (
 	"context"
+	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -32,6 +34,7 @@ type mockClient struct {
 func (m *mockClient) Connect(ctx context.Context) error { return nil }
 func (m *mockClient) Close() error                      { return nil }
 func (m *mockClient) Health(ctx context.Context) error  { return nil }
+func (m *mockClient) SetTimeout(d time.Duration)        {}
 
 func (m *mockClient) Execute(ctx context.Context, query string, vars map[string]any) (any, error) {
 	if m.executeFunc != nil {
@@ -153,13 +156,13 @@ func TestVisiblePeriod_Overlap(t *testing.T) {
 func TestLivenessGraph_ComputeEffectivePeriods(t *testing.T) {
 	// 时间点定义（使用相对偏移，单位：小时）
 	t0 := int64(0)
-	t0_5 := int64(500)   // t0.5
-	t1 := int64(1000)    // t1
-	t1_5 := int64(1500)  // t1.5
-	t2_5 := int64(2500)  // t2.5
-	t3 := int64(3000)    // t3
-	t3_5 := int64(3500)  // t3.5
-	t4 := int64(4000)    // t4
+	t0_5 := int64(500)  // t0.5
+	t1 := int64(1000)   // t1
+	t1_5 := int64(1500) // t1.5
+	t2_5 := int64(2500) // t2.5
+	t3 := int64(3000)   // t3
+	t3_5 := int64(3500) // t3.5
+	t4 := int64(4000)   // t4
 
 	tests := []struct {
 		name string
@@ -189,8 +192,8 @@ func TestLivenessGraph_ComputeEffectivePeriods(t *testing.T) {
 				{
 					id: "pod:pod-1",
 					rawPeriods: []*VisiblePeriod{
-						{Start: t0_5, End: t1},   // [t0.5, t1]
-						{Start: t3, End: t3_5},   // [t3, t3.5]
+						{Start: t0_5, End: t1}, // [t0.5, t1]
+						{Start: t3, End: t3_5}, // [t3, t3.5]
 					},
 				},
 				{
@@ -212,25 +215,25 @@ func TestLivenessGraph_ComputeEffectivePeriods(t *testing.T) {
 					fromID: "pod:pod-1",
 					toID:   "node:node-1",
 					rawPeriods: []*VisiblePeriod{
-						{Start: t0_5, End: t1},   // [t0.5, t1]
-						{Start: t3, End: t3_5},   // [t3, t3.5]
+						{Start: t0_5, End: t1}, // [t0.5, t1]
+						{Start: t3, End: t3_5}, // [t3, t3.5]
 					},
 				},
 			},
 			rootID: "pod:pod-1",
 			expectNodeEffective: map[string][]*VisiblePeriod{
 				"pod:pod-1": {
-					{Start: t0_5, End: t1},   // 根节点 = RawPeriods
+					{Start: t0_5, End: t1}, // 根节点 = RawPeriods
 					{Start: t3, End: t3_5},
 				},
 				"node:node-1": {
-					{Start: t0_5, End: t1},   // 边的有效时间段
+					{Start: t0_5, End: t1}, // 边的有效时间段
 					{Start: t3, End: t3_5},
 				},
 			},
 			expectEdgeEffective: map[string][]*VisiblePeriod{
 				"node_with_pod:pod-1|node-1": {
-					{Start: t0_5, End: t1},   // Pod ∩ Node ∩ Relation
+					{Start: t0_5, End: t1}, // Pod ∩ Node ∩ Relation
 					{Start: t3, End: t3_5},
 				},
 			},
@@ -589,9 +592,9 @@ func TestInstance_GetVisiblePeriods(t *testing.T) {
 				periodStart time.Time
 				periodEnd   time.Time
 			}{
-				{baseTime.Add(-2 * time.Hour), baseTime.Add(-1 * time.Hour)},            // 10:00-11:00
-				{baseTime.Add(-30 * time.Minute), baseTime.Add(30 * time.Minute)},       // 11:30-12:30
-				{baseTime.Add(1*time.Hour + 30*time.Minute), baseTime.Add(2*time.Hour)}, // 13:30-14:00
+				{baseTime.Add(-2 * time.Hour), baseTime.Add(-1 * time.Hour)},              // 10:00-11:00
+				{baseTime.Add(-30 * time.Minute), baseTime.Add(30 * time.Minute)},         // 11:30-12:30
+				{baseTime.Add(1*time.Hour + 30*time.Minute), baseTime.Add(2 * time.Hour)}, // 13:30-14:00
 			},
 			queryStart: baseTime.Add(-90 * time.Minute), // 10:30
 			queryEnd:   baseTime.Add(90 * time.Minute),  // 13:30
@@ -655,4 +658,121 @@ func TestInstance_GetVisiblePeriods(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestBuildLivenessGraph_SkipEdgeWhenTargetLivenessFails
+// 目标节点 liveness 查询失败时：
+//   - 边不会加入图，保持节点/边一致性
+//   - 错误会被记录在 TraversalErrors 中
+func TestBuildLivenessGraph_SkipEdgeWhenTargetLivenessFails(t *testing.T) {
+	rootID := "pod:⟨bcs_cluster_id=BCS-K8S-001,namespace=default,pod=pod-0⟩"
+	targetID := "system:⟨bk_cloud_id=0,bk_target_ip=1.1.1.1⟩"
+
+	client := &mockClient{
+		executeFunc: func(ctx context.Context, query string, vars map[string]any) (any, error) {
+			switch {
+			case strings.Contains(query, "pod_liveness_record"):
+				return []any{
+					map[string]any{
+						"id":           "root-live",
+						"period_start": float64(0),
+						"period_end":   float64(1000),
+						"is_active":    true,
+						"created_at":   float64(0),
+						"updated_at":   float64(1000),
+					},
+				}, nil
+			case strings.Contains(query, "pod_to_system"):
+				return []any{
+					map[string]any{
+						"relation_id":  "pod_to_system:1",
+						"from_id":      rootID,
+						"to_id":        targetID,
+						"period_start": float64(0),
+						"period_end":   float64(1000),
+					},
+				}, nil
+			case strings.Contains(query, targetID):
+				return nil, errors.New("query failed")
+			default:
+				return nil, nil
+			}
+		},
+	}
+
+	instance := newTestInstance(client)
+	req := &QueryRequest{
+		Timestamp:     1000,
+		LookBackDelta: 1000,
+		SourceType:    ResourceTypePod,
+		SourceInfo:    map[string]string{"bcs_cluster_id": "BCS-K8S-001", "namespace": "default", "pod": "pod-0"},
+		TargetType:    ResourceTypeSystem,
+	}
+
+	graph, err := instance.BuildLivenessGraph(context.Background(), req)
+	require.NoError(t, err)
+
+	assert.True(t, graph.HasErrors(), "expected traversal errors to be recorded")
+	assert.Empty(t, graph.Edges, "edge should not be added when target liveness fails")
+	assert.NotNil(t, graph.GetNode(rootID), "root node should exist")
+	assert.Nil(t, graph.GetNode(targetID), "target node should not be added when liveness fails")
+}
+
+// TestBuildLivenessGraph_RecordRelationQueryError
+// 关系查询失败时应记录错误，且不会添加边
+func TestBuildLivenessGraph_RecordRelationQueryError(t *testing.T) {
+	rootID := "pod:⟨bcs_cluster_id=BCS-K8S-001,namespace=default,pod=pod-0⟩"
+
+	client := &mockClient{
+		executeFunc: func(ctx context.Context, query string, vars map[string]any) (any, error) {
+			switch {
+			case strings.Contains(query, "pod_liveness_record"):
+				return []any{
+					map[string]any{
+						"id":           "root-live",
+						"period_start": float64(0),
+						"period_end":   float64(1000),
+						"is_active":    true,
+						"created_at":   float64(0),
+						"updated_at":   float64(1000),
+					},
+				}, nil
+			case strings.Contains(query, "pod_to_system"):
+				return nil, errors.New("relation query failed")
+			default:
+				return nil, nil
+			}
+		},
+	}
+
+	instance := newTestInstance(client)
+	req := &QueryRequest{
+		Timestamp:     1000,
+		LookBackDelta: 1000,
+		SourceType:    ResourceTypePod,
+		SourceInfo:    map[string]string{"bcs_cluster_id": "BCS-K8S-001", "namespace": "default", "pod": "pod-0"},
+		TargetType:    ResourceTypeSystem,
+	}
+
+	graph, err := instance.BuildLivenessGraph(context.Background(), req)
+	require.NoError(t, err)
+
+	assert.True(t, graph.HasErrors(), "relation query error should be recorded")
+	assert.Empty(t, graph.Edges, "edges should not be added when relation query fails")
+	assert.NotNil(t, graph.GetNode(rootID))
+}
+
+// TestQueryBuilder_EscapeIdentifiers 确保查询字符串对资源ID进行了转义
+func TestQueryBuilder_EscapeIdentifiers(t *testing.T) {
+	builder := NewQueryBuilder()
+	builder.DisableLimit()
+
+	resourceID := "pod:⟨name=o'clock\\path⟩"
+
+	liveSQL := builder.BuildLivenessQuery(ResourceTypePod, resourceID, 0, 1000)
+	assert.Contains(t, liveSQL, "pod_id = 'pod:⟨name=o\\'clock\\\\path⟩'")
+	assert.NotContains(t, liveSQL, "o'clock\\path")
+
+	relationSQL := builder.BuildRelatedResourcesQuery(RelationPodToSystem, resourceID, DirectionOutbound, 0, 1000)
+	assert.Contains(t, relationSQL, "WHERE in = 'pod:⟨name=o\\'clock\\\\path⟩'")
 }

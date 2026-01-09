@@ -16,6 +16,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 
 	"github.com/TencentBlueKing/bkmonitor-datalink/pkg/unify-query/service/tsdb"
 )
@@ -24,6 +25,7 @@ import (
 type BKBaseClient struct {
 	config     *ClientConfig
 	httpClient *http.Client
+	timeout    time.Duration
 }
 
 // NewBKBaseClient 创建 BKBase SurrealDB 客户端
@@ -32,12 +34,20 @@ func NewBKBaseClient(cfg *ClientConfig) (*BKBaseClient, error) {
 		return nil, fmt.Errorf("address is required for BKBase client")
 	}
 
+	timeout := tsdb.GraphTimeout
 	return &BKBaseClient{
 		config: cfg,
 		httpClient: &http.Client{
-			Timeout: tsdb.GraphTimeout,
+			Timeout: timeout,
 		},
+		timeout: timeout,
 	}, nil
+}
+
+// SetTimeout 设置查询超时时间
+func (c *BKBaseClient) SetTimeout(d time.Duration) {
+	c.timeout = d
+	c.httpClient.Timeout = d
 }
 
 func (c *BKBaseClient) Connect(ctx context.Context) error {

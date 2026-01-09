@@ -13,6 +13,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/TencentBlueKing/bkmonitor-datalink/pkg/unify-query/log"
 	"github.com/TencentBlueKing/bkmonitor-datalink/pkg/unify-query/trace"
 )
 
@@ -46,6 +47,14 @@ func (i *Instance) GetLivenessRecords(ctx context.Context, resourceID string, st
 	records, err := i.parser.ParseLivenessRecords(result)
 	if err != nil {
 		return nil, err
+	}
+
+	// 检测截断：如果返回的记录数等于 maxLimit，可能存在截断
+	maxLimit := i.builder.GetMaxLimit()
+	if maxLimit > 0 && len(records) >= maxLimit {
+		log.Warnf(ctx, "liveness records may be truncated: resource=%s, count=%d, limit=%d",
+			resourceID, len(records), maxLimit)
+		span.Set("truncated", true)
 	}
 
 	span.Set("result-count", len(records))
@@ -211,14 +220,11 @@ func (i *Instance) bfsTraversal(ctx context.Context, graph *LivenessGraph, req *
 				continue
 			}
 
-			// 确定遍历方向和目标类型
-			var targetType ResourceType
+			// 确定遍历方向
 			var direction TraversalDirection
 			if schema.FromType == currentNode.ResourceType {
-				targetType = schema.ToType
 				direction = DirectionOutbound
 			} else {
-				targetType = schema.FromType
 				direction = DirectionInbound
 			}
 
@@ -236,7 +242,11 @@ func (i *Instance) bfsTraversal(ctx context.Context, graph *LivenessGraph, req *
 				ctx, current.resourceID, relationType, direction, queryStart, queryEnd,
 			)
 			if err != nil {
-				// 记录错误但继续遍历
+				// 记录错误到图中，让调用者知道图可能不完整
+				errMsg := fmt.Sprintf("failed to query relations: resource=%s, type=%s, direction=%s: %v",
+					current.resourceID, relationType, direction, err)
+				graph.AddTraversalError(errMsg)
+				log.Warnf(ctx, errMsg)
 				continue
 			}
 
@@ -247,22 +257,10 @@ func (i *Instance) bfsTraversal(ctx context.Context, graph *LivenessGraph, req *
 					continue // 关系在查询时间范围内不可见
 				}
 
-				// 获取目标节点的 liveness（使用缓存避免重复查询）
-				targetPeriods, cached := nodeLiveness[rr.TargetID]
-				if !cached {
-					// 首次遇到此目标节点或之前查询失败，查询其真实 liveness
-					var queryErr error
-					targetPeriods, queryErr = i.GetVisiblePeriods(ctx, rr.TargetID, queryStart, queryEnd)
-					if queryErr != nil {
-						// 查询失败，不缓存，后续边可重试
-						continue
-					}
-					// 只有成功查询才缓存（包括空结果，空结果表示节点确实不可见）
-					nodeLiveness[rr.TargetID] = targetPeriods
-				}
-
-				// 如果目标节点没有有效 liveness，跳过此边
-				if len(targetPeriods) == 0 {
+				// 从目标节点ID解析实际的资源类型
+				// 这比依赖 schema 更准确，因为动态关系的 FromType/ToType 可能相同
+				actualTargetType, _, parseErr := ParseResourceID(rr.TargetID)
+				if parseErr != nil {
 					continue
 				}
 
@@ -270,14 +268,38 @@ func (i *Instance) bfsTraversal(ctx context.Context, graph *LivenessGraph, req *
 				edge.Direction = direction
 				edge.Category = schema.Category
 
-				// 添加边（边总是添加，因为可能有多条边指向同一目标）
+				// 获取目标节点的 liveness（使用缓存避免重复查询）
+				targetPeriods, cached := nodeLiveness[rr.TargetID]
+				if !cached {
+					// 首次遇到此目标节点或之前查询失败，查询其真实 liveness
+					var queryErr error
+					targetPeriods, queryErr = i.GetVisiblePeriods(ctx, rr.TargetID, queryStart, queryEnd)
+					if queryErr != nil {
+						// 查询失败，记录错误，不添加边也不添加节点
+						errMsg := fmt.Sprintf("failed to get target liveness: target=%s, edge=%s: %v",
+							rr.TargetID, edge.RelationID, queryErr)
+						graph.AddTraversalError(errMsg)
+						log.Warnf(ctx, errMsg)
+						continue
+					}
+					// 只有成功查询才缓存（包括空结果，空结果表示节点确实不可见）
+					nodeLiveness[rr.TargetID] = targetPeriods
+				}
+
+				// 如果目标节点没有有效 liveness，不添加边也不添加节点
+				if len(targetPeriods) == 0 {
+					continue
+				}
+
+				// 目标节点有效，现在才添加边
+				// 这确保了 graph.Edges 和 graph.Nodes 的一致性
 				graph.AddEdge(edge)
 
 				// 如果目标节点尚未添加到图中，添加它
 				if graph.GetNode(rr.TargetID) == nil {
 					targetNode := &NodeLiveness{
 						ResourceID:   rr.TargetID,
-						ResourceType: targetType,
+						ResourceType: actualTargetType,
 						RawPeriods:   targetPeriods,
 					}
 					graph.AddNode(targetNode)
@@ -325,6 +347,17 @@ func (i *Instance) queryRelatedResources(
 	relatedResources, err := i.parser.ParseRelatedResources(result, relationType, direction, queryStart, queryEnd)
 	if err != nil {
 		return nil, err
+	}
+
+	// 检测截断：检查原始结果数量是否达到 maxLimit
+	// 注意：relatedResources 是按 relationID 分组后的结果，需要检查原始记录数
+	if data, ok := result.([]any); ok {
+		maxLimit := i.builder.GetMaxLimit()
+		if maxLimit > 0 && len(data) >= maxLimit {
+			log.Warnf(ctx, "related resources may be truncated: resource=%s, relation=%s, count=%d, limit=%d",
+				resourceID, relationType, len(data), maxLimit)
+			span.Set("truncated", true)
+		}
 	}
 
 	span.Set("related-count", len(relatedResources))

@@ -34,6 +34,10 @@ type LivenessGraph struct {
 
 	// 邻接表：资源ID -> 关联ID列表（出边）
 	Adjacency map[string][]string `json:"adjacency"`
+
+	// 遍历过程中遇到的错误（非致命错误，图可能不完整）
+	// 调用者应检查此字段以判断图是否完整
+	TraversalErrors []string `json:"traversal_errors,omitempty"`
 }
 
 // NodeLiveness 节点存活信息
@@ -92,9 +96,16 @@ func (g *LivenessGraph) AddNode(node *NodeLiveness) {
 }
 
 // AddEdge 添加边
+// 如果边已存在（相同 RelationID），会更新边但不会重复添加到邻接表
 func (g *LivenessGraph) AddEdge(edge *EdgeLiveness) {
+	// 检查边是否已存在
+	_, exists := g.Edges[edge.RelationID]
 	g.Edges[edge.RelationID] = edge
-	g.Adjacency[edge.FromID] = append(g.Adjacency[edge.FromID], edge.RelationID)
+
+	// 只有新边才添加到邻接表
+	if !exists {
+		g.Adjacency[edge.FromID] = append(g.Adjacency[edge.FromID], edge.RelationID)
+	}
 }
 
 // GetNode 获取节点
@@ -105,6 +116,21 @@ func (g *LivenessGraph) GetNode(resourceID string) *NodeLiveness {
 // GetEdge 获取边
 func (g *LivenessGraph) GetEdge(relationID string) *EdgeLiveness {
 	return g.Edges[relationID]
+}
+
+// AddTraversalError 记录遍历过程中的错误
+func (g *LivenessGraph) AddTraversalError(errMsg string) {
+	g.TraversalErrors = append(g.TraversalErrors, errMsg)
+}
+
+// HasErrors 检查图是否有遍历错误
+func (g *LivenessGraph) HasErrors() bool {
+	return len(g.TraversalErrors) > 0
+}
+
+// IsComplete 检查图是否完整（没有遍历错误）
+func (g *LivenessGraph) IsComplete() bool {
+	return len(g.TraversalErrors) == 0
 }
 
 // GetOutEdges 获取节点的出边
@@ -132,6 +158,9 @@ func (g *LivenessGraph) GetOutEdges(resourceID string) []*EdgeLiveness {
 //
 // 多路径处理：使用迭代收敛算法，确保所有入边都被考虑
 // 当一个节点可通过多条边到达时，取所有边的 effective periods 的并集
+//
+// 注意：此算法假设图是从根节点可达的 DAG 或树结构
+// 对于环形图，算法会在 maxIterations 次迭代后停止
 func (g *LivenessGraph) ComputeEffectivePeriods(rootID string) {
 	root := g.Nodes[rootID]
 	if root == nil {
@@ -147,9 +176,15 @@ func (g *LivenessGraph) ComputeEffectivePeriods(rootID string) {
 		inEdges[edge.ToID] = append(inEdges[edge.ToID], edge)
 	}
 
-	// 迭代收敛算法：重复处理直到没有变化
-	// 这确保了多路径场景下所有入边都被正确处理
-	for {
+	// 最大迭代次数 = 节点数 + 1，足以让信息传播到所有可达节点
+	// 对于 DAG，最多需要 |V| 次迭代；额外 1 次用于确认收敛
+	maxIterations := len(g.Nodes) + 1
+	if maxIterations < 2 {
+		maxIterations = 2
+	}
+
+	// 迭代收敛算法：重复处理直到没有变化或达到最大迭代次数
+	for iteration := 0; iteration < maxIterations; iteration++ {
 		changed := false
 
 		// 遍历所有边，更新边的 EffectivePeriods
@@ -160,18 +195,17 @@ func (g *LivenessGraph) ComputeEffectivePeriods(rootID string) {
 				continue
 			}
 
-			// 只有当源节点有 EffectivePeriods 时才能计算边的 EffectivePeriods
-			if len(fromNode.EffectivePeriods) == 0 {
-				continue
-			}
-
 			// 计算边的有效时间段
 			// = 边的原始时间段 ∩ 源节点有效时间段 ∩ 目标节点原始时间段
-			newEdgePeriods := ComputeOverlapPeriods(
-				edge.RawPeriods,
-				fromNode.EffectivePeriods,
-				toNode.RawPeriods,
-			)
+			// 注意：如果源节点的 EffectivePeriods 为空，结果也为空
+			var newEdgePeriods []*VisiblePeriod
+			if len(fromNode.EffectivePeriods) > 0 {
+				newEdgePeriods = ComputeOverlapPeriods(
+					edge.RawPeriods,
+					fromNode.EffectivePeriods,
+					toNode.RawPeriods,
+				)
+			}
 
 			// 检查边的 EffectivePeriods 是否有变化
 			if !periodsEqual(edge.EffectivePeriods, newEdgePeriods) {
@@ -192,9 +226,13 @@ func (g *LivenessGraph) ComputeEffectivePeriods(rootID string) {
 				unionPeriods = UnionPeriodLists(unionPeriods, edge.EffectivePeriods)
 			}
 
+			// 规范化后比较，避免顺序敏感导致的假阳性变化检测
+			normalizedUnion := normalizePeriods(unionPeriods)
+			normalizedCurrent := normalizePeriods(node.EffectivePeriods)
+
 			// 检查节点的 EffectivePeriods 是否有变化
-			if !periodsEqual(node.EffectivePeriods, unionPeriods) {
-				node.EffectivePeriods = unionPeriods
+			if !periodsEqual(normalizedCurrent, normalizedUnion) {
+				node.EffectivePeriods = normalizedUnion
 				changed = true
 			}
 		}
@@ -206,7 +244,8 @@ func (g *LivenessGraph) ComputeEffectivePeriods(rootID string) {
 	}
 }
 
-// periodsEqual 检查两个时间段列表是否相等
+// periodsEqual 检查两个时间段列表是否相等（顺序无关）
+// 假设两个列表都已经过 normalizePeriods 处理（排序+合并）
 func periodsEqual(a, b []*VisiblePeriod) bool {
 	if len(a) != len(b) {
 		return false
@@ -217,6 +256,49 @@ func periodsEqual(a, b []*VisiblePeriod) bool {
 		}
 	}
 	return true
+}
+
+// normalizePeriods 对时间段列表进行规范化：排序并合并重叠区间
+// 返回一个新的规范化列表，确保比较时顺序一致
+func normalizePeriods(periods []*VisiblePeriod) []*VisiblePeriod {
+	if len(periods) == 0 {
+		return nil
+	}
+	if len(periods) == 1 {
+		return []*VisiblePeriod{{Start: periods[0].Start, End: periods[0].End}}
+	}
+
+	// 复制并按开始时间排序
+	sorted := make([]*VisiblePeriod, len(periods))
+	copy(sorted, periods)
+	for i := 0; i < len(sorted)-1; i++ {
+		for j := i + 1; j < len(sorted); j++ {
+			if sorted[j].Start < sorted[i].Start ||
+				(sorted[j].Start == sorted[i].Start && sorted[j].End < sorted[i].End) {
+				sorted[i], sorted[j] = sorted[j], sorted[i]
+			}
+		}
+	}
+
+	// 合并重叠或相邻的时间段
+	result := make([]*VisiblePeriod, 0, len(sorted))
+	current := &VisiblePeriod{Start: sorted[0].Start, End: sorted[0].End}
+
+	for i := 1; i < len(sorted); i++ {
+		if sorted[i].Start <= current.End {
+			// 重叠或相邻，扩展当前时间段
+			if sorted[i].End > current.End {
+				current.End = sorted[i].End
+			}
+		} else {
+			// 不重叠，保存当前时间段，开始新的
+			result = append(result, current)
+			current = &VisiblePeriod{Start: sorted[i].Start, End: sorted[i].End}
+		}
+	}
+	result = append(result, current)
+
+	return result
 }
 
 // ComputeOverlapPeriods 计算多个时间段列表的交集

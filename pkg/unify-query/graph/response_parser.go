@@ -71,10 +71,12 @@ type RelatedResource struct {
 
 // ParseRelatedResources 解析关系查询结果
 // 返回确定性配对的边和目标节点ID列表
+// 注意：direction 参数保留用于 API 一致性，但当前未使用
+// 因为 query_builder 已经将 from_id 映射为当前节点，to_id 映射为目标节点
 func (p *ResponseParser) ParseRelatedResources(
 	result any,
 	relationType RelationType,
-	direction TraversalDirection,
+	_ TraversalDirection, // direction 当前未使用，由 query_builder 处理
 	queryStart, queryEnd int64,
 ) ([]*RelatedResource, error) {
 	data, ok := result.([]any)
@@ -118,12 +120,10 @@ func (p *ResponseParser) ParseRelatedResources(
 		period := &VisiblePeriod{Start: visibleStart, End: visibleEnd}
 
 		// 确定目标节点ID
-		var targetID string
-		if direction == DirectionOutbound {
-			targetID = toID
-		} else {
-			targetID = fromID
-		}
+		// from_id 始终是当前节点（查询匹配的节点）
+		// to_id 始终是目标节点（需要遍历到的节点）
+		// 无论方向如何，目标节点都是 toID
+		targetID := toID
 
 		if targetID == "" {
 			continue

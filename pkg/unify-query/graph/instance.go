@@ -77,6 +77,20 @@ func (i *Instance) Close() error {
 // SetTimeout 设置查询超时时间
 func (i *Instance) SetTimeout(d time.Duration) {
 	i.timeout = d
+	i.client.SetTimeout(d)
+}
+
+// SetMaxLimit 设置查询结果最大行数
+// 设置为 0 或负数可禁用限制
+func (i *Instance) SetMaxLimit(limit int) {
+	i.maxLimit = limit
+	i.builder.SetMaxLimit(limit)
+}
+
+// DisableLimit 禁用查询结果限制
+func (i *Instance) DisableLimit() {
+	i.maxLimit = 0
+	i.builder.DisableLimit()
 }
 
 // SetTolerance 设置时间有效性检查的回溯容忍度

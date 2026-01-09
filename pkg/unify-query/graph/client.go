@@ -12,6 +12,7 @@ package graph
 import (
 	"context"
 	"fmt"
+	"time"
 )
 
 // Client SurrealDB 客户端接口
@@ -20,6 +21,7 @@ type Client interface {
 	Close() error
 	Execute(ctx context.Context, query string, vars map[string]any) (any, error)
 	Health(ctx context.Context) error
+	SetTimeout(d time.Duration)
 }
 
 // ClientType 客户端类型
