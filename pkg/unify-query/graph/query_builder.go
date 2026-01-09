@@ -33,11 +33,32 @@ func (b *QueryBuilder) SetTolerance(d time.Duration) {
 	b.tolerance = d
 }
 
+// GetTolerance 获取时间容忍度
+func (b *QueryBuilder) GetTolerance() time.Duration {
+	return b.tolerance
+}
+
+// applyTolerance 应用时间容忍度，扩展查询时间窗口
+// 返回扩展后的 startTime 和 endTime
+func (b *QueryBuilder) applyTolerance(startTime, endTime int64) (int64, int64) {
+	toleranceMs := b.tolerance.Milliseconds()
+	adjustedStart := startTime - toleranceMs
+	if adjustedStart < 0 {
+		adjustedStart = 0
+	}
+	adjustedEnd := endTime + toleranceMs
+	return adjustedStart, adjustedEnd
+}
+
 // BuildLivenessQuery 构建存活记录查询
 // 查询条件：period_start <= endTime AND period_end >= startTime
+// 时间窗口会应用 tolerance 进行扩展
 func (b *QueryBuilder) BuildLivenessQuery(resourceType ResourceType, resourceID string, startTime, endTime int64) string {
 	tableName := GetLivenessTableName(resourceType)
 	fieldName := string(resourceType) + "_id"
+
+	// 应用 tolerance 扩展时间窗口
+	adjustedStart, adjustedEnd := b.applyTolerance(startTime, endTime)
 
 	return fmt.Sprintf(`
 SELECT * FROM %s 
@@ -45,12 +66,16 @@ WHERE %s = '%s'
 AND period_start <= %d 
 AND period_end >= %d
 ORDER BY period_start ASC
-`, tableName, fieldName, resourceID, endTime, startTime)
+`, tableName, fieldName, resourceID, adjustedEnd, adjustedStart)
 }
 
 // BuildRelationLivenessQuery 构建关联存活记录查询
+// 时间窗口会应用 tolerance 进行扩展
 func (b *QueryBuilder) BuildRelationLivenessQuery(relationType RelationType, relationID string, startTime, endTime int64) string {
 	tableName := GetRelationLivenessTableName(relationType)
+
+	// 应用 tolerance 扩展时间窗口
+	adjustedStart, adjustedEnd := b.applyTolerance(startTime, endTime)
 
 	return fmt.Sprintf(`
 SELECT * FROM %s 
@@ -58,11 +83,12 @@ WHERE relation_id = '%s'
 AND period_start <= %d 
 AND period_end >= %d
 ORDER BY period_start ASC
-`, tableName, relationID, endTime, startTime)
+`, tableName, relationID, adjustedEnd, adjustedStart)
 }
 
 // BuildRelatedResourcesQuery 构建查询与指定资源相关的所有关系和目标资源
 // 返回关系记录及其关联的目标资源 liveness
+// 时间窗口会应用 tolerance 进行扩展
 func (b *QueryBuilder) BuildRelatedResourcesQuery(
 	relationType RelationType,
 	resourceID string,
@@ -83,6 +109,9 @@ func (b *QueryBuilder) BuildRelatedResourcesQuery(
 		targetField = FieldIn
 	}
 
+	// 应用 tolerance 扩展时间窗口
+	adjustedStart, adjustedEnd := b.applyTolerance(startTime, endTime)
+
 	// SurrealDB 查询：查找关系及其 liveness，同时获取目标资源的 liveness
 	return fmt.Sprintf(`
 SELECT 
@@ -97,5 +126,5 @@ WHERE %s = '%s'
 AND period_start <= %d 
 AND period_end >= %d
 ORDER BY period_start ASC
-`, matchField, targetField, relationTable, matchField, resourceID, endTime, startTime)
+`, matchField, targetField, relationTable, matchField, resourceID, adjustedEnd, adjustedStart)
 }

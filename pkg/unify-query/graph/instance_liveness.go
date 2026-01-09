@@ -168,8 +168,15 @@ func (i *Instance) bfsTraversal(ctx context.Context, graph *LivenessGraph, req *
 		hop        int
 	}
 	queue := []queueItem{{rootID, 0}}
-	visited := make(map[string]bool)
-	visited[rootID] = true
+
+	// queued 记录节点是否已加入过队列（用于控制 BFS 遍历）
+	// 注意：节点可能通过多条边到达，我们需要处理所有边，但只入队一次
+	queued := make(map[string]bool)
+	queued[rootID] = true
+
+	// nodeLiveness 缓存已成功查询的节点 liveness，避免重复查询
+	// 只有成功查询且有结果时才缓存，查询失败或暂时无结果不缓存（允许后续边重试）
+	nodeLiveness := make(map[string][]*VisiblePeriod)
 
 	for len(queue) > 0 {
 		current := queue[0]
@@ -224,8 +231,8 @@ func (i *Instance) bfsTraversal(ctx context.Context, graph *LivenessGraph, req *
 				}
 			}
 
-			// 查询该关系类型下与当前资源相关的所有边和目标节点
-			edges, targetNodes, err := i.queryRelatedResources(
+			// 查询该关系类型下与当前资源相关的所有边
+			relatedResources, err := i.queryRelatedResources(
 				ctx, current.resourceID, relationType, direction, queryStart, queryEnd,
 			)
 			if err != nil {
@@ -233,30 +240,53 @@ func (i *Instance) bfsTraversal(ctx context.Context, graph *LivenessGraph, req *
 				continue
 			}
 
-			// 添加边和目标节点到图中
-			for idx, edge := range edges {
+			// 处理每条边和目标节点
+			for _, rr := range relatedResources {
+				edge := rr.Edge
 				if len(edge.RawPeriods) == 0 {
 					continue // 关系在查询时间范围内不可见
 				}
 
-				targetNode := targetNodes[idx]
-				if len(targetNode.RawPeriods) == 0 {
-					continue // 目标资源在查询时间范围内不可见
+				// 获取目标节点的 liveness（使用缓存避免重复查询）
+				targetPeriods, cached := nodeLiveness[rr.TargetID]
+				if !cached {
+					// 首次遇到此目标节点或之前查询失败，查询其真实 liveness
+					var queryErr error
+					targetPeriods, queryErr = i.GetVisiblePeriods(ctx, rr.TargetID, queryStart, queryEnd)
+					if queryErr != nil {
+						// 查询失败，不缓存，后续边可重试
+						continue
+					}
+					// 只有成功查询才缓存（包括空结果，空结果表示节点确实不可见）
+					nodeLiveness[rr.TargetID] = targetPeriods
+				}
+
+				// 如果目标节点没有有效 liveness，跳过此边
+				if len(targetPeriods) == 0 {
+					continue
 				}
 
 				// 设置边的方向和类别
 				edge.Direction = direction
 				edge.Category = schema.Category
 
-				// 添加边
+				// 添加边（边总是添加，因为可能有多条边指向同一目标）
 				graph.AddEdge(edge)
 
-				// 如果目标节点未访问过，添加并加入队列
-				if !visited[targetNode.ResourceID] {
-					visited[targetNode.ResourceID] = true
-					targetNode.ResourceType = targetType
+				// 如果目标节点尚未添加到图中，添加它
+				if graph.GetNode(rr.TargetID) == nil {
+					targetNode := &NodeLiveness{
+						ResourceID:   rr.TargetID,
+						ResourceType: targetType,
+						RawPeriods:   targetPeriods,
+					}
 					graph.AddNode(targetNode)
-					queue = append(queue, queueItem{targetNode.ResourceID, current.hop + 1})
+				}
+
+				// 如果目标节点尚未入队，加入队列继续遍历
+				if !queued[rr.TargetID] {
+					queued[rr.TargetID] = true
+					queue = append(queue, queueItem{rr.TargetID, current.hop + 1})
 				}
 			}
 		}
@@ -265,15 +295,15 @@ func (i *Instance) bfsTraversal(ctx context.Context, graph *LivenessGraph, req *
 	return nil
 }
 
-// queryRelatedResources 查询与指定资源相关的所有边和目标节点
-// 返回边列表和对应的目标节点列表（一一对应）
+// queryRelatedResources 查询与指定资源相关的所有边
+// 返回确定性配对的边和目标节点ID列表
 func (i *Instance) queryRelatedResources(
 	ctx context.Context,
 	resourceID string,
 	relationType RelationType,
 	direction TraversalDirection,
 	queryStart, queryEnd int64,
-) ([]*EdgeLiveness, []*NodeLiveness, error) {
+) ([]*RelatedResource, error) {
 	var err error
 	ctx, span := trace.NewSpan(ctx, "graph-query-related-resources")
 	defer span.End(&err)
@@ -288,15 +318,15 @@ func (i *Instance) queryRelatedResources(
 
 	result, err := i.client.Execute(ctx, query, nil)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	// 解析结果
-	edges, targetNodes, err := i.parser.ParseRelatedResources(result, relationType, direction, queryStart, queryEnd)
+	relatedResources, err := i.parser.ParseRelatedResources(result, relationType, direction, queryStart, queryEnd)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	span.Set("edges-count", len(edges))
-	return edges, targetNodes, nil
+	span.Set("related-count", len(relatedResources))
+	return relatedResources, nil
 }

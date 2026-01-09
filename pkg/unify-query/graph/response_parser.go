@@ -63,22 +63,27 @@ func (p *ResponseParser) ParseLivenessRecords(result any) ([]*LivenessRecord, er
 	return records, nil
 }
 
-// ParseRelatedResources 解析关系查询结果，返回边和目标节点列表
-// 边和目标节点一一对应
+// RelatedResource 关联资源结果，确保边和目标节点的确定性配对
+type RelatedResource struct {
+	Edge     *EdgeLiveness // 边的 liveness
+	TargetID string        // 目标节点 ID
+}
+
+// ParseRelatedResources 解析关系查询结果
+// 返回确定性配对的边和目标节点ID列表
 func (p *ResponseParser) ParseRelatedResources(
 	result any,
 	relationType RelationType,
 	direction TraversalDirection,
 	queryStart, queryEnd int64,
-) ([]*EdgeLiveness, []*NodeLiveness, error) {
+) ([]*RelatedResource, error) {
 	data, ok := result.([]any)
 	if !ok {
-		return nil, nil, nil
+		return nil, nil
 	}
 
-	// 按目标资源ID分组，合并同一资源的多个时间段
-	edgeMap := make(map[string]*EdgeLiveness)
-	nodeMap := make(map[string]*NodeLiveness)
+	// 按关系ID分组，合并同一关系的多个时间段
+	edgeMap := make(map[string]*RelatedResource)
 
 	for _, item := range data {
 		itemMap, ok := item.(map[string]any)
@@ -93,7 +98,7 @@ func (p *ResponseParser) ParseRelatedResources(
 		periodStart, _ := itemMap[FieldPeriodStart].(float64)
 		periodEnd, _ := itemMap[FieldPeriodEnd].(float64)
 
-		if relationID == "" || toID == "" {
+		if relationID == "" {
 			continue
 		}
 
@@ -120,40 +125,32 @@ func (p *ResponseParser) ParseRelatedResources(
 			targetID = fromID
 		}
 
-		// 合并边的时间段
-		if edge, exists := edgeMap[relationID]; exists {
-			edge.RawPeriods = append(edge.RawPeriods, period)
-		} else {
-			edgeMap[relationID] = &EdgeLiveness{
-				RelationID:   relationID,
-				RelationType: relationType,
-				FromID:       fromID,
-				ToID:         toID,
-				RawPeriods:   []*VisiblePeriod{period},
-			}
+		if targetID == "" {
+			continue
 		}
 
-		// 合并目标节点的时间段（关系的 liveness 作为目标节点的初始 liveness）
-		if node, exists := nodeMap[targetID]; exists {
-			node.RawPeriods = append(node.RawPeriods, period)
+		// 合并边的时间段，保持与目标节点的配对
+		if rr, exists := edgeMap[relationID]; exists {
+			rr.Edge.RawPeriods = append(rr.Edge.RawPeriods, period)
 		} else {
-			nodeMap[targetID] = &NodeLiveness{
-				ResourceID: targetID,
-				RawPeriods: []*VisiblePeriod{period},
+			edgeMap[relationID] = &RelatedResource{
+				Edge: &EdgeLiveness{
+					RelationID:   relationID,
+					RelationType: relationType,
+					FromID:       fromID,
+					ToID:         toID,
+					RawPeriods:   []*VisiblePeriod{period},
+				},
+				TargetID: targetID,
 			}
 		}
 	}
 
-	// 转换为切片
-	edges := make([]*EdgeLiveness, 0, len(edgeMap))
-	nodes := make([]*NodeLiveness, 0, len(nodeMap))
-
-	for _, edge := range edgeMap {
-		edges = append(edges, edge)
-	}
-	for _, node := range nodeMap {
-		nodes = append(nodes, node)
+	// 转换为切片（顺序不重要，因为每个元素自包含配对信息）
+	results := make([]*RelatedResource, 0, len(edgeMap))
+	for _, rr := range edgeMap {
+		results = append(results, rr)
 	}
 
-	return edges, nodes, nil
+	return results, nil
 }

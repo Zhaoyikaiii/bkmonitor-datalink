@@ -124,11 +124,14 @@ func (g *LivenessGraph) GetOutEdges(resourceID string) []*EdgeLiveness {
 // ========================================
 
 // ComputeEffectivePeriods 计算有效可见时间段
-// 从根节点开始，BFS 遍历计算每个节点和边的有效可见时间段
+// 从根节点开始，迭代计算每个节点和边的有效可见时间段
 // 规则：
 //   - 根节点：EffectivePeriods = RawPeriods
 //   - 边：EffectivePeriods = RawPeriods ∩ FromNode.EffectivePeriods ∩ ToNode.RawPeriods
-//   - 子节点：EffectivePeriods = 边的 EffectivePeriods（继承自父边）
+//   - 子节点：EffectivePeriods = 所有入边的 EffectivePeriods 的并集（Union）
+//
+// 多路径处理：使用迭代收敛算法，确保所有入边都被考虑
+// 当一个节点可通过多条边到达时，取所有边的 effective periods 的并集
 func (g *LivenessGraph) ComputeEffectivePeriods(rootID string) {
 	root := g.Nodes[rootID]
 	if root == nil {
@@ -138,49 +141,82 @@ func (g *LivenessGraph) ComputeEffectivePeriods(rootID string) {
 	// 根节点的有效时间段 = 原始时间段
 	root.EffectivePeriods = root.RawPeriods
 
-	// BFS 遍历计算
-	visited := make(map[string]bool)
-	queue := []string{rootID}
-	visited[rootID] = true
+	// 构建反向邻接表：目标节点ID -> 入边列表
+	inEdges := make(map[string][]*EdgeLiveness)
+	for _, edge := range g.Edges {
+		inEdges[edge.ToID] = append(inEdges[edge.ToID], edge)
+	}
 
-	for len(queue) > 0 {
-		currentID := queue[0]
-		queue = queue[1:]
+	// 迭代收敛算法：重复处理直到没有变化
+	// 这确保了多路径场景下所有入边都被正确处理
+	for {
+		changed := false
 
-		currentNode := g.Nodes[currentID]
-		if currentNode == nil {
-			continue
-		}
-
-		// 遍历当前节点的所有出边
-		for _, relationID := range g.Adjacency[currentID] {
-			edge := g.Edges[relationID]
-			if edge == nil {
+		// 遍历所有边，更新边的 EffectivePeriods
+		for _, edge := range g.Edges {
+			fromNode := g.Nodes[edge.FromID]
+			toNode := g.Nodes[edge.ToID]
+			if fromNode == nil || toNode == nil {
 				continue
 			}
 
-			targetNode := g.Nodes[edge.ToID]
-			if targetNode == nil {
+			// 只有当源节点有 EffectivePeriods 时才能计算边的 EffectivePeriods
+			if len(fromNode.EffectivePeriods) == 0 {
 				continue
 			}
 
 			// 计算边的有效时间段
 			// = 边的原始时间段 ∩ 源节点有效时间段 ∩ 目标节点原始时间段
-			edge.EffectivePeriods = ComputeOverlapPeriods(
+			newEdgePeriods := ComputeOverlapPeriods(
 				edge.RawPeriods,
-				currentNode.EffectivePeriods,
-				targetNode.RawPeriods,
+				fromNode.EffectivePeriods,
+				toNode.RawPeriods,
 			)
 
-			// 如果目标节点未访问过，设置其有效时间段并加入队列
-			if !visited[edge.ToID] {
-				visited[edge.ToID] = true
-				// 目标节点的有效时间段 = 边的有效时间段
-				targetNode.EffectivePeriods = edge.EffectivePeriods
-				queue = append(queue, edge.ToID)
+			// 检查边的 EffectivePeriods 是否有变化
+			if !periodsEqual(edge.EffectivePeriods, newEdgePeriods) {
+				edge.EffectivePeriods = newEdgePeriods
+				changed = true
 			}
 		}
+
+		// 遍历所有非根节点，更新节点的 EffectivePeriods（所有入边的并集）
+		for nodeID, node := range g.Nodes {
+			if nodeID == rootID {
+				continue
+			}
+
+			edges := inEdges[nodeID]
+			var unionPeriods []*VisiblePeriod
+			for _, edge := range edges {
+				unionPeriods = UnionPeriodLists(unionPeriods, edge.EffectivePeriods)
+			}
+
+			// 检查节点的 EffectivePeriods 是否有变化
+			if !periodsEqual(node.EffectivePeriods, unionPeriods) {
+				node.EffectivePeriods = unionPeriods
+				changed = true
+			}
+		}
+
+		// 如果没有任何变化，算法收敛，退出
+		if !changed {
+			break
+		}
 	}
+}
+
+// periodsEqual 检查两个时间段列表是否相等
+func periodsEqual(a, b []*VisiblePeriod) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i].Start != b[i].Start || a[i].End != b[i].End {
+			return false
+		}
+	}
+	return true
 }
 
 // ComputeOverlapPeriods 计算多个时间段列表的交集
@@ -214,6 +250,51 @@ func OverlapTwoPeriodLists(list1, list2 []*VisiblePeriod) []*VisiblePeriod {
 			}
 		}
 	}
+
+	return result
+}
+
+// UnionPeriodLists 计算两个时间段列表的并集
+// 结果会合并重叠或相邻的时间段
+func UnionPeriodLists(list1, list2 []*VisiblePeriod) []*VisiblePeriod {
+	if len(list1) == 0 {
+		return list2
+	}
+	if len(list2) == 0 {
+		return list1
+	}
+
+	// 合并两个列表
+	all := make([]*VisiblePeriod, 0, len(list1)+len(list2))
+	all = append(all, list1...)
+	all = append(all, list2...)
+
+	// 按开始时间排序
+	for i := 0; i < len(all)-1; i++ {
+		for j := i + 1; j < len(all); j++ {
+			if all[j].Start < all[i].Start {
+				all[i], all[j] = all[j], all[i]
+			}
+		}
+	}
+
+	// 合并重叠或相邻的时间段
+	result := make([]*VisiblePeriod, 0, len(all))
+	current := &VisiblePeriod{Start: all[0].Start, End: all[0].End}
+
+	for i := 1; i < len(all); i++ {
+		if all[i].Start <= current.End {
+			// 重叠或相邻，扩展当前时间段
+			if all[i].End > current.End {
+				current.End = all[i].End
+			}
+		} else {
+			// 不重叠，保存当前时间段，开始新的
+			result = append(result, current)
+			current = &VisiblePeriod{Start: all[i].Start, End: all[i].End}
+		}
+	}
+	result = append(result, current)
 
 	return result
 }
