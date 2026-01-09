@@ -11,6 +11,7 @@ package tsdb
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/spf13/viper"
 
@@ -56,6 +57,11 @@ func setDefaultConfig() {
 	viper.SetDefault(EsTimeoutConfigPath, "30s")
 	viper.SetDefault(EsMaxSizeConfigPath, 1e4)
 	viper.SetDefault(EsMaxRoutingConfigPath, 10)
+
+	// Graph 配置
+	viper.SetDefault(GraphTimeoutConfigPath, "30s")
+	viper.SetDefault(GraphMaxLimitConfigPath, 1000)
+	viper.SetDefault(GraphToleranceConfigPath, 600000) // 10 minutes in milliseconds
 }
 
 // initConfig 加载配置
@@ -93,6 +99,11 @@ func initConfig() {
 	EsTimeout = viper.GetDuration(EsTimeoutConfigPath)
 	EsMaxRouting = viper.GetInt(EsMaxRoutingConfigPath)
 	EsMaxSize = viper.GetInt(EsMaxSizeConfigPath)
+
+	// Graph 配置
+	GraphTimeout = viper.GetDuration(GraphTimeoutConfigPath)
+	GraphMaxLimit = viper.GetInt(GraphMaxLimitConfigPath)
+	GraphTolerance = time.Duration(viper.GetInt64(GraphToleranceConfigPath)) * time.Millisecond
 }
 
 // init 初始化，通过 eventBus 加载配置读取前和读取后操作

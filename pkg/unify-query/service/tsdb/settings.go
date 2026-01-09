@@ -51,6 +51,11 @@ const (
 	EsMaxRoutingConfigPath = "elasticsearch.max_routing"
 	EsMaxSizeConfigPath    = "elasticsearch.max_size"
 
+	// Graph 配置
+	GraphTimeoutConfigPath   = "graph.timeout"
+	GraphMaxLimitConfigPath  = "graph.max_limit"
+	GraphToleranceConfigPath = "graph.tolerance"
+
 	// query router 配置
 	QueryRouterForceVmClusterNameConfigPath = "query_router.force_vm_cluster_name"
 )
@@ -90,6 +95,11 @@ var (
 	EsTimeout    time.Duration
 	EsMaxRouting int
 	EsMaxSize    int
+
+	// Graph 配置
+	GraphTimeout   time.Duration
+	GraphMaxLimit  int
+	GraphTolerance time.Duration
 
 	QueryRouterForceVmClusterName string
 )
