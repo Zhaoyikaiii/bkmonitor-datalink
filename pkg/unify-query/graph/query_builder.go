@@ -89,14 +89,11 @@ func (b *QueryBuilder) BuildLivenessQuery(resourceType ResourceType, resourceID 
 	// 应用 tolerance 扩展时间窗口
 	adjustedStart, adjustedEnd := b.applyTolerance(startTime, endTime)
 
-	// 转义 resourceID 防止 SQL 注入
-	escapedID := escapeSurrealString(resourceID)
-
 	query := fmt.Sprintf(`SELECT * FROM %s 
 WHERE %s = '%s' 
 AND period_start <= %d 
 AND period_end >= %d
-ORDER BY period_start ASC`, tableName, fieldName, escapedID, adjustedEnd, adjustedStart)
+ORDER BY period_start ASC`, tableName, fieldName, resourceID, adjustedEnd, adjustedStart)
 
 	if b.maxLimit > 0 {
 		query += fmt.Sprintf("\nLIMIT %d", b.maxLimit)

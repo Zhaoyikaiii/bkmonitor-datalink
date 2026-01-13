@@ -246,7 +246,8 @@ func (i *Instance) bfsTraversal(ctx context.Context, graph *LivenessGraph, req *
 				errMsg := fmt.Sprintf("failed to query relations: resource=%s, type=%s, direction=%s: %v",
 					current.resourceID, relationType, direction, err)
 				graph.AddTraversalError(errMsg)
-				log.Warnf(ctx, errMsg)
+				log.Warnf(ctx, "failed to query relations: resource=%s, type=%s, direction=%s: %v",
+					current.resourceID, relationType, direction, err)
 				continue
 			}
 
@@ -279,7 +280,8 @@ func (i *Instance) bfsTraversal(ctx context.Context, graph *LivenessGraph, req *
 						errMsg := fmt.Sprintf("failed to get target liveness: target=%s, edge=%s: %v",
 							rr.TargetID, edge.RelationID, queryErr)
 						graph.AddTraversalError(errMsg)
-						log.Warnf(ctx, errMsg)
+						log.Warnf(ctx, "failed to get target liveness: target=%s, edge=%s: %v",
+							rr.TargetID, edge.RelationID, queryErr)
 						continue
 					}
 					// 只有成功查询才缓存（包括空结果，空结果表示节点确实不可见）
