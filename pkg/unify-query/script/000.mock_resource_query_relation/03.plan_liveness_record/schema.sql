@@ -58,6 +58,8 @@ REMOVE TABLE IF EXISTS container_with_pod;
 REMOVE TABLE IF EXISTS pod_with_service;
 REMOVE TABLE IF EXISTS deployment_with_replicaset;
 REMOVE TABLE IF EXISTS pod_with_replicaset;
+REMOVE TABLE IF EXISTS pod_to_pod;
+REMOVE TABLE IF EXISTS pod_to_system;
 
 -- Drop relation liveness record tables
 REMOVE TABLE IF EXISTS node_with_pod_liveness_record;
@@ -66,6 +68,8 @@ REMOVE TABLE IF EXISTS container_with_pod_liveness_record;
 REMOVE TABLE IF EXISTS pod_with_service_liveness_record;
 REMOVE TABLE IF EXISTS deployment_with_replicaset_liveness_record;
 REMOVE TABLE IF EXISTS pod_with_replicaset_liveness_record;
+REMOVE TABLE IF EXISTS pod_to_pod_liveness_record;
+REMOVE TABLE IF EXISTS pod_to_system_liveness_record;
 
 -- ============================================================================
 -- SECTION 2: Helper Functions
@@ -917,7 +921,125 @@ THEN {
 };
 
 -- ============================================================================
--- SECTION 11: Helper Query Functions
+-- SECTION 11: Dynamic Relation Tables (pod_to_pod, pod_to_system)
+-- ============================================================================
+
+-- pod_to_pod relation (dynamic: call relationship between pods)
+DEFINE TABLE pod_to_pod SCHEMAFULL TYPE RELATION FROM pod TO pod;
+DEFINE FIELD created_at ON pod_to_pod TYPE option<int>;
+DEFINE FIELD updated_at ON pod_to_pod TYPE int;
+
+DEFINE TABLE pod_to_pod_liveness_record SCHEMAFULL;
+DEFINE FIELD relation_id ON pod_to_pod_liveness_record TYPE record<pod_to_pod>;
+DEFINE FIELD period_start ON pod_to_pod_liveness_record TYPE int;
+DEFINE FIELD period_end ON pod_to_pod_liveness_record TYPE int;
+DEFINE FIELD is_active ON pod_to_pod_liveness_record TYPE bool DEFAULT true;
+DEFINE FIELD created_at ON pod_to_pod_liveness_record TYPE int;
+DEFINE FIELD updated_at ON pod_to_pod_liveness_record TYPE int;
+
+DEFINE INDEX idx_pod_to_pod_liveness_relation_id ON pod_to_pod_liveness_record FIELDS relation_id;
+
+DEFINE EVENT OVERWRITE event_pod_to_pod_created ON TABLE pod_to_pod 
+WHEN $event = "CREATE" 
+THEN {
+    UPDATE $after.id SET created_at = $after.updated_at;
+    CREATE pod_to_pod_liveness_record SET 
+        relation_id = $after.id,
+        period_start = $after.updated_at,
+        period_end = $after.updated_at,
+        is_active = true,
+        created_at = $after.updated_at,
+        updated_at = $after.updated_at;
+};
+
+DEFINE EVENT OVERWRITE event_pod_to_pod_updated_expired ON TABLE pod_to_pod 
+WHEN $event = "UPDATE" 
+    AND $after.updated_at - $before.updated_at > {tolerance_time_ms}
+    AND $after.id = $before.id 
+THEN {
+    LET $last_record = (SELECT * FROM pod_to_pod_liveness_record WHERE relation_id = $after.id AND is_active = true ORDER BY created_at DESC LIMIT 1)[0];
+    IF $last_record != NONE THEN
+        UPDATE pod_to_pod_liveness_record SET is_active = false WHERE id = $last_record.id AND is_active = true
+    END;
+    CREATE pod_to_pod_liveness_record SET 
+        relation_id = $after.id,
+        period_start = $after.updated_at,
+        period_end = $after.updated_at,
+        is_active = true,
+        created_at = $after.updated_at,
+        updated_at = $after.updated_at;
+};
+
+DEFINE EVENT OVERWRITE event_pod_to_pod_updated_active ON TABLE pod_to_pod 
+WHEN $event = "UPDATE" 
+    AND $after.updated_at - $before.updated_at <= {tolerance_time_ms}
+    AND $after.id = $before.id 
+THEN {
+    LET $last_record = (SELECT * FROM pod_to_pod_liveness_record WHERE relation_id = $after.id AND is_active = true ORDER BY created_at DESC LIMIT 1)[0];
+    IF $last_record != NONE THEN
+        UPDATE pod_to_pod_liveness_record SET updated_at = $after.updated_at, period_end = $after.updated_at WHERE id = $last_record.id AND is_active = true
+    END;
+};
+
+-- pod_to_system relation (dynamic: pod calling external system)
+DEFINE TABLE pod_to_system SCHEMAFULL TYPE RELATION FROM pod TO system;
+DEFINE FIELD created_at ON pod_to_system TYPE option<int>;
+DEFINE FIELD updated_at ON pod_to_system TYPE int;
+
+DEFINE TABLE pod_to_system_liveness_record SCHEMAFULL;
+DEFINE FIELD relation_id ON pod_to_system_liveness_record TYPE record<pod_to_system>;
+DEFINE FIELD period_start ON pod_to_system_liveness_record TYPE int;
+DEFINE FIELD period_end ON pod_to_system_liveness_record TYPE int;
+DEFINE FIELD is_active ON pod_to_system_liveness_record TYPE bool DEFAULT true;
+DEFINE FIELD created_at ON pod_to_system_liveness_record TYPE int;
+DEFINE FIELD updated_at ON pod_to_system_liveness_record TYPE int;
+
+DEFINE INDEX idx_pod_to_system_liveness_relation_id ON pod_to_system_liveness_record FIELDS relation_id;
+
+DEFINE EVENT OVERWRITE event_pod_to_system_created ON TABLE pod_to_system 
+WHEN $event = "CREATE" 
+THEN {
+    UPDATE $after.id SET created_at = $after.updated_at;
+    CREATE pod_to_system_liveness_record SET 
+        relation_id = $after.id,
+        period_start = $after.updated_at,
+        period_end = $after.updated_at,
+        is_active = true,
+        created_at = $after.updated_at,
+        updated_at = $after.updated_at;
+};
+
+DEFINE EVENT OVERWRITE event_pod_to_system_updated_expired ON TABLE pod_to_system 
+WHEN $event = "UPDATE" 
+    AND $after.updated_at - $before.updated_at > {tolerance_time_ms}
+    AND $after.id = $before.id 
+THEN {
+    LET $last_record = (SELECT * FROM pod_to_system_liveness_record WHERE relation_id = $after.id AND is_active = true ORDER BY created_at DESC LIMIT 1)[0];
+    IF $last_record != NONE THEN
+        UPDATE pod_to_system_liveness_record SET is_active = false WHERE id = $last_record.id AND is_active = true
+    END;
+    CREATE pod_to_system_liveness_record SET 
+        relation_id = $after.id,
+        period_start = $after.updated_at,
+        period_end = $after.updated_at,
+        is_active = true,
+        created_at = $after.updated_at,
+        updated_at = $after.updated_at;
+};
+
+DEFINE EVENT OVERWRITE event_pod_to_system_updated_active ON TABLE pod_to_system 
+WHEN $event = "UPDATE" 
+    AND $after.updated_at - $before.updated_at <= {tolerance_time_ms}
+    AND $after.id = $before.id 
+THEN {
+    LET $last_record = (SELECT * FROM pod_to_system_liveness_record WHERE relation_id = $after.id AND is_active = true ORDER BY created_at DESC LIMIT 1)[0];
+    IF $last_record != NONE THEN
+        UPDATE pod_to_system_liveness_record SET updated_at = $after.updated_at, period_end = $after.updated_at WHERE id = $last_record.id AND is_active = true
+    END;
+};
+
+-- ============================================================================
+-- SECTION 12: Helper Query Functions
 -- ============================================================================
 
 -- fn::check_liveness_range_exists: Check if a record has liveness in time range
