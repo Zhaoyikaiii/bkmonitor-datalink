@@ -225,74 +225,54 @@ func ParseResourceID(resourceID string) (ResourceType, map[string]string, error)
 	return resourceType, labels, nil
 }
 
-// GetLivenessEdgeTableName 获取资源类型的 liveness 边表名
-// 边表方案：pod -> pod_liveness -> liveness
-func GetLivenessEdgeTableName(resourceType ResourceType) string {
-	return string(resourceType) + "_liveness"
+// GetLivenessRecordTableName 获取资源类型的 liveness record 表名
+// 例如：pod -> pod_liveness_record
+func GetLivenessRecordTableName(resourceType ResourceType) string {
+	return string(resourceType) + "_liveness_record"
 }
 
-// GetRelationLivenessEdgeTableName 获取关系类型的 liveness 边表名
-// 边表方案：node_with_pod -> node_with_pod_liveness -> liveness
-func GetRelationLivenessEdgeTableName(relationType RelationType) string {
-	return string(relationType) + "_liveness"
+// GetRelationLivenessRecordTableName 获取关系类型的 liveness record 表名
+// 例如：node_with_pod -> node_with_pod_liveness_record
+func GetRelationLivenessRecordTableName(relationType RelationType) string {
+	return string(relationType) + "_liveness_record"
+}
+
+// GetLivenessIDField 获取 liveness record 中引用实体的字段名
+func GetLivenessIDField(resourceType ResourceType) string {
+	return string(resourceType) + "_id"
+}
+
+// resourcePrimaryKeys 资源类型主键映射表
+var resourcePrimaryKeys = map[ResourceType][]string{
+	ResourceTypePod:                {"bcs_cluster_id", "namespace", "pod"},
+	ResourceTypeNode:               {"bcs_cluster_id", "node"},
+	ResourceTypeContainer:          {"bcs_cluster_id", "namespace", "pod", "container"},
+	ResourceTypeDeployment:         {"bcs_cluster_id", "namespace", "deployment"},
+	ResourceTypeReplicaSet:         {"bcs_cluster_id", "namespace", "replicaset"},
+	ResourceTypeStatefulSet:        {"bcs_cluster_id", "namespace", "statefulset"},
+	ResourceTypeDaemonSet:          {"bcs_cluster_id", "namespace", "daemonset"},
+	ResourceTypeJob:                {"bcs_cluster_id", "namespace", "job"},
+	ResourceTypeService:            {"bcs_cluster_id", "namespace", "service"},
+	ResourceTypeIngress:            {"bcs_cluster_id", "namespace", "ingress"},
+	ResourceTypeCluster:            {"bcs_cluster_id"},
+	ResourceTypeNamespace:          {"bcs_cluster_id", "namespace"},
+	ResourceTypeSystem:             {"bk_cloud_id", "bk_target_ip"},
+	ResourceTypeK8sAddress:         {"address"},
+	ResourceTypeDomain:             {"domain"},
+	ResourceTypeAPMService:         {"bk_biz_id", "app_name", "apm_service_name"},
+	ResourceTypeAPMServiceInstance: {"bk_biz_id", "app_name", "apm_service_name", "apm_service_instance_id"},
+	ResourceTypeDataSource:         {"bk_data_id"},
+	ResourceTypeBKLogConfig:        {"bklogconfig_namespace", "bklogconfig_name"},
+	ResourceTypeBiz:                {"bk_biz_id"},
+	ResourceTypeSet:                {"bk_set_id"},
+	ResourceTypeModule:             {"bk_module_id"},
+	ResourceTypeHost:               {"bk_host_id"},
+	ResourceTypeAppVersion:         {"bcs_cluster_id", "namespace", "app_version"},
+	ResourceTypeGitCommit:          {"git_repo", "commit_id"},
+	ResourceTypeEnvironment:        {"bcs_cluster_id", "namespace", "pod", "env_name"},
 }
 
 // GetResourcePrimaryKeys 获取资源类型的主键字段
 func GetResourcePrimaryKeys(resourceType ResourceType) []string {
-	switch resourceType {
-	case ResourceTypePod:
-		return []string{"bcs_cluster_id", "namespace", "pod"}
-	case ResourceTypeNode:
-		return []string{"bcs_cluster_id", "node"}
-	case ResourceTypeContainer:
-		return []string{"bcs_cluster_id", "namespace", "pod", "container"}
-	case ResourceTypeDeployment:
-		return []string{"bcs_cluster_id", "namespace", "deployment"}
-	case ResourceTypeReplicaSet:
-		return []string{"bcs_cluster_id", "namespace", "replicaset"}
-	case ResourceTypeStatefulSet:
-		return []string{"bcs_cluster_id", "namespace", "statefulset"}
-	case ResourceTypeDaemonSet:
-		return []string{"bcs_cluster_id", "namespace", "daemonset"}
-	case ResourceTypeJob:
-		return []string{"bcs_cluster_id", "namespace", "job"}
-	case ResourceTypeService:
-		return []string{"bcs_cluster_id", "namespace", "service"}
-	case ResourceTypeIngress:
-		return []string{"bcs_cluster_id", "namespace", "ingress"}
-	case ResourceTypeCluster:
-		return []string{"bcs_cluster_id"}
-	case ResourceTypeNamespace:
-		return []string{"bcs_cluster_id", "namespace"}
-	case ResourceTypeSystem:
-		return []string{"bk_cloud_id", "bk_target_ip"}
-	case ResourceTypeK8sAddress:
-		return []string{"bcs_cluster_id", "address"}
-	case ResourceTypeDomain:
-		return []string{"bcs_cluster_id", "domain"}
-	case ResourceTypeAPMService:
-		return []string{"apm_application_name", "apm_service_name"}
-	case ResourceTypeAPMServiceInstance:
-		return []string{"apm_application_name", "apm_service_name", "apm_service_instance_name"}
-	case ResourceTypeDataSource:
-		return []string{"bk_data_id"}
-	case ResourceTypeBKLogConfig:
-		return []string{"bklogconfig_namespace", "bklogconfig_name"}
-	case ResourceTypeBiz:
-		return []string{"bk_biz_id"}
-	case ResourceTypeSet:
-		return []string{"bk_set_id"}
-	case ResourceTypeModule:
-		return []string{"bk_module_id"}
-	case ResourceTypeHost:
-		return []string{"bk_host_id"}
-	case ResourceTypeAppVersion:
-		return []string{"app_name", "version"}
-	case ResourceTypeGitCommit:
-		return []string{"git_repo", "commit_id"}
-	case ResourceTypeEnvironment:
-		return []string{"environment"}
-	default:
-		return nil
-	}
+	return resourcePrimaryKeys[resourceType]
 }

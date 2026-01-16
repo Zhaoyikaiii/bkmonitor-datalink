@@ -15,6 +15,40 @@ import (
 	"strings"
 )
 
+// SQL 模板常量
+const (
+	sqlIndent1 = "    "                     // 1级缩进
+	sqlIndent2 = "        "                 // 2级缩进
+	sqlIndent3 = "            "             // 3级缩进
+	sqlIndent4 = "                "         // 4级缩进
+	sqlIndent5 = "                    "     // 5级缩进
+	sqlIndent6 = "                        " // 6级缩进
+
+	fieldSourceID   = "source_id"
+	fieldTargetID   = "target_id"
+	fieldRelationID = "relation_id"
+
+	// SQL 子查询模板
+	tplLivenessSelect    = "(SELECT * FROM %s WHERE %s = $parent.id AND period_end >= $start AND period_start <= $end)"
+	tplLivenessSelectRef = "(SELECT * FROM %s WHERE %s = $parent.%s AND period_end >= $start AND period_start <= $end)"
+	tplRelLivenessSelect = "(SELECT * FROM %s WHERE relation_id = $parent.id AND period_end >= $start AND period_start <= $end)"
+	tplLivenessFilter    = "(SELECT count() FROM only %s WHERE %s = $parent.id AND $end >= period_start AND $start <= period_end GROUP ALL) > 0"
+	tplRelLivenessFilter = "(SELECT count() FROM only %s WHERE relation_id = $parent.id AND $end >= period_start AND $start <= period_end GROUP ALL) > 0"
+)
+
+// buildEntityDataFields 构建 entity_data 字段列表
+func buildEntityDataFields(keys []string, prefix string) string {
+	fields := make([]string, 0, len(keys))
+	for _, key := range keys {
+		if prefix == "" {
+			fields = append(fields, fmt.Sprintf("%s: %s", key, key))
+		} else {
+			fields = append(fields, fmt.Sprintf("%s: %s.%s", key, prefix, key))
+		}
+	}
+	return strings.Join(fields, ", ")
+}
+
 // SurrealQueryBuilder 构建 SurrealQL 关联查询
 type SurrealQueryBuilder struct {
 	request *QueryRequest
@@ -22,7 +56,6 @@ type SurrealQueryBuilder struct {
 
 // NewSurrealQueryBuilder 创建查询构建器
 func NewSurrealQueryBuilder(request *QueryRequest) *SurrealQueryBuilder {
-	// 规范化请求参数
 	request.Normalize()
 	return &SurrealQueryBuilder{request: request}
 }
@@ -30,14 +63,9 @@ func NewSurrealQueryBuilder(request *QueryRequest) *SurrealQueryBuilder {
 // Build 构建完整的 SurrealQL 查询
 func (b *SurrealQueryBuilder) Build() string {
 	var sb strings.Builder
-
-	// 1. 变量定义
 	sb.WriteString(b.buildVariables())
 	sb.WriteString("\n\n")
-
-	// 2. 主查询
 	sb.WriteString(b.buildMainQuery())
-
 	return sb.String()
 }
 
@@ -58,29 +86,21 @@ LET $end = %d;`,
 func (b *SurrealQueryBuilder) buildMainQuery() string {
 	var sb strings.Builder
 
-	// SELECT 子句
 	sb.WriteString("SELECT {\n")
-
-	// Root 部分
-	sb.WriteString("    root: ")
+	sb.WriteString(sqlIndent1 + "root: ")
 	sb.WriteString(b.buildRootSelect())
-	sb.WriteString(",\n\n")
 
-	// Hop1 部分
-	sb.WriteString("    hop1: ")
-	sb.WriteString(b.buildHopSelect(1, b.request.SourceType))
+	if b.request.MaxHops > 0 {
+		sb.WriteString(",\n\n")
+		sb.WriteString(sqlIndent1 + "hop1: ")
+		sb.WriteString(b.buildHopSelect(1, b.request.SourceType))
+	}
 	sb.WriteString("\n")
 
 	sb.WriteString("} AS result\n")
-
-	// FROM 子句
 	sb.WriteString(fmt.Sprintf("FROM %s\n", b.request.SourceType))
-
-	// WHERE 子句
 	sb.WriteString(b.buildWhereClause())
 	sb.WriteString("\n")
-
-	// LIMIT 子句
 	sb.WriteString(fmt.Sprintf("LIMIT %d;", b.request.Limit))
 
 	return sb.String()
@@ -90,13 +110,8 @@ func (b *SurrealQueryBuilder) buildMainQuery() string {
 func (b *SurrealQueryBuilder) buildRootSelect() string {
 	sourceType := b.request.SourceType
 	primaryKeys := GetResourcePrimaryKeys(sourceType)
-	livenessEdgeTable := GetLivenessEdgeTableName(sourceType)
-
-	// 构建 entity_data
-	entityDataFields := make([]string, 0, len(primaryKeys))
-	for _, key := range primaryKeys {
-		entityDataFields = append(entityDataFields, fmt.Sprintf("%s: %s", key, key))
-	}
+	livenessTable := GetLivenessRecordTableName(sourceType)
+	livenessIDField := GetLivenessIDField(sourceType)
 
 	return fmt.Sprintf(`{
         entity_type: meta::tb(id),
@@ -104,10 +119,11 @@ func (b *SurrealQueryBuilder) buildRootSelect() string {
         entity_data: { %s },
         created_at: created_at,
         updated_at: updated_at,
-        liveness: ->%s->liveness[WHERE period_end >= $start AND period_start <= $end].*
+        liveness: `+tplLivenessSelect+`
     }`,
-		strings.Join(entityDataFields, ", "),
-		livenessEdgeTable)
+		buildEntityDataFields(primaryKeys, ""),
+		livenessTable,
+		livenessIDField)
 }
 
 // buildHopSelect 构建指定跳数的 SELECT 结构
@@ -116,7 +132,6 @@ func (b *SurrealQueryBuilder) buildHopSelect(hop int, currentType ResourceType) 
 		return "{}"
 	}
 
-	// 获取当前资源类型的所有相关关系
 	relations := b.getRelationsForType(currentType)
 	if len(relations) == 0 {
 		return "{}"
@@ -134,19 +149,20 @@ func (b *SurrealQueryBuilder) buildHopSelect(hop int, currentType ResourceType) 
 		sb.WriteString(b.buildRelationQuery(hop, currentType, rel))
 	}
 
-	sb.WriteString("\n    }")
+	sb.WriteString("\n" + sqlIndent1 + "}")
 
 	return sb.String()
 }
 
 // RelationQueryInfo 关系查询信息
 type RelationQueryInfo struct {
-	Schema        *RelationSchema
-	Direction     TraversalDirection // 遍历方向
-	KeySuffix     string             // 键名后缀（动态关系才有）
-	TraversalExpr string             // SurrealQL 遍历表达式 (-> 或 <-)
-	TargetField   string             // 目标字段 (in 或 out)
-	TargetType    ResourceType       // 目标资源类型
+	Schema      *RelationSchema
+	Direction   TraversalDirection
+	KeySuffix   string       // 键名后缀（动态关系才有）
+	TargetField string       // 目标字段 (source_id 或 target_id)
+	TargetType  ResourceType // 目标资源类型
+	WhereField  string       // WHERE 子句中用于匹配当前实体的字段
+	SelectField string       // SELECT 中获取目标实体的字段
 }
 
 // getRelationsForType 获取指定资源类型的所有可用关系查询
@@ -156,24 +172,20 @@ func (b *SurrealQueryBuilder) getRelationsForType(resourceType ResourceType) []*
 	for i := range schemaRegistry {
 		schema := &schemaRegistry[i]
 
-		// 检查关系类别是否允许
 		if !b.request.IsRelationCategoryAllowed(schema.Category) {
 			continue
 		}
 
-		// 检查资源类型是否匹配
 		if schema.FromType != resourceType && schema.ToType != resourceType {
 			continue
 		}
 
 		if schema.Category == RelationCategoryStatic {
-			// 静态关系：根据 Schema 确定方向
 			info := b.buildStaticRelationInfo(schema, resourceType)
 			if info != nil {
 				results = append(results, info)
 			}
 		} else {
-			// 动态关系：根据 DynamicRelationDirection 确定方向
 			infos := b.buildDynamicRelationInfos(schema, resourceType)
 			results = append(results, infos...)
 		}
@@ -186,20 +198,20 @@ func (b *SurrealQueryBuilder) getRelationsForType(resourceType ResourceType) []*
 func (b *SurrealQueryBuilder) buildStaticRelationInfo(schema *RelationSchema, currentType ResourceType) *RelationQueryInfo {
 	info := &RelationQueryInfo{
 		Schema:    schema,
-		KeySuffix: "", // 静态关系不需要后缀
+		KeySuffix: "",
 	}
 
 	if schema.FromType == currentType {
-		// 当前类型是 From，正向遍历到 To
 		info.Direction = DirectionOutbound
-		info.TraversalExpr = "->"
-		info.TargetField = "out"
+		info.WhereField = fieldSourceID
+		info.SelectField = fieldTargetID
+		info.TargetField = fieldTargetID
 		info.TargetType = schema.ToType
 	} else {
-		// 当前类型是 To，反向遍历到 From
 		info.Direction = DirectionInbound
-		info.TraversalExpr = "<-"
-		info.TargetField = "in"
+		info.WhereField = fieldTargetID
+		info.SelectField = fieldSourceID
+		info.TargetField = fieldSourceID
 		info.TargetType = schema.FromType
 	}
 
@@ -211,31 +223,30 @@ func (b *SurrealQueryBuilder) buildDynamicRelationInfos(schema *RelationSchema, 
 	var results []*RelationQueryInfo
 	direction := b.request.DynamicRelationDirection
 
-	// 检查当前类型是否可以作为 From（outbound）
 	canOutbound := schema.FromType == currentType
-	// 检查当前类型是否可以作为 To（inbound）
 	canInbound := schema.ToType == currentType
 
-	// 根据请求的方向生成查询
 	if (direction == DirectionOutbound || direction == DirectionBoth) && canOutbound {
 		results = append(results, &RelationQueryInfo{
-			Schema:        schema,
-			Direction:     DirectionOutbound,
-			KeySuffix:     "_outbound",
-			TraversalExpr: "->",
-			TargetField:   "out",
-			TargetType:    schema.ToType,
+			Schema:      schema,
+			Direction:   DirectionOutbound,
+			KeySuffix:   "_outbound",
+			WhereField:  fieldSourceID,
+			SelectField: fieldTargetID,
+			TargetField: fieldTargetID,
+			TargetType:  schema.ToType,
 		})
 	}
 
 	if (direction == DirectionInbound || direction == DirectionBoth) && canInbound {
 		results = append(results, &RelationQueryInfo{
-			Schema:        schema,
-			Direction:     DirectionInbound,
-			KeySuffix:     "_inbound",
-			TraversalExpr: "<-",
-			TargetField:   "in",
-			TargetType:    schema.FromType,
+			Schema:      schema,
+			Direction:   DirectionInbound,
+			KeySuffix:   "_inbound",
+			WhereField:  fieldTargetID,
+			SelectField: fieldSourceID,
+			TargetField: fieldSourceID,
+			TargetType:  schema.FromType,
 		})
 	}
 
@@ -246,27 +257,18 @@ func (b *SurrealQueryBuilder) buildDynamicRelationInfos(schema *RelationSchema, 
 func (b *SurrealQueryBuilder) buildRelationQuery(hop int, _ ResourceType, rel *RelationQueryInfo) string {
 	relationType := rel.Schema.RelationType
 	relationTable := string(relationType)
-	relationLivenessEdgeTable := GetRelationLivenessEdgeTableName(relationType)
-	targetLivenessEdgeTable := GetLivenessEdgeTableName(rel.TargetType)
-
-	// 键名：静态关系直接用关系名，动态关系加方向后缀
+	relationLivenessTable := GetRelationLivenessRecordTableName(relationType)
+	targetLivenessTable := GetLivenessRecordTableName(rel.TargetType)
+	targetLivenessIDField := GetLivenessIDField(rel.TargetType)
 	keyName := relationTable + rel.KeySuffix
-
-	// 构建 target 的 entity_data
 	targetPrimaryKeys := GetResourcePrimaryKeys(rel.TargetType)
-	targetDataFields := make([]string, 0, len(targetPrimaryKeys))
-	for _, key := range targetPrimaryKeys {
-		targetDataFields = append(targetDataFields, fmt.Sprintf("%s: %s.%s", key, rel.TargetField, key))
-	}
 
-	// 构建基础字段
 	var fieldsBuilder strings.Builder
 	fieldsBuilder.WriteString(fmt.Sprintf(`
             hop: %d,
             relation_type: '%s',
             relation_category: '%s',`, hop, relationType, rel.Schema.Category))
 
-	// 动态关系需要 direction 字段
 	if rel.Schema.Category == RelationCategoryDynamic {
 		fieldsBuilder.WriteString(fmt.Sprintf(`
             direction: '%s',`, rel.Direction))
@@ -274,44 +276,219 @@ func (b *SurrealQueryBuilder) buildRelationQuery(hop int, _ ResourceType, rel *R
 
 	fieldsBuilder.WriteString(fmt.Sprintf(`
             relation_id: <string>id,
-            relation_liveness: ->%s->liveness[WHERE period_end >= $start AND period_start <= $end].*,
+            relation_liveness: `+tplRelLivenessSelect+`,
             target: {
                 entity_type: '%s',
                 entity_id: <string>%s,
                 entity_data: { %s },
-                liveness: %s->%s->liveness[WHERE period_end >= $start AND period_start <= $end].*
-            }`,
-		relationLivenessEdgeTable,
+                liveness: `+tplLivenessSelectRef,
+		relationLivenessTable,
 		rel.TargetType,
-		rel.TargetField,
-		strings.Join(targetDataFields, ", "),
-		rel.TargetField,
-		targetLivenessEdgeTable))
+		rel.SelectField,
+		buildEntityDataFields(targetPrimaryKeys, rel.SelectField),
+		targetLivenessTable,
+		targetLivenessIDField,
+		rel.SelectField))
 
-	// 如果还有下一跳，递归构建
 	if hop < b.request.MaxHops {
 		nextHopKey := fmt.Sprintf("hop%d", hop+1)
-		// TODO: 递归构建下一跳需要更复杂的逻辑，这里先留空
-		// 实际实现需要在 target 的 context 中展开
+		nextHopSelect := b.buildNestedHopSelect(hop+1, rel.TargetType, rel.SelectField)
 		fieldsBuilder.WriteString(fmt.Sprintf(`,
-            %s: {}`, nextHopKey))
+                %s: %s`, nextHopKey, nextHopSelect))
 	}
 
-	return fmt.Sprintf(`        %s: (SELECT {%s
-        } FROM %s%s WHERE updated_at >= $start)`,
+	fieldsBuilder.WriteString(`
+            }`)
+
+	return fmt.Sprintf(sqlIndent2+`%s: (SELECT {%s
+        } FROM %s WHERE %s = $parent.id
+          AND `+tplRelLivenessFilter+`)`,
 		keyName,
 		fieldsBuilder.String(),
-		rel.TraversalExpr,
-		relationTable)
+		relationTable,
+		rel.WhereField,
+		relationLivenessTable)
+}
+
+// buildNestedHopSelect 构建嵌套在 target 内的下一跳查询
+func (b *SurrealQueryBuilder) buildNestedHopSelect(hop int, currentType ResourceType, parentField string) string {
+	if hop > b.request.MaxHops {
+		return "{}"
+	}
+
+	relations := b.getRelationsForType(currentType)
+	if len(relations) == 0 {
+		return "{}"
+	}
+
+	var sb strings.Builder
+	sb.WriteString("{\n")
+
+	first := true
+	for _, rel := range relations {
+		if !first {
+			sb.WriteString(",\n")
+		}
+		first = false
+		sb.WriteString(b.buildNestedRelationQuery(hop, rel, parentField))
+	}
+
+	sb.WriteString("\n" + sqlIndent4 + "}")
+
+	return sb.String()
+}
+
+// buildNestedRelationQuery 构建嵌套的关系查询（用于 hop2+）
+func (b *SurrealQueryBuilder) buildNestedRelationQuery(hop int, rel *RelationQueryInfo, parentField string) string {
+	relationType := rel.Schema.RelationType
+	relationTable := string(relationType)
+	relationLivenessTable := GetRelationLivenessRecordTableName(relationType)
+	targetLivenessTable := GetLivenessRecordTableName(rel.TargetType)
+	targetLivenessIDField := GetLivenessIDField(rel.TargetType)
+	keyName := relationTable + rel.KeySuffix
+	targetPrimaryKeys := GetResourcePrimaryKeys(rel.TargetType)
+
+	var fieldsBuilder strings.Builder
+	fieldsBuilder.WriteString(fmt.Sprintf(`
+                        hop: %d,
+                        relation_type: '%s',
+                        relation_category: '%s',`, hop, relationType, rel.Schema.Category))
+
+	if rel.Schema.Category == RelationCategoryDynamic {
+		fieldsBuilder.WriteString(fmt.Sprintf(`
+                        direction: '%s',`, rel.Direction))
+	}
+
+	fieldsBuilder.WriteString(fmt.Sprintf(`
+                        relation_id: <string>id,
+                        relation_liveness: `+tplRelLivenessSelect+`,
+                        target: {
+                            entity_type: '%s',
+                            entity_id: <string>%s,
+                            entity_data: { %s },
+                            liveness: `+tplLivenessSelectRef,
+		relationLivenessTable,
+		rel.TargetType,
+		rel.SelectField,
+		buildEntityDataFields(targetPrimaryKeys, rel.SelectField),
+		targetLivenessTable,
+		targetLivenessIDField,
+		rel.SelectField))
+
+	if hop < b.request.MaxHops {
+		nextHopKey := fmt.Sprintf("hop%d", hop+1)
+		nextHopSelect := b.buildDeeperNestedHopSelect(hop+1, rel.TargetType, rel.SelectField, 4)
+		fieldsBuilder.WriteString(fmt.Sprintf(`,
+                            %s: %s`, nextHopKey, nextHopSelect))
+	}
+
+	fieldsBuilder.WriteString(`
+                        }`)
+
+	return fmt.Sprintf(sqlIndent5+`%s: (SELECT {%s
+                    } FROM %s WHERE %s = $parent.%s
+                      AND `+tplRelLivenessFilter+`)`,
+		keyName,
+		fieldsBuilder.String(),
+		relationTable,
+		rel.WhereField,
+		parentField,
+		relationLivenessTable)
+}
+
+// buildDeeperNestedHopSelect 构建更深层嵌套的 hop（hop3+）
+func (b *SurrealQueryBuilder) buildDeeperNestedHopSelect(hop int, currentType ResourceType, parentField string, indentLevel int) string {
+	if hop > b.request.MaxHops {
+		return "{}"
+	}
+
+	relations := b.getRelationsForType(currentType)
+	if len(relations) == 0 {
+		return "{}"
+	}
+
+	indent := strings.Repeat(sqlIndent1, indentLevel)
+	var sb strings.Builder
+	sb.WriteString("{\n")
+
+	first := true
+	for _, rel := range relations {
+		if !first {
+			sb.WriteString(",\n")
+		}
+		first = false
+		sb.WriteString(b.buildDeeperNestedRelationQuery(hop, rel, parentField, indentLevel))
+	}
+
+	sb.WriteString(fmt.Sprintf("\n%s}", indent))
+
+	return sb.String()
+}
+
+// buildDeeperNestedRelationQuery 构建更深层嵌套的关系查询
+func (b *SurrealQueryBuilder) buildDeeperNestedRelationQuery(hop int, rel *RelationQueryInfo, parentField string, indentLevel int) string {
+	relationType := rel.Schema.RelationType
+	relationTable := string(relationType)
+	relationLivenessTable := GetRelationLivenessRecordTableName(relationType)
+	targetLivenessTable := GetLivenessRecordTableName(rel.TargetType)
+	targetLivenessIDField := GetLivenessIDField(rel.TargetType)
+
+	keyName := relationTable + rel.KeySuffix
+	indent := strings.Repeat(sqlIndent1, indentLevel)
+	innerIndent := strings.Repeat(sqlIndent1, indentLevel+1)
+	targetPrimaryKeys := GetResourcePrimaryKeys(rel.TargetType)
+
+	var fieldsBuilder strings.Builder
+	fieldsBuilder.WriteString(fmt.Sprintf(`
+%shop: %d,
+%srelation_type: '%s',
+%srelation_category: '%s',`, innerIndent, hop, innerIndent, relationType, innerIndent, rel.Schema.Category))
+
+	if rel.Schema.Category == RelationCategoryDynamic {
+		fieldsBuilder.WriteString(fmt.Sprintf(`
+%sdirection: '%s',`, innerIndent, rel.Direction))
+	}
+
+	fieldsBuilder.WriteString(fmt.Sprintf(`
+%srelation_id: <string>id,
+%srelation_liveness: `+tplRelLivenessSelect+`,
+%starget: {
+%s    entity_type: '%s',
+%s    entity_id: <string>%s,
+%s    entity_data: { %s },
+%s    liveness: `+tplLivenessSelectRef,
+		innerIndent,
+		innerIndent, relationLivenessTable,
+		innerIndent,
+		innerIndent, rel.TargetType,
+		innerIndent, rel.SelectField,
+		innerIndent, buildEntityDataFields(targetPrimaryKeys, rel.SelectField),
+		innerIndent, targetLivenessTable, targetLivenessIDField, rel.SelectField))
+
+	if hop < b.request.MaxHops {
+		nextHopKey := fmt.Sprintf("hop%d", hop+1)
+		nextHopSelect := b.buildDeeperNestedHopSelect(hop+1, rel.TargetType, rel.SelectField, indentLevel+2)
+		fieldsBuilder.WriteString(fmt.Sprintf(`,
+%s    %s: %s`, innerIndent, nextHopKey, nextHopSelect))
+	}
+
+	fieldsBuilder.WriteString(fmt.Sprintf(`
+%s}`, innerIndent))
+
+	return fmt.Sprintf(`%s%s: (SELECT {%s
+%s} FROM %s WHERE %s = $parent.%s
+%s  AND `+tplRelLivenessFilter+`)`,
+		indent, keyName,
+		fieldsBuilder.String(),
+		indent, relationTable, rel.WhereField, parentField,
+		indent, relationLivenessTable)
 }
 
 // buildWhereClause 构建 WHERE 子句
 func (b *SurrealQueryBuilder) buildWhereClause() string {
 	var conditions []string
 
-	// 根据 source_info 构建过滤条件
 	if len(b.request.SourceInfo) > 0 {
-		// 按键排序保证确定性
 		keys := make([]string, 0, len(b.request.SourceInfo))
 		for k := range b.request.SourceInfo {
 			keys = append(keys, k)
@@ -324,14 +501,9 @@ func (b *SurrealQueryBuilder) buildWhereClause() string {
 		}
 	}
 
-	// 时间过滤
-	conditions = append(conditions, "updated_at >= $start")
-
-	// Liveness 过滤（使用边表）
-	livenessEdgeTable := GetLivenessEdgeTableName(b.request.SourceType)
-	conditions = append(conditions, fmt.Sprintf(
-		"array::len(->%s->liveness[WHERE period_end >= $start AND period_start <= $end]) > 0",
-		livenessEdgeTable))
+	livenessTable := GetLivenessRecordTableName(b.request.SourceType)
+	livenessIDField := GetLivenessIDField(b.request.SourceType)
+	conditions = append(conditions, fmt.Sprintf(tplLivenessFilter, livenessTable, livenessIDField))
 
 	return "WHERE " + strings.Join(conditions, "\n  AND ")
 }
