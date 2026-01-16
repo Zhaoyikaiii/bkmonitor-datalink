@@ -155,17 +155,25 @@ class SurrealDBClient:
                 logger.error(f"Missing tables: {missing_tables}")
                 return False
             
-            # Verify relation tables are TYPE RELATION
+            # Verify relation tables have source_id/target_id fields by querying table info
             relation_tables = ['pod_to_pod', 'pod_to_system', 'node_with_pod', 'node_with_system',
                                'container_with_pod', 'pod_with_service', 'deployment_with_replicaset',
                                'pod_with_replicaset']
             
             for table_name in relation_tables:
-                table_def = tables.get(table_name, '')
-                if 'TYPE RELATION' not in table_def:
-                    logger.error(f"Table '{table_name}' is not TYPE RELATION: {table_def}")
+                # Query table fields
+                fields_result = self.execute(f"INFO FOR TABLE {table_name};", use_db=True)
+                if fields_result and fields_result[0].get('status') == 'OK':
+                    table_info = fields_result[0].get('result', {})
+                    fields = table_info.get('fields', {})
+                    
+                    if 'source_id' not in fields or 'target_id' not in fields:
+                        logger.error(f"Table '{table_name}' missing source_id/target_id fields: {list(fields.keys())}")
+                        return False
+                    logger.info(f"✓ {table_name}: source_id/target_id verified")
+                else:
+                    logger.error(f"Failed to get info for table '{table_name}': {fields_result}")
                     return False
-                logger.info(f"✓ {table_name}: TYPE RELATION verified")
             
             logger.info("Schema verification passed!")
             return True
