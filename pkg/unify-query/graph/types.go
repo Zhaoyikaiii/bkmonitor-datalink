@@ -225,14 +225,16 @@ func ParseResourceID(resourceID string) (ResourceType, map[string]string, error)
 	return resourceType, labels, nil
 }
 
-// GetLivenessTableName 获取资源类型的存活记录表名
-func GetLivenessTableName(resourceType ResourceType) string {
-	return string(resourceType) + "_liveness_record"
+// GetLivenessEdgeTableName 获取资源类型的 liveness 边表名
+// 边表方案：pod -> pod_liveness -> liveness
+func GetLivenessEdgeTableName(resourceType ResourceType) string {
+	return string(resourceType) + "_liveness"
 }
 
-// GetRelationLivenessTableName 获取关系类型的存活记录表名
-func GetRelationLivenessTableName(relationType RelationType) string {
-	return string(relationType) + "_liveness_record"
+// GetRelationLivenessEdgeTableName 获取关系类型的 liveness 边表名
+// 边表方案：node_with_pod -> node_with_pod_liveness -> liveness
+func GetRelationLivenessEdgeTableName(relationType RelationType) string {
+	return string(relationType) + "_liveness"
 }
 
 // GetResourcePrimaryKeys 获取资源类型的主键字段

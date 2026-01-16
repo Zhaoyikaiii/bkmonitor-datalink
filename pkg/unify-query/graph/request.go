@@ -13,16 +13,47 @@ package graph
 // 查询请求结构
 // ========================================
 
+// 默认值常量
+const (
+	DefaultMaxHops       = 2
+	DefaultLimit         = 100
+	DefaultLookBackDelta = 86400000 // 24小时（毫秒）
+	MaxAllowedHops       = 5
+)
+
 // QueryRequest 关联查询请求
 type QueryRequest struct {
 	Timestamp                int64              `json:"timestamp"`                            // 查询时间点（毫秒时间戳）
 	SourceType               ResourceType       `json:"source_type"`                          // 源资源类型
 	SourceInfo               map[string]string  `json:"source_info"`                          // 源资源过滤条件
-	TargetType               ResourceType       `json:"target_type,omitempty"`                // 目标资源类型
-	MaxHops                  int                `json:"max_hops,omitempty"`                   // 最大跳数
+	TargetType               ResourceType       `json:"target_type,omitempty"`                // 目标资源类型（可选，用于定向查询）
+	MaxHops                  int                `json:"max_hops,omitempty"`                   // 最大跳数（默认2，范围1-5）
 	AllowedRelationTypes     []RelationCategory `json:"allowed_relation_types,omitempty"`     // 允许的关系类别
-	DynamicRelationDirection TraversalDirection `json:"dynamic_relation_direction,omitempty"` // 动态关系方向
-	LookBackDelta            int64              `json:"look_back_delta,omitempty"`            // 回溯时间窗口（毫秒）
+	DynamicRelationDirection TraversalDirection `json:"dynamic_relation_direction,omitempty"` // 动态关系方向（默认both）
+	LookBackDelta            int64              `json:"look_back_delta,omitempty"`            // 回溯时间窗口（毫秒，默认86400000）
+	Limit                    int                `json:"limit,omitempty"`                      // 返回的Root数量限制（默认100）
+}
+
+// Normalize 规范化请求参数，填充默认值
+func (r *QueryRequest) Normalize() {
+	if r.MaxHops <= 0 {
+		r.MaxHops = DefaultMaxHops
+	}
+	if r.MaxHops > MaxAllowedHops {
+		r.MaxHops = MaxAllowedHops
+	}
+	if r.Limit <= 0 {
+		r.Limit = DefaultLimit
+	}
+	if r.LookBackDelta <= 0 {
+		r.LookBackDelta = DefaultLookBackDelta
+	}
+	if r.DynamicRelationDirection == "" {
+		r.DynamicRelationDirection = DirectionBoth
+	}
+	if len(r.AllowedRelationTypes) == 0 {
+		r.AllowedRelationTypes = []RelationCategory{RelationCategoryStatic, RelationCategoryDynamic}
+	}
 }
 
 // GetQueryRange 获取查询时间范围
