@@ -39,7 +39,7 @@ func (p *SurrealResponseParser) Parse(rawResponse []map[string]any) ([]*Liveness
 	}
 
 	// 获取第一个查询的结果
-	firstResult, ok := rawResponse[0]["result"]
+	firstResult, ok := rawResponse[0][ResponseFieldResult]
 	if !ok {
 		return graphs, nil
 	}
@@ -57,13 +57,13 @@ func (p *SurrealResponseParser) Parse(rawResponse []map[string]any) ([]*Liveness
 		}
 
 		// 获取 result 字段（包含 root 和 hopN）
-		resultData, ok := record["result"].(map[string]any)
+		resultData, ok := record[ResponseFieldResult].(map[string]any)
 		if !ok {
 			continue
 		}
 
 		// 解析 root 节点
-		rootData, ok := resultData["root"].(map[string]any)
+		rootData, ok := resultData[ResponseFieldRoot].(map[string]any)
 		if !ok {
 			continue
 		}
@@ -83,7 +83,7 @@ func (p *SurrealResponseParser) Parse(rawResponse []map[string]any) ([]*Liveness
 
 		// 解析 hop1, hop2, ... 的关系
 		for key, value := range resultData {
-			if !strings.HasPrefix(key, "hop") {
+			if !strings.HasPrefix(key, ResponseFieldHopPrefix) {
 				continue
 			}
 
@@ -103,16 +103,16 @@ func (p *SurrealResponseParser) Parse(rawResponse []map[string]any) ([]*Liveness
 
 // parseEntity 解析实体数据为 NodeLiveness
 func (p *SurrealResponseParser) parseEntity(data map[string]any) (*NodeLiveness, error) {
-	entityID, ok := data["entity_id"].(string)
+	entityID, ok := data[ResponseFieldEntityID].(string)
 	if !ok || entityID == "" {
-		return nil, fmt.Errorf("missing entity_id")
+		return nil, fmt.Errorf("missing %s", ResponseFieldEntityID)
 	}
 
-	entityType, _ := data["entity_type"].(string)
+	entityType, _ := data[ResponseFieldEntityType].(string)
 
 	// 解析 entity_data 为 labels
 	labels := make(map[string]string)
-	if entityData, ok := data["entity_data"].(map[string]any); ok {
+	if entityData, ok := data[ResponseFieldEntityData].(map[string]any); ok {
 		for k, v := range entityData {
 			if s, ok := v.(string); ok {
 				labels[k] = s
@@ -123,7 +123,7 @@ func (p *SurrealResponseParser) parseEntity(data map[string]any) (*NodeLiveness,
 	}
 
 	// 解析 liveness 时间段
-	rawPeriods := p.parseLivenessPeriods(data["liveness"])
+	rawPeriods := p.parseLivenessPeriods(data[ResponseFieldLiveness])
 
 	return &NodeLiveness{
 		ResourceID:   entityID,
@@ -172,22 +172,22 @@ func (p *SurrealResponseParser) parseHopRelations(graph *LivenessGraph, fromID s
 // parseRelation 解析单个关系
 // 返回值：边、目标节点、嵌套的hop数据列表、错误
 func (p *SurrealResponseParser) parseRelation(fromID, relationKey string, data map[string]any) (*EdgeLiveness, *NodeLiveness, []map[string]any, error) {
-	relationID, ok := data["relation_id"].(string)
+	relationID, ok := data[ResponseFieldRelationID].(string)
 	if !ok || relationID == "" {
-		return nil, nil, nil, fmt.Errorf("missing relation_id")
+		return nil, nil, nil, fmt.Errorf("missing %s", ResponseFieldRelationID)
 	}
 
-	relationType, _ := data["relation_type"].(string)
-	relationCategory, _ := data["relation_category"].(string)
-	direction, _ := data["direction"].(string)
+	relationType, _ := data[ResponseFieldRelationType].(string)
+	relationCategory, _ := data[ResponseFieldRelationCategory].(string)
+	direction, _ := data[ResponseFieldDirection].(string)
 
 	// 解析关系的 liveness
-	relationLiveness := p.parseLivenessPeriods(data["relation_liveness"])
+	relationLiveness := p.parseLivenessPeriods(data[ResponseFieldRelationLiveness])
 
 	// 解析 target 实体
-	targetData, ok := data["target"].(map[string]any)
+	targetData, ok := data[ResponseFieldTarget].(map[string]any)
 	if !ok {
-		return nil, nil, nil, fmt.Errorf("missing target")
+		return nil, nil, nil, fmt.Errorf("missing %s", ResponseFieldTarget)
 	}
 
 	targetNode, err := p.parseEntity(targetData)
@@ -198,7 +198,7 @@ func (p *SurrealResponseParser) parseRelation(fromID, relationKey string, data m
 	// 提取 target 中嵌套的 hop（hop2, hop3, ...）
 	var nestedHops []map[string]any
 	for key, value := range targetData {
-		if strings.HasPrefix(key, "hop") {
+		if strings.HasPrefix(key, ResponseFieldHopPrefix) {
 			if hopData, ok := value.(map[string]any); ok {
 				nestedHops = append(nestedHops, hopData)
 			}
@@ -232,8 +232,8 @@ func (p *SurrealResponseParser) parseLivenessPeriods(data any) []*VisiblePeriod 
 			continue
 		}
 
-		start := p.toInt64(periodData["period_start"])
-		end := p.toInt64(periodData["period_end"])
+		start := p.toInt64(periodData[FieldPeriodStart])
+		end := p.toInt64(periodData[FieldPeriodEnd])
 
 		if start <= end {
 			periods = append(periods, &VisiblePeriod{

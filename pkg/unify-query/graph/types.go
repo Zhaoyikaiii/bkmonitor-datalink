@@ -140,6 +140,33 @@ const (
 )
 
 // ========================================
+// SurrealDB 响应字段常量
+// ========================================
+
+const (
+	// 响应结构字段
+	ResponseFieldResult = "result"
+	ResponseFieldRoot   = "root"
+	ResponseFieldTarget = "target"
+
+	// hop 前缀（hop1, hop2, ...）
+	ResponseFieldHopPrefix = "hop"
+
+	// 实体字段
+	ResponseFieldEntityID   = "entity_id"
+	ResponseFieldEntityType = "entity_type"
+	ResponseFieldEntityData = "entity_data"
+	ResponseFieldLiveness   = "liveness"
+
+	// 关系字段
+	ResponseFieldRelationID       = "relation_id"
+	ResponseFieldRelationType     = "relation_type"
+	ResponseFieldRelationCategory = "relation_category"
+	ResponseFieldRelationLiveness = "relation_liveness"
+	ResponseFieldDirection        = "direction"
+)
+
+// ========================================
 // 核心数据结构
 // ========================================
 
