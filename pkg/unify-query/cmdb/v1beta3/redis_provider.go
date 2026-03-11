@@ -43,6 +43,9 @@ const (
 	DefaultRedisPubSubChannelResourceDef = DefaultRedisKeyPrefixResourceDef + DefaultRedisPubSubChannelSuffix
 	DefaultRedisPubSubChannelRelationDef = DefaultRedisKeyPrefixRelationDef + DefaultRedisPubSubChannelSuffix
 
+	// 空 namespace 的映射值（与 bk-monitor-worker 保持一致）
+	NamespaceAll = "__all__"
+
 	// 内部默认值
 	defaultRedisReconnectInterval = 5 * time.Second
 	defaultRedisReconnectMaxRetry = 10
@@ -149,6 +152,14 @@ func (rsp *RedisSchemaProvider) Close() error {
 	return nil
 }
 
+// normalizeNamespace 规范化 namespace，空的映射到 __all__（与 bk-monitor-worker 保持一致）
+func (rsp *RedisSchemaProvider) normalizeNamespace(namespace string) string {
+	if namespace == "" {
+		return NamespaceAll
+	}
+	return namespace
+}
+
 // loadAllEntities 启动时全量加载所有实体
 func (rsp *RedisSchemaProvider) loadAllEntities() error {
 	var err error
@@ -202,6 +213,7 @@ func (rsp *RedisSchemaProvider) loadEntitiesByKind(ctx context.Context, kind str
 
 // loadEntityByKind 加载单个实体到缓存
 func (rsp *RedisSchemaProvider) loadEntityByKind(kind, namespace, name, jsonData string) error {
+	normalizedNs := rsp.normalizeNamespace(namespace)
 	switch kind {
 	case KindResourceDef:
 		var def ResourceDefinition
@@ -209,10 +221,10 @@ func (rsp *RedisSchemaProvider) loadEntityByKind(kind, namespace, name, jsonData
 			return fmt.Errorf("failed to unmarshal ResourceDefinition: %w", err)
 		}
 		rsp.mu.Lock()
-		if _, ok := rsp.resourceDefinitions[namespace]; !ok {
-			rsp.resourceDefinitions[namespace] = make(map[string]*ResourceDefinition)
+		if _, ok := rsp.resourceDefinitions[normalizedNs]; !ok {
+			rsp.resourceDefinitions[normalizedNs] = make(map[string]*ResourceDefinition)
 		}
-		rsp.resourceDefinitions[namespace][name] = &def
+		rsp.resourceDefinitions[normalizedNs][name] = &def
 		rsp.mu.Unlock()
 
 	case KindRelationDef:
@@ -221,10 +233,10 @@ func (rsp *RedisSchemaProvider) loadEntityByKind(kind, namespace, name, jsonData
 			return fmt.Errorf("failed to unmarshal RelationDefinition: %w", err)
 		}
 		rsp.mu.Lock()
-		if _, ok := rsp.relationDefinitions[namespace]; !ok {
-			rsp.relationDefinitions[namespace] = make(map[string]*RelationDefinition)
+		if _, ok := rsp.relationDefinitions[normalizedNs]; !ok {
+			rsp.relationDefinitions[normalizedNs] = make(map[string]*RelationDefinition)
 		}
-		rsp.relationDefinitions[namespace][name] = &def
+		rsp.relationDefinitions[normalizedNs][name] = &def
 		rsp.mu.Unlock()
 	}
 	return nil
@@ -233,6 +245,7 @@ func (rsp *RedisSchemaProvider) loadEntityByKind(kind, namespace, name, jsonData
 // reloadNamespace 按 namespace 全量重建该 kind 的本地缓存（与 bk-monitor-worker 保持一致）
 func (rsp *RedisSchemaProvider) reloadNamespace(ctx context.Context, kind, namespace string) error {
 	redisKey := DefaultRedisKeyPrefix + ":" + kind
+	normalizedNs := rsp.normalizeNamespace(namespace)
 
 	entitiesJSON, err := rsp.client.HGet(ctx, redisKey, namespace).Result()
 	if errors.Is(err, redis.Nil) {
@@ -240,9 +253,9 @@ func (rsp *RedisSchemaProvider) reloadNamespace(ctx context.Context, kind, names
 		rsp.mu.Lock()
 		switch kind {
 		case KindResourceDef:
-			delete(rsp.resourceDefinitions, namespace)
+			delete(rsp.resourceDefinitions, normalizedNs)
 		case KindRelationDef:
-			delete(rsp.relationDefinitions, namespace)
+			delete(rsp.relationDefinitions, normalizedNs)
 		}
 		rsp.mu.Unlock()
 		log.Infof(ctx, "cleared namespace cache: kind=%s, ns=%s", kind, namespace)
@@ -269,7 +282,7 @@ func (rsp *RedisSchemaProvider) reloadNamespace(ctx context.Context, kind, names
 			newMap[name] = &def
 		}
 		rsp.mu.Lock()
-		rsp.resourceDefinitions[namespace] = newMap
+		rsp.resourceDefinitions[normalizedNs] = newMap
 		rsp.mu.Unlock()
 
 	case KindRelationDef:
@@ -283,7 +296,7 @@ func (rsp *RedisSchemaProvider) reloadNamespace(ctx context.Context, kind, names
 			newMap[name] = &def
 		}
 		rsp.mu.Lock()
-		rsp.relationDefinitions[namespace] = newMap
+		rsp.relationDefinitions[normalizedNs] = newMap
 		rsp.mu.Unlock()
 	}
 
@@ -383,10 +396,23 @@ func (rsp *RedisSchemaProvider) GetResourceDefinition(namespace, name string) (*
 	rsp.mu.RLock()
 	defer rsp.mu.RUnlock()
 
-	if nsMap, ok := rsp.resourceDefinitions[namespace]; ok {
+	ns := rsp.normalizeNamespace(namespace)
+
+	// 先从指定 namespace 查找
+	if nsMap, ok := rsp.resourceDefinitions[ns]; ok {
 		if def, ok := nsMap[name]; ok {
 			span.Set("cache.hit", true)
 			return def, nil
+		}
+	}
+
+	// 如果指定 namespace 没找到，尝试从 __all__ 查找
+	if ns != NamespaceAll {
+		if allMap, ok := rsp.resourceDefinitions[NamespaceAll]; ok {
+			if def, ok := allMap[name]; ok {
+				span.Set("cache.hit", true)
+				return def, nil
+			}
 		}
 	}
 
@@ -411,9 +437,24 @@ func (rsp *RedisSchemaProvider) ListResourceDefinitions(namespace string) ([]*Re
 		return result, nil
 	}
 
-	if nsMap, ok := rsp.resourceDefinitions[namespace]; ok {
-		for _, def := range nsMap {
+	ns := rsp.normalizeNamespace(namespace)
+	seen := make(map[string]struct{})
+
+	if nsMap, ok := rsp.resourceDefinitions[ns]; ok {
+		for name, def := range nsMap {
 			result = append(result, def)
+			seen[name] = struct{}{}
+		}
+	}
+
+	// 合并 __all__ 的定义（指定 namespace 优先）
+	if ns != NamespaceAll {
+		if allMap, ok := rsp.resourceDefinitions[NamespaceAll]; ok {
+			for name, def := range allMap {
+				if _, exists := seen[name]; !exists {
+					result = append(result, def)
+				}
+			}
 		}
 	}
 	return result, nil
@@ -428,10 +469,23 @@ func (rsp *RedisSchemaProvider) GetRelationDefinition(namespace, name string) (*
 	rsp.mu.RLock()
 	defer rsp.mu.RUnlock()
 
-	if nsMap, ok := rsp.relationDefinitions[namespace]; ok {
+	ns := rsp.normalizeNamespace(namespace)
+
+	// 先从指定 namespace 查找
+	if nsMap, ok := rsp.relationDefinitions[ns]; ok {
 		if def, ok := nsMap[name]; ok {
 			span.Set("cache.hit", true)
 			return def, nil
+		}
+	}
+
+	// 如果指定 namespace 没找到，尝试从 __all__ 查找
+	if ns != NamespaceAll {
+		if allMap, ok := rsp.relationDefinitions[NamespaceAll]; ok {
+			if def, ok := allMap[name]; ok {
+				span.Set("cache.hit", true)
+				return def, nil
+			}
 		}
 	}
 
@@ -456,9 +510,24 @@ func (rsp *RedisSchemaProvider) ListRelationDefinitions(namespace string) ([]*Re
 		return result, nil
 	}
 
-	if nsMap, ok := rsp.relationDefinitions[namespace]; ok {
-		for _, def := range nsMap {
+	ns := rsp.normalizeNamespace(namespace)
+	seen := make(map[string]struct{})
+
+	if nsMap, ok := rsp.relationDefinitions[ns]; ok {
+		for name, def := range nsMap {
 			result = append(result, def)
+			seen[name] = struct{}{}
+		}
+	}
+
+	// 合并 __all__（指定 namespace 优先）
+	if ns != NamespaceAll {
+		if allMap, ok := rsp.relationDefinitions[NamespaceAll]; ok {
+			for name, def := range allMap {
+				if _, exists := seen[name]; !exists {
+					result = append(result, def)
+				}
+			}
 		}
 	}
 	return result, nil
