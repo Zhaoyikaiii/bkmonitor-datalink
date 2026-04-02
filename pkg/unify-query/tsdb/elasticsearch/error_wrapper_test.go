@@ -141,6 +141,13 @@ func Test_handleESError(t *testing.T) {
 			esAddr:         "http://127.0.0.1:9200",
 			expectedErrMsg: "es 查询失败: Elasticsearch error from http://127.0.0.1:9200: [too_many_buckets_exception] Trying to create too many buckets. Must be less than or equal to: [65535] but was [65536]. This limit can be set by changing the [search.max_buckets] cluster level setting.",
 		},
+		// io.EOF with nil res: handleESError returns nil, but caller must handle nil res safely
+		{
+			name:           "should return nil for io.EOF with nil res",
+			err:            io.EOF,
+			res:            nil,
+			expectedErrMsg: "",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
