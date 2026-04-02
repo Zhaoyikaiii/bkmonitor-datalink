@@ -35,6 +35,12 @@ const (
 	DefaultKey = "log"
 )
 
+// isIgnoreValueField 判断取值字段是否应被忽略：空字符串、"*"(全表)、"_index"(索引占位)
+// 这些字段经 dimTransform 返回空后，在聚合逻辑中映射为 COUNT(*)
+func isIgnoreValueField(s string) bool {
+	return s == "" || s == SelectAll || s == SelectIndex
+}
+
 const (
 	DorisTypeInt       = "INT"
 	DorisTypeTinyInt   = "TINYINT"
@@ -157,7 +163,12 @@ func (d *DorisSQLExpr) ParserAggregatesAndOrders(selectDistinct []string, aggreg
 		strings.ToUpper(d.timeField),
 	}...)
 
-	valueField, _ := d.dimTransform(d.valueField)
+	// _time 替换为内置时间字段（如 dtEventTimeStamp），其余由 dimTransform 处理
+	vf := d.valueField
+	if vf == FieldTime && d.timeField != "" {
+		vf = d.timeField
+	}
+	valueField, _ := d.dimTransform(vf)
 
 	var (
 		window         time.Duration
@@ -188,7 +199,7 @@ func (d *DorisSQLExpr) ParserAggregatesAndOrders(selectDistinct []string, aggreg
 			groupByFields = append(groupByFields, newDim)
 		}
 
-		if valueField == "" || valueField == SelectIndex {
+		if valueField == "" {
 			valueField = SelectAll
 		}
 
@@ -633,7 +644,7 @@ func (d *DorisSQLExpr) getField(s string) (metadata.FieldOption, bool) {
 }
 
 func (d *DorisSQLExpr) dimTransform(s string) (ns string, as string) {
-	if s == "" || s == "*" {
+	if isIgnoreValueField(s) {
 		return ns, as
 	}
 

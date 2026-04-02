@@ -18,6 +18,11 @@ import (
 
 	"github.com/prometheus/prometheus/promql/parser"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 
 	"github.com/TencentBlueKing/bkmonitor-datalink/pkg/unify-query/curl"
 	"github.com/TencentBlueKing/bkmonitor-datalink/pkg/unify-query/influxdb"
@@ -25,6 +30,7 @@ import (
 	"github.com/TencentBlueKing/bkmonitor-datalink/pkg/unify-query/log"
 	"github.com/TencentBlueKing/bkmonitor-datalink/pkg/unify-query/metadata"
 	"github.com/TencentBlueKing/bkmonitor-datalink/pkg/unify-query/mock"
+	uqtrace "github.com/TencentBlueKing/bkmonitor-datalink/pkg/unify-query/trace"
 )
 
 var (
@@ -217,6 +223,443 @@ func TestInstance_QueryLabelValues(t *testing.T) {
 			sort.Strings(res)
 			actual, _ := json.Marshal(res)
 			assert.Equal(t, c.expected, string(actual))
+		})
+	}
+}
+
+func TestVmResponse_VmQueryCluster(t *testing.T) {
+	t.Run("with vm_query_cluster", func(t *testing.T) {
+		raw := `{
+			"result": true,
+			"message": "成功",
+			"code": "00",
+			"data": {
+				"result_table_scan_range": null,
+				"cluster": "monitor-op",
+				"totalRecords": 1,
+				"list": [{
+					"status": "success",
+					"isPartial": false,
+					"data": {
+						"resultType": "vector",
+						"result": [{"metric": {"pod": "test-pod"}, "value": [1730184058, "1.0"]}]
+					}
+				}],
+				"select_fields_order": [],
+				"sql": "test",
+				"timetaken": 0.0,
+				"bksql_call_elapsed_time": 0,
+				"device": "vm",
+				"result_table_ids": ["2_test_rt"],
+				"vm_query_cluster": {
+"query_cluster": "vm-query-history.example.com",
+					"storage_cluster_list": ["vm-op1", "vm-op2"]
+				}
+			},
+			"errors": null
+		}`
+
+		var resp VmResponse
+		err := json.Unmarshal([]byte(raw), &resp)
+		assert.NoError(t, err)
+
+		assert.True(t, resp.Result)
+		assert.Equal(t, OK, resp.Code)
+		assert.NotNil(t, resp.Data.VmQueryCluster)
+		assert.Equal(t, "vm-query-history.example.com", resp.Data.VmQueryCluster.QueryCluster)
+		assert.Equal(t, []string{"vm-op1", "vm-op2"}, resp.Data.VmQueryCluster.StorageClusterList)
+	})
+
+	t.Run("without vm_query_cluster", func(t *testing.T) {
+		raw := `{
+			"result": true,
+			"message": "成功",
+			"code": "00",
+			"data": {
+				"result_table_scan_range": null,
+				"cluster": "monitor-op",
+				"totalRecords": 1,
+				"list": [{
+					"status": "success",
+					"isPartial": false,
+					"data": {
+						"resultType": "vector",
+						"result": [{"metric": {"pod": "test-pod"}, "value": [1730184058, "1.0"]}]
+					}
+				}],
+				"select_fields_order": [],
+				"sql": "test",
+				"timetaken": 0.0,
+				"bksql_call_elapsed_time": 0,
+				"device": "vm",
+				"result_table_ids": ["2_test_rt"]
+			},
+			"errors": null
+		}`
+
+		var resp VmResponse
+		err := json.Unmarshal([]byte(raw), &resp)
+		assert.NoError(t, err)
+
+		assert.True(t, resp.Result)
+		assert.Nil(t, resp.Data.VmQueryCluster)
+	})
+
+	t.Run("with full vm_query_cluster fields", func(t *testing.T) {
+		raw := `{
+			"result": true,
+			"message": "成功",
+			"code": "00",
+			"data": {
+				"result_table_scan_range": null,
+				"cluster": "monitor-op",
+				"totalRecords": 0,
+				"list": [],
+				"select_fields_order": [],
+				"sql": "test",
+				"timetaken": 0.0,
+				"bksql_call_elapsed_time": 0,
+				"device": "vm",
+				"result_table_ids": ["2_test_rt"],
+				"vm_query_cluster": {
+"query_cluster": "vm-query-history.example.com",
+					"storage_cluster_list": ["vm-op1", "vm-op2"]
+				}
+			},
+			"errors": null
+		}`
+
+		var resp VmResponse
+		err := json.Unmarshal([]byte(raw), &resp)
+		assert.NoError(t, err)
+
+		assert.NotNil(t, resp.Data.VmQueryCluster)
+		assert.Equal(t, "vm-query-history.example.com", resp.Data.VmQueryCluster.QueryCluster)
+		assert.Equal(t, []string{"vm-op1", "vm-op2"}, resp.Data.VmQueryCluster.StorageClusterList)
+	})
+
+	t.Run("with empty storage_cluster_list", func(t *testing.T) {
+		raw := `{
+			"result": true,
+			"message": "成功",
+			"code": "00",
+			"data": {
+				"result_table_scan_range": null,
+				"cluster": "monitor-op",
+				"totalRecords": 0,
+				"list": [],
+				"select_fields_order": [],
+				"sql": "test",
+				"timetaken": 0.0,
+				"bksql_call_elapsed_time": 0,
+				"device": "vm",
+				"result_table_ids": ["2_test_rt"],
+				"vm_query_cluster": {
+"query_cluster": "vm-query.example.com",
+					"storage_cluster_list": []
+				}
+			},
+			"errors": null
+		}`
+
+		var resp VmResponse
+		err := json.Unmarshal([]byte(raw), &resp)
+		assert.NoError(t, err)
+
+		assert.NotNil(t, resp.Data.VmQueryCluster)
+		assert.Equal(t, "vm-query.example.com", resp.Data.VmQueryCluster.QueryCluster)
+		assert.Empty(t, resp.Data.VmQueryCluster.StorageClusterList)
+	})
+}
+
+func TestVmLableValuesResponse_VmQueryCluster(t *testing.T) {
+	raw := `{
+		"result": true,
+		"message": "成功",
+		"code": "00",
+		"data": {
+			"result_table_scan_range": null,
+			"cluster": "monitor-op",
+			"totalRecords": 2,
+			"list": [{
+				"status": "success",
+				"isPartial": false,
+				"data": ["val1", "val2"]
+			}],
+			"select_fields_order": [],
+			"sql": "test",
+			"timetaken": 0.0,
+			"bksql_call_elapsed_time": 0,
+			"device": "vm",
+			"result_table_ids": ["2_test_rt"],
+			"vm_query_cluster": {
+				"query_cluster": "vm-query.example.com",
+				"storage_cluster_list": ["storage-1"]
+			}
+		},
+		"errors": null
+	}`
+
+	var resp VmLableValuesResponse
+	err := json.Unmarshal([]byte(raw), &resp)
+	assert.NoError(t, err)
+
+	assert.NotNil(t, resp.Data.VmQueryCluster)
+	assert.Equal(t, "vm-query.example.com", resp.Data.VmQueryCluster.QueryCluster)
+	assert.Equal(t, []string{"storage-1"}, resp.Data.VmQueryCluster.StorageClusterList)
+}
+
+func TestVmSeriesResponse_VmQueryCluster(t *testing.T) {
+	raw := `{
+		"result": true,
+		"message": "成功",
+		"code": "00",
+		"data": {
+			"result_table_scan_range": null,
+			"cluster": "monitor-op",
+			"totalRecords": 1,
+			"list": [{
+				"status": "success",
+				"isPartial": false,
+				"data": [{"__name__": "cpu_usage", "pod": "test-pod"}]
+			}],
+			"select_fields_order": [],
+			"sql": "test",
+			"timetaken": 0.0,
+			"bksql_call_elapsed_time": 0,
+			"device": "vm",
+			"result_table_ids": ["2_test_rt"],
+			"vm_query_cluster": {
+				"query_cluster": "vm-series.example.com",
+				"storage_cluster_list": ["s1", "s2", "s3"]
+			}
+		},
+		"errors": null
+	}`
+
+	var resp VmSeriesResponse
+	err := json.Unmarshal([]byte(raw), &resp)
+	assert.NoError(t, err)
+
+	assert.NotNil(t, resp.Data.VmQueryCluster)
+	assert.Equal(t, "vm-series.example.com", resp.Data.VmQueryCluster.QueryCluster)
+	assert.Equal(t, []string{"s1", "s2", "s3"}, resp.Data.VmQueryCluster.StorageClusterList)
+}
+
+func TestInstance_DirectQuery_WithVmQueryCluster(t *testing.T) {
+	mock.Init()
+	ctx := metadata.InitHashID(context.Background())
+
+	// mock response 携带 vm_query_cluster
+	mock.Vm.Set(map[string]any{
+		`query:1730184058sum(increase({__name__="container_cpu_usage_seconds_total_value", result_table_id="2_bcs_prom_computation_result_table_00000", container="unify-query"}[1m])) by (pod)`: `{"result":true,"message":"成功","code":"00","data":{"result_table_scan_range":null,"cluster":"monitor-op","totalRecords":1,"list":[{"status":"success","isPartial":false,"data":{"resultType":"vector","result":[{"metric":{"pod":"test-pod"},"value":[1730184058,"1.5"]}]}}],"select_fields_order":[],"sql":"test","timetaken":0.0,"bksql_call_elapsed_time":0,"device":"vm","result_table_ids":["2_bcs_prom_computation_result_table_00000"],"vm_query_cluster":{"query_cluster":"vm-query-history.example.com","storage_cluster_list":["vm-op1","vm-op2"]}},"errors":null}`,
+	})
+
+	end := time.Unix(1730184058, 0)
+
+	ctx = metadata.InitHashID(ctx)
+	expand := &metadata.VmExpand{
+		ResultTableList: []string{"2_bcs_prom_computation_result_table_00000"},
+	}
+	metadata.SetExpand(ctx, expand)
+
+	res, err := instance.DirectQuery(ctx, fmt.Sprintf(`sum(increase(%s[1m])) by (pod)`, vmCondition.ToMatch()), end)
+	assert.NoError(t, err)
+	assert.Len(t, res, 1)
+
+	actual, _ := json.Marshal(res)
+	assert.Equal(t, `[{"metric":{"pod":"test-pod"},"value":[1730184058,"1.5"]}]`, string(actual))
+}
+
+func TestInstance_DirectQueryRange_WithVmQueryCluster(t *testing.T) {
+	mock.Init()
+	ctx := metadata.InitHashID(context.Background())
+
+	// mock response 携带 vm_query_cluster
+	mock.Vm.Set(map[string]any{
+		`query_range:17301804581730184058300sum(increase({__name__="container_cpu_usage_seconds_total_value", result_table_id="2_bcs_prom_computation_result_table_00000", container="unify-query"}[1m])) by (pod)`: `{"result":true,"message":"成功","code":"00","data":{"result_table_scan_range":null,"cluster":"monitor-op","totalRecords":1,"list":[{"status":"success","isPartial":false,"data":{"resultType":"matrix","result":[{"metric":{"pod":"test-pod"},"values":[[1730181358,"0.5"],[1730181658,"1.0"]]}]}}],"select_fields_order":[],"sql":"test","timetaken":0.0,"bksql_call_elapsed_time":0,"device":"vm","result_table_ids":["2_bcs_prom_computation_result_table_00000"],"vm_query_cluster":{"query_cluster":"vm-query-history.example.com","storage_cluster_list":["vm-op1","vm-op2"]}},"errors":null}`,
+	})
+
+	start := time.Unix(1730180458, 0)
+	end := time.Unix(1730184058, 0)
+	step := time.Minute * 5
+
+	ctx = metadata.InitHashID(ctx)
+	expand := &metadata.VmExpand{
+		ResultTableList: []string{"2_bcs_prom_computation_result_table_00000"},
+	}
+	metadata.SetExpand(ctx, expand)
+
+	res, _, err := instance.DirectQueryRange(ctx, fmt.Sprintf(`sum(increase(%s[1m])) by (pod)`, vmCondition.ToMatch()), start, end, step)
+	assert.NoError(t, err)
+	assert.Len(t, res, 1)
+}
+
+func spanAttrString(attrs []attribute.KeyValue, key string) (string, bool) {
+	for _, kv := range attrs {
+		if string(kv.Key) == key {
+			return kv.Value.AsString(), true
+		}
+	}
+	return "", false
+}
+
+func spanAttrStringSlice(attrs []attribute.KeyValue, key string) ([]string, bool) {
+	for _, kv := range attrs {
+		if string(kv.Key) == key {
+			return kv.Value.AsStringSlice(), true
+		}
+	}
+	return nil, false
+}
+
+func TestSpanSetVmQueryClusterIfPresent(t *testing.T) {
+	rec := tracetest.NewSpanRecorder()
+	tp := sdktrace.NewTracerProvider(sdktrace.WithSpanProcessor(rec))
+	prevTP := otel.GetTracerProvider()
+	otel.SetTracerProvider(tp)
+	t.Cleanup(func() {
+		_ = tp.Shutdown(context.Background())
+		otel.SetTracerProvider(prevTP)
+	})
+
+	t.Run("writes JSON for vm-data prefix", func(t *testing.T) {
+		rec.Reset()
+		_, span := uqtrace.NewSpan(context.Background(), "test-span")
+		vc := &metadata.VmQueryCluster{
+			QueryCluster:       "vm-query.example.com",
+			StorageClusterList: []string{"s1", "s2"},
+		}
+		spanSetVmQueryClusterIfPresent(span, "vm-data", vc)
+		var err error
+		span.End(&err)
+
+		ended := rec.Ended()
+		require.Len(t, ended, 1)
+		got, ok := spanAttrString(ended[0].Attributes(), "vm-data-vm-query-cluster")
+		require.True(t, ok)
+		want, jerr := json.Marshal(vc)
+		require.NoError(t, jerr)
+		assert.JSONEq(t, string(want), got)
+	})
+
+	t.Run("writes JSON for response- prefix", func(t *testing.T) {
+		rec.Reset()
+		_, span := uqtrace.NewSpan(context.Background(), "test-span")
+		vc := &metadata.VmQueryCluster{
+			QueryCluster:       "vm-instant.example.com",
+			StorageClusterList: []string{"a"},
+		}
+		spanSetVmQueryClusterIfPresent(span, "response-", vc)
+		var err error
+		span.End(&err)
+
+		ended := rec.Ended()
+		require.Len(t, ended, 1)
+		got, ok := spanAttrString(ended[0].Attributes(), "response--vm-query-cluster")
+		require.True(t, ok)
+		want, jerr := json.Marshal(vc)
+		require.NoError(t, jerr)
+		assert.JSONEq(t, string(want), got)
+	})
+
+	t.Run("nil does not set attribute", func(t *testing.T) {
+		rec.Reset()
+		_, span := uqtrace.NewSpan(context.Background(), "test-span")
+		spanSetVmQueryClusterIfPresent(span, "vm-data", nil)
+		var err error
+		span.End(&err)
+
+		ended := rec.Ended()
+		require.Len(t, ended, 1)
+		_, ok := spanAttrString(ended[0].Attributes(), "vm-data-vm-query-cluster")
+		assert.False(t, ok)
+	})
+}
+
+func TestSpanSetStorageListDiff(t *testing.T) {
+	rec := tracetest.NewSpanRecorder()
+	tp := sdktrace.NewTracerProvider(sdktrace.WithSpanProcessor(rec))
+	prevTP := otel.GetTracerProvider()
+	otel.SetTracerProvider(tp)
+	t.Cleanup(func() {
+		_ = tp.Shutdown(context.Background())
+		otel.SetTracerProvider(prevTP)
+	})
+
+	// These test cases mirror the JSON examples from the code review:
+	// request:  {"rt_vm_1": {"table_id": "rt_1", "storage_name": "vm_op_1"}, ...}
+	// response StorageClusterList: ["vm_op_1", "vm_op_2"]
+	cases := map[string]struct {
+		rtDetail              map[string]metadata.RtDetail
+		responseVMClusterList []string
+		wantStatus            string
+		wantMissing           string // JSON string or empty
+	}{
+		"match: request cluster names equal response cluster names": {
+			rtDetail: map[string]metadata.RtDetail{
+				"rt_vm_1": {TableID: "rt_1", StorageName: "vm_op_1"},
+				"rt_vm_2": {TableID: "rt_2", StorageName: "vm_op_2"},
+			},
+			responseVMClusterList: []string{"vm_op_1", "vm_op_2"},
+			wantStatus:            "match",
+			wantMissing:           "",
+		},
+		"mismatch: vm_op_2 missing from response": {
+			rtDetail: map[string]metadata.RtDetail{
+				"rt_vm_1": {TableID: "rt_1", StorageName: "vm_op_1"},
+				"rt_vm_2": {TableID: "rt_2", StorageName: "vm_op_2"},
+			},
+			responseVMClusterList: []string{"vm_op_1"},
+			wantStatus:            "mismatch",
+			wantMissing:           `[{"cluster":"vm_op_2","vm_rt_list":["rt_vm_2"],"table_id_list":["rt_2"]}]`,
+		},
+		"response has extra cluster not in request: match (extra ignored)": {
+			rtDetail: map[string]metadata.RtDetail{
+				"rt_vm_1": {TableID: "rt_1", StorageName: "vm_op_1"},
+			},
+			responseVMClusterList: []string{"vm_op_1", "vm_op_2"},
+			wantStatus:            "match",
+			wantMissing:           "",
+		},
+		"empty request and response: match": {
+			rtDetail:              nil,
+			responseVMClusterList: nil,
+			wantStatus:            "match",
+			wantMissing:           "",
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			rec.Reset()
+			_, span := uqtrace.NewSpan(context.Background(), "test-span")
+			spanSetStorageListDiff(span, tc.rtDetail, tc.responseVMClusterList)
+			var err error
+			span.End(&err)
+
+			attrs := rec.Ended()[0].Attributes()
+
+			status, _ := spanAttrString(attrs, "query-storage-status")
+			assert.Equal(t, tc.wantStatus, status)
+
+			// Check missing field
+			if tc.wantMissing != "" {
+				missing, ok := spanAttrString(attrs, "query-storage-missing")
+				assert.True(t, ok)
+				// Parse and compare as JSON to handle ordering
+				var gotMissing, wantMissing any
+				assert.NoError(t, json.Unmarshal([]byte(missing), &gotMissing))
+				assert.NoError(t, json.Unmarshal([]byte(tc.wantMissing), &wantMissing))
+				assert.Equal(t, wantMissing, gotMissing)
+			} else {
+				_, ok := spanAttrString(attrs, "query-storage-missing")
+				assert.False(t, ok)
+			}
+
+			// extra field is no longer recorded
+			_, hasExtra := spanAttrStringSlice(attrs, "query-storage-extra")
+			assert.False(t, hasExtra)
 		})
 	}
 }

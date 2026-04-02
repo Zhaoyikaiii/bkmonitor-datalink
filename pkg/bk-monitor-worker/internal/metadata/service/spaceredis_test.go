@@ -16,18 +16,22 @@ import (
 	"fmt"
 	"log"
 	"sort"
+	"strconv"
 	"testing"
 	"time"
 
+	miniredis "github.com/alicebob/miniredis/v2"
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/jinzhu/gorm"
 	"github.com/stretchr/testify/assert"
 
+	"github.com/TencentBlueKing/bkmonitor-datalink/pkg/bk-monitor-worker/common"
 	cfg "github.com/TencentBlueKing/bkmonitor-datalink/pkg/bk-monitor-worker/config"
 	"github.com/TencentBlueKing/bkmonitor-datalink/pkg/bk-monitor-worker/internal/metadata/models"
 	"github.com/TencentBlueKing/bkmonitor-datalink/pkg/bk-monitor-worker/internal/metadata/models/bcs"
 	"github.com/TencentBlueKing/bkmonitor-datalink/pkg/bk-monitor-worker/internal/metadata/models/customreport"
 	"github.com/TencentBlueKing/bkmonitor-datalink/pkg/bk-monitor-worker/internal/metadata/models/migrate"
+	"github.com/TencentBlueKing/bkmonitor-datalink/pkg/bk-monitor-worker/internal/metadata/models/recordrule"
 	"github.com/TencentBlueKing/bkmonitor-datalink/pkg/bk-monitor-worker/internal/metadata/models/resulttable"
 	"github.com/TencentBlueKing/bkmonitor-datalink/pkg/bk-monitor-worker/internal/metadata/models/space"
 	"github.com/TencentBlueKing/bkmonitor-datalink/pkg/bk-monitor-worker/internal/metadata/models/storage"
@@ -39,6 +43,30 @@ import (
 	"github.com/TencentBlueKing/bkmonitor-datalink/pkg/bk-monitor-worker/utils/mocker"
 	"github.com/TencentBlueKing/bkmonitor-datalink/pkg/bk-monitor-worker/utils/optionx"
 )
+
+var storageRedisTestServer *miniredis.Miniredis
+
+func setupStorageRedisForTest(t *testing.T) {
+	t.Helper()
+
+	if storageRedisTestServer != nil {
+		return
+	}
+
+	server, err := miniredis.Run()
+	assert.NoError(t, err)
+
+	port, err := strconv.Atoi(server.Port())
+	assert.NoError(t, err)
+
+	cfg.StorageRedisMode = "standalone"
+	cfg.StorageRedisStandaloneHost = server.Host()
+	cfg.StorageRedisStandalonePort = port
+	cfg.StorageRedisStandalonePassword = ""
+	cfg.StorageRedisDatabase = 0
+
+	storageRedisTestServer = server
+}
 
 func TestSpacePusher_getMeasurementType(t *testing.T) {
 	type args struct {
@@ -1739,7 +1767,10 @@ func TestSpacePusher_composeEsTableIdDetail(t *testing.T) {
 	// 准备测试数据
 	tableID1 := "1001_bkmonitor_time_series_50010.__default__"
 	tableID2 := "1001_bkmonitor_time_series_50011.__default__"
+	tableID3 := "1001_bkmonitor_time_series_50012.__default__"
 	dataLabel1 := "a" // 初始化为字符串
+	labels1 := json.RawMessage(`{"env":"prod","region":"sh"}`)
+	labels3 := json.RawMessage(`["unexpected"]`)
 
 	// 插入 ResultTable 数据
 	resultTables := []resulttable.ResultTable{
@@ -1748,6 +1779,7 @@ func TestSpacePusher_composeEsTableIdDetail(t *testing.T) {
 			BkBizId:      1001,
 			BkBizIdAlias: "appid",
 			DataLabel:    &dataLabel1, // 使用字符串指针
+			Labels:       labels1,
 		},
 		{
 			TableId:      tableID2,
@@ -1755,23 +1787,18 @@ func TestSpacePusher_composeEsTableIdDetail(t *testing.T) {
 			BkBizIdAlias: "",
 			DataLabel:    nil,
 		},
+		{
+			TableId:      tableID3,
+			BkBizId:      1001,
+			BkBizIdAlias: "",
+			DataLabel:    nil,
+			Labels:       labels3,
+		},
 	}
 	for _, rt := range resultTables {
 		db.Delete(&resulttable.ResultTable{}, "table_id = ?", rt.TableId)
 		assert.NoError(t, db.Create(&rt).Error, "Failed to insert ResultTable")
 	}
-
-	//// 插入 ResultTable 数据
-	//resultTable := resulttable.ResultTable{
-	//	TableId:      tableID1,
-	//	BkBizId:      1001,
-	//	BkBizIdAlias: "appid",
-	//	DataLabel:    &dataLabel1, // 使用字符串指针
-	//}
-	//
-	//// 确保数据不存在后重新插入
-	//db.Delete(&resulttable.ResultTable{}, "table_id = ?", resultTable.TableId)
-	//assert.NoError(t, db.Create(&resultTable).Error, "Failed to insert ResultTable")
 
 	// 准备 SpacePusher 实例
 	spacePusher := SpacePusher{}
@@ -1796,6 +1823,7 @@ func TestSpacePusher_composeEsTableIdDetail(t *testing.T) {
 		"options":                 map[string]any{"option1": "value1"},
 		"storage_cluster_records": []any{},
 		"data_label":              "a",
+		"labels":                  map[string]any{"env": "prod", "region": "sh"},
 		"storage_type":            "elasticsearch",
 		"storage_id":              float64(1), // 修改为 float64
 		"db":                      "indexSet1",
@@ -1825,6 +1853,7 @@ func TestSpacePusher_composeEsTableIdDetail(t *testing.T) {
 		"options":                 map[string]any{"option1": "value1"},
 		"storage_cluster_records": []any{},
 		"data_label":              nil,
+		"labels":                  map[string]any{},
 		"storage_type":            "elasticsearch",
 		"storage_id":              float64(1), // 修改为 float64
 		"db":                      "indexSet1",
@@ -1840,6 +1869,265 @@ func TestSpacePusher_composeEsTableIdDetail(t *testing.T) {
 	assert.Equal(t, resTid, tableID2, "TableID should match")
 
 	assert.Equal(t, expectedDetail2, actualDetail2, "detailStr should match expected JSON")
+
+	resTid3, detailStr3, err := spacePusher.composeEsTableIdDetail(
+		tableID3,
+		map[string]any{"option1": "value1"},
+		1,
+		"sourceType1",
+		"indexSet1",
+		nil,
+	)
+	assert.NoError(t, err, "composeEsTableIdDetail should not return an error")
+	assert.Equal(t, tableID3, resTid3, "TableID should match")
+
+	var actualDetail3 map[string]any
+	err = json.Unmarshal([]byte(detailStr3), &actualDetail3)
+	assert.NoError(t, err, "detailStr should be valid JSON")
+	assert.Equal(t, map[string]any{}, actualDetail3["labels"], "non-object labels should fallback to empty map")
+}
+
+func TestNormalizeResultTableLabels(t *testing.T) {
+	tests := []struct {
+		name   string
+		labels json.RawMessage
+		want   map[string]any
+	}{
+		{
+			name:   "object",
+			labels: json.RawMessage(`{"env":"prod"}`),
+			want:   map[string]any{"env": "prod"},
+		},
+		{
+			name:   "null",
+			labels: json.RawMessage(`null`),
+			want:   map[string]any{},
+		},
+		{
+			name:   "empty",
+			labels: nil,
+			want:   map[string]any{},
+		},
+		{
+			name:   "string",
+			labels: json.RawMessage(`"invalid"`),
+			want:   map[string]any{},
+		},
+		{
+			name:   "invalid json",
+			labels: json.RawMessage(`{"env":`),
+			want:   map[string]any{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, normalizeResultTableLabels("test.table", tt.labels))
+		})
+	}
+}
+
+func TestSpacePusher_composeDorisTableIdDetail(t *testing.T) {
+	mocker.InitTestDBConfig("../../../bmw_test.yaml")
+	db := mysql.GetDBSession().DB
+	db.AutoMigrate(&resulttable.ResultTable{})
+
+	tableID1 := "bklog.test_rt_doris_labels"
+	tableID2 := "bklog.test_rt_doris_invalid_labels"
+	dataLabel := "test_label"
+	labels1 := json.RawMessage(`{"env":"prod"}`)
+	labels2 := json.RawMessage(`["unexpected"]`)
+
+	resultTables := []resulttable.ResultTable{
+		{
+			TableId:   tableID1,
+			DataLabel: &dataLabel,
+			Labels:    labels1,
+		},
+		{
+			TableId: tableID2,
+			Labels:  labels2,
+		},
+	}
+	for _, rt := range resultTables {
+		db.Delete(&resulttable.ResultTable{}, "table_id = ?", rt.TableId)
+		assert.NoError(t, db.Create(&rt).Error, "Failed to insert ResultTable")
+	}
+
+	spacePusher := SpacePusher{}
+
+	_, detailStr, err := spacePusher.composeDorisTableIdDetail(tableID1, "bklog_test_rt_bkbase", nil)
+	assert.NoError(t, err, "composeDorisTableIdDetail should not return an error")
+	var actualDetail map[string]any
+	err = json.Unmarshal([]byte(detailStr), &actualDetail)
+	assert.NoError(t, err, "detailStr should be valid JSON")
+	assert.Equal(t, map[string]any{"env": "prod"}, actualDetail["labels"], "labels should be object")
+	assert.Equal(t, "test_label", actualDetail["data_label"], "data_label should be preserved")
+
+	_, detailStr2, err := spacePusher.composeDorisTableIdDetail(tableID2, "bklog_test_rt_bkbase", nil)
+	assert.NoError(t, err, "composeDorisTableIdDetail should not return an error")
+	var actualDetail2 map[string]any
+	err = json.Unmarshal([]byte(detailStr2), &actualDetail2)
+	assert.NoError(t, err, "detailStr should be valid JSON")
+	assert.Equal(t, map[string]any{}, actualDetail2["labels"], "non-object labels should fallback to empty map")
+}
+
+func TestSpacePusher_PushTableIdDetailWithLabels(t *testing.T) {
+	mocker.InitTestDBConfig("../../../bmw_test.yaml")
+	setupStorageRedisForTest(t)
+	db := mysql.GetDBSession().DB
+	db.AutoMigrate(&resulttable.ResultTable{}, &storage.AccessVMRecord{}, &resulttable.ResultTableField{}, &resulttable.ResultTableOption{})
+
+	tableID := "demo.labels_rt"
+	labels := json.RawMessage(`{"env":"prod","module":"worker"}`)
+
+	rt := resulttable.ResultTable{
+		TableId:      tableID,
+		SchemaType:   models.ResultTableSchemaTypeFixed,
+		IsDeleted:    false,
+		IsEnable:     true,
+		BkTenantId:   tenant.DefaultTenantId,
+		BkBizIdAlias: "appid",
+		Labels:       labels,
+	}
+	db.Delete(&resulttable.ResultTable{}, "table_id = ?", rt.TableId)
+	assert.NoError(t, db.Create(&rt).Error, "Failed to insert ResultTable")
+
+	vmRecord := storage.AccessVMRecord{
+		BkTenantId:      tenant.DefaultTenantId,
+		ResultTableId:   tableID,
+		VmResultTableId: "vm_demo_labels_rt",
+	}
+	db.Delete(&storage.AccessVMRecord{}, "result_table_id = ?", vmRecord.ResultTableId)
+	assert.NoError(t, db.Create(&vmRecord).Error, "Failed to insert AccessVMRecord")
+
+	client := redis.GetStorageRedisInstance()
+	assert.NoError(t, client.Delete(cfg.ResultTableDetailKey))
+
+	pusher := NewSpacePusher()
+	err := pusher.PushTableIdDetail(tenant.DefaultTenantId, []string{tableID}, false)
+	assert.NoError(t, err, "PushTableIdDetail should not return an error")
+
+	detailStr := client.HGet(cfg.ResultTableDetailKey, tableID)
+	assert.NotEmpty(t, detailStr, "result_table_detail should be written to redis")
+
+	var detail map[string]any
+	err = json.Unmarshal([]byte(detailStr), &detail)
+	assert.NoError(t, err, "detailStr should be valid JSON")
+	assert.Equal(t, map[string]any{"env": "prod", "module": "worker"}, detail["labels"], "labels should be normalized as object")
+}
+
+func TestSpacePusher_PushTableIdDetailWithRecordRuleOverride(t *testing.T) {
+	mocker.InitTestDBConfig("../../../bmw_test.yaml")
+	setupStorageRedisForTest(t)
+	db := mysql.GetDBSession().DB
+	db.AutoMigrate(
+		&resulttable.ResultTable{},
+		&storage.AccessVMRecord{},
+		&resulttable.ResultTableField{},
+		&resulttable.ResultTableOption{},
+		&resulttable.DataSource{},
+		&resulttable.DataSourceResultTable{},
+		&storage.ClusterInfo{},
+	)
+
+	tableID := "demo.precalculate_rt"
+	dataLabel := "should_not_keep"
+	labels := json.RawMessage(`{"env":"prod"}`)
+
+	db.Exec("DELETE FROM "+recordrule.RecordRule{}.TableName()+" WHERE table_id = ?", tableID)
+	db.Delete(&resulttable.ResultTable{}, "table_id = ?", tableID)
+	db.Delete(&storage.AccessVMRecord{}, "result_table_id = ?", tableID)
+	db.Delete(&resulttable.ResultTableField{}, "table_id = ?", tableID)
+	db.Delete(&resulttable.DataSourceResultTable{}, "table_id = ?", tableID)
+	db.Delete(&resulttable.DataSource{}, "bk_data_id = ?", 61001)
+
+	rt := resulttable.ResultTable{
+		TableId:      tableID,
+		SchemaType:   models.ResultTableSchemaTypeFixed,
+		IsDeleted:    false,
+		IsEnable:     true,
+		BkTenantId:   tenant.DefaultTenantId,
+		DataLabel:    &dataLabel,
+		Labels:       labels,
+		BkBizIdAlias: "appid",
+	}
+	assert.NoError(t, db.Create(&rt).Error, "Failed to insert ResultTable")
+
+	accessVmRecord := storage.AccessVMRecord{
+		BkTenantId:      tenant.DefaultTenantId,
+		ResultTableId:   tableID,
+		VmResultTableId: "vm_from_access_vm",
+		VmClusterId:     101,
+	}
+	assert.NoError(t, db.Create(&accessVmRecord).Error, "Failed to insert AccessVMRecord")
+
+	rtField := resulttable.ResultTableField{
+		TableID:    tableID,
+		FieldName:  "metric_from_rt_field",
+		Tag:        models.ResultTableFieldTagMetric,
+		BkTenantId: tenant.DefaultTenantId,
+	}
+	assert.NoError(t, db.Create(&rtField).Error, "Failed to insert ResultTableField")
+
+	ds := resulttable.DataSource{
+		BkDataId:   61001,
+		EtlConfig:  models.ETLConfigTypeBkStandard,
+		BkTenantId: tenant.DefaultTenantId,
+	}
+	assert.NoError(t, db.Create(&ds).Error, "Failed to insert DataSource")
+
+	dsrt := resulttable.DataSourceResultTable{
+		TableId:    tableID,
+		BkDataId:   ds.BkDataId,
+		BkTenantId: tenant.DefaultTenantId,
+	}
+	assert.NoError(t, db.Create(&dsrt).Error, "Failed to insert DataSourceResultTable")
+
+	assert.NoError(t, db.Exec(
+		"INSERT INTO "+recordrule.RecordRule{}.TableName()+" (space_type, space_id, table_id, record_name, rule_type, rule_config, bk_sql_config, rule_metrics, src_vm_table_ids, vm_cluster_id, dst_vm_table_id, status, count_freq, creator, updater, created_at, updated_at, bk_tenant_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		"bkcc",
+		"2",
+		tableID,
+		"test_record_rule",
+		"test",
+		"{}",
+		"[]",
+		`{"record_one":"metric_from_rule","record_two":"metric_from_rule_2"}`,
+		`[]`,
+		202,
+		"vm_from_record_rule",
+		"created",
+		60,
+		models.SystemUser,
+		models.SystemUser,
+		time.Now(),
+		time.Now(),
+		tenant.DefaultTenantId,
+	).Error, "Failed to insert RecordRule")
+
+	client := redis.GetStorageRedisInstance()
+	assert.NoError(t, client.Delete(cfg.ResultTableDetailKey))
+
+	pusher := NewSpacePusher()
+	err := pusher.PushTableIdDetail(tenant.DefaultTenantId, []string{tableID}, false)
+	assert.NoError(t, err, "PushTableIdDetail should not return an error")
+
+	detailStr := client.HGet(cfg.ResultTableDetailKey, tableID)
+	assert.NotEmpty(t, detailStr, "result_table_detail should be written to redis")
+
+	var detail map[string]any
+	err = json.Unmarshal([]byte(detailStr), &detail)
+	assert.NoError(t, err, "detailStr should be valid JSON")
+	assert.Equal(t, "vm_from_record_rule", detail["vm_rt"], "record rule vm_rt should override access vm data")
+	assert.EqualValues(t, 202, detail["storage_id"], "record rule storage_id should override access vm data")
+	assert.Equal(t, "", detail["storage_name"], "record rule detail should preserve empty storage_name when no cluster mapping exists")
+	assert.Equal(t, "", detail["measurement"], "record rule detail should clear measurement")
+	assert.Equal(t, models.MeasurementTypeBkSplit, detail["measurement_type"], "record rule detail should force split measurement")
+	assert.Equal(t, "", detail["data_label"], "record rule detail should clear data_label")
+	assert.Equal(t, map[string]any{}, detail["labels"], "record rule detail should clear labels")
+	assert.Nil(t, detail["bk_data_id"], "record rule detail should keep bk_data_id as null")
+	assert.Equal(t, []any{"metric_from_rule", "metric_from_rule_2"}, detail["fields"], "record rule metrics should override rt fields")
 }
 
 func TestSpacePusher_pushBkccSpaceTableIds(t *testing.T) {
@@ -2391,22 +2679,30 @@ func TestSpaceRedisSvc_composeTableIdFields(t *testing.T) {
 		{
 			GroupID:   60011,
 			TableID:   "1001_test.__default__",
+			ScopeID:   0,
 			FieldName: "field1",
+			IsActive:  true,
 		},
 		{
 			GroupID:   60011,
 			TableID:   "1001_test.__default__",
+			ScopeID:   0,
 			FieldName: "field2",
+			IsActive:  true,
 		},
 		{
 			GroupID:   60011,
 			TableID:   "1001_test.__default__",
+			ScopeID:   0,
 			FieldName: "field3",
+			IsActive:  true,
 		},
 		{
 			GroupID:   60011,
 			TableID:   "1001_test.__default__",
+			ScopeID:   0,
 			FieldName: "field4",
+			IsActive:  true,
 		},
 	}
 	for _, timeSeriesMetric := range timeSeriesMetrics {
@@ -2422,21 +2718,56 @@ func TestSpaceRedisSvc_composeTableIdFields(t *testing.T) {
 	}, actualData, "composeTableIdFields should return the expected data")
 }
 
-// setupFilterTestData 设置测试数据用于 filterTsInfo 测试
-func setupFilterTsInfoTestData(t *testing.T, groupID uint) func() {
+func ensureColumnExists(db *gorm.DB, table, column, colType string) {
+	var count int
+	db.Raw(
+		"SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?",
+		table, column,
+	).Count(&count)
+	if count == 0 {
+		db.Exec(fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s", table, column, colType))
+	}
+}
+
+// setupFilterTsInfoTestData 设置测试数据用于 filterTsInfo 测试
+// createdFrom 参数决定数据源的链路类型: common.DataIdFromBkGse(V3) 或 common.DataIdFromBkData(V4)
+func setupFilterTsInfoTestData(t *testing.T, groupID uint, createdFrom string) func() {
 	mocker.InitTestDBConfig("../../../bmw_test.yaml")
 	db := mysql.GetDBSession().DB
+
+	// 确保测试表 schema 包含所需列
+	ensureColumnExists(db, "metadata_timeseriesgroup", "metric_group_dimensions", "JSON")
+	ensureColumnExists(db, "metadata_timeseriesmetric", "field_config", "JSON")
+	ensureColumnExists(db, "metadata_timeseriesmetric", "is_active", "TINYINT(1) DEFAULT 1")
+	ensureColumnExists(db, "metadata_timeseriesmetric", "field_scope", "VARCHAR(255) DEFAULT 'default'")
+	ensureColumnExists(db, "metadata_datasource", "created_from", "VARCHAR(16) DEFAULT ''")
+	ensureColumnExists(db, "metadata_datasource", "is_tenant_specific_global", "TINYINT(1) DEFAULT 0")
+
+	dataId := 50000 + groupID
 
 	// 清理旧数据
 	db.Delete(&customreport.TimeSeriesGroup{}, "time_series_group_id = ?", groupID)
 	db.Delete(&customreport.TimeSeriesMetric{}, "group_id = ?", groupID)
+	db.Delete(&resulttable.DataSource{}, "bk_data_id = ?", dataId)
+
+	// 创建 DataSource（用于区分 V3/V4 链路）
+	ds := resulttable.DataSource{
+		BkDataId:    dataId,
+		BkTenantId:  tenant.DefaultTenantId,
+		DataName:    fmt.Sprintf("test_ds_%d", dataId),
+		CreatedFrom: createdFrom,
+		Token:       fmt.Sprintf("token_%d", dataId),
+		IsEnable:    true,
+	}
+	err := db.Create(&ds).Error
+	assert.NoError(t, err)
 
 	// 创建 TimeSeriesGroup
 	tableID := fmt.Sprintf("test_filter_%d.__default__", groupID)
 	tsGroup := customreport.TimeSeriesGroup{
 		CustomGroupBase: customreport.CustomGroupBase{
 			TableID:  tableID,
-			BkDataID: 50000 + groupID,
+			BkDataID: dataId,
 			BkBizID:  1001,
 			Label:    "test_label",
 		},
@@ -2444,7 +2775,7 @@ func setupFilterTsInfoTestData(t *testing.T, groupID uint) func() {
 		BkTenantId:          tenant.DefaultTenantId,
 		TimeSeriesGroupName: fmt.Sprintf("test_filter_group_%d", groupID),
 	}
-	err := db.Create(&tsGroup).Error
+	err = db.Create(&tsGroup).Error
 	assert.NoError(t, err)
 
 	tagListStr, _ := jsonx.MarshalString([]string{"tag1", "tag2"})
@@ -2495,23 +2826,15 @@ func setupFilterTsInfoTestData(t *testing.T, groupID uint) func() {
 	return func() {
 		db.Delete(&customreport.TimeSeriesMetric{}, "group_id = ?", groupID)
 		db.Delete(&customreport.TimeSeriesGroup{}, "time_series_group_id = ?", groupID)
+		db.Delete(&resulttable.DataSource{}, "bk_data_id = ?", dataId)
 	}
 }
 
-// TestFilterTsInfoWithIsActiveEnabled 测试启用 is_active 过滤时的行为
-func TestFilterTsInfoWithIsActiveEnabled(t *testing.T) {
+// TestFilterTsInfoV3BkGse 测试 V3 链路（bkgse）: 严格根据 last_modify_time 过滤
+func TestFilterTsInfoV3BkGse(t *testing.T) {
 	groupID := uint(300)
-	cleanup := setupFilterTsInfoTestData(t, groupID)
+	cleanup := setupFilterTsInfoTestData(t, groupID, common.DataIdFromBkGse)
 	defer cleanup()
-
-	// 保存原始配置
-	originalConfig := cfg.GlobalEnableTsMetricFilterByIsActive
-	defer func() {
-		cfg.GlobalEnableTsMetricFilterByIsActive = originalConfig
-	}()
-
-	// 启用 is_active 过滤
-	cfg.GlobalEnableTsMetricFilterByIsActive = true
 
 	spacePusher := &SpacePusher{}
 	tableID := fmt.Sprintf("test_filter_%d.__default__", groupID)
@@ -2519,90 +2842,67 @@ func TestFilterTsInfoWithIsActiveEnabled(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, tsInfo)
 
-	// 验证结果: 只应该包含 is_active=true 的指标
-	fieldNames := tsInfo.GroupIdFieldsMap[groupID]
-	assert.Contains(t, fieldNames, "active_metric", "should contain active metric")
-	assert.Contains(t, fieldNames, "expired_metric", "should contain expired but active metric")
-	assert.NotContains(t, fieldNames, "inactive_metric", "should not contain inactive metric")
-	assert.Equal(t, 2, len(fieldNames), "should have exactly 2 active metrics")
-}
-
-// TestFilterTsInfoWithIsActiveDisabled 测试禁用 is_active 过滤时的行为（原有逻辑）
-func TestFilterTsInfoWithIsActiveDisabled(t *testing.T) {
-	groupID := uint(301)
-	cleanup := setupFilterTsInfoTestData(t, groupID)
-	defer cleanup()
-
-	// 保存原始配置
-	originalConfig := cfg.GlobalEnableTsMetricFilterByIsActive
-	defer func() {
-		cfg.GlobalEnableTsMetricFilterByIsActive = originalConfig
-	}()
-
-	// 禁用 is_active 过滤
-	cfg.GlobalEnableTsMetricFilterByIsActive = false
-
-	spacePusher := &SpacePusher{}
-	tableID := fmt.Sprintf("test_filter_%d.__default__", groupID)
-	tsInfo, err := spacePusher.filterTsInfo(tenant.DefaultTenantId, []string{tableID})
-	assert.NoError(t, err)
-	assert.NotNil(t, tsInfo)
-
-	// 验证结果: 只应该包含最近更新的指标（不管 is_active 状态）
+	// V3 链路只根据 last_modify_time 过滤: 只包含最近更新的指标
 	fieldNames := tsInfo.GroupIdFieldsMap[groupID]
 	assert.Contains(t, fieldNames, "active_metric", "should contain recently updated active metric")
-	assert.Contains(t, fieldNames, "inactive_metric", "should contain recently updated inactive metric")
+	assert.Contains(t, fieldNames, "inactive_metric", "should contain recently updated inactive metric (V3 ignores is_active)")
 	assert.NotContains(t, fieldNames, "expired_metric", "should not contain expired metric")
 	assert.Equal(t, 2, len(fieldNames), "should have exactly 2 recently updated metrics")
 }
 
-// TestFilterTsInfoBehaviorComparison 测试两种模式的行为差异
-func TestFilterTsInfoBehaviorComparison(t *testing.T) {
-	groupID := uint(302)
-	cleanup := setupFilterTsInfoTestData(t, groupID)
+// TestFilterTsInfoV4BkData 测试 V4 链路（bkdata）: 根据 last_modify_time 或 is_active 过滤
+func TestFilterTsInfoV4BkData(t *testing.T) {
+	groupID := uint(301)
+	cleanup := setupFilterTsInfoTestData(t, groupID, common.DataIdFromBkData)
 	defer cleanup()
-
-	// 保存原始配置
-	originalConfig := cfg.GlobalEnableTsMetricFilterByIsActive
-	defer func() {
-		cfg.GlobalEnableTsMetricFilterByIsActive = originalConfig
-	}()
 
 	spacePusher := &SpacePusher{}
 	tableID := fmt.Sprintf("test_filter_%d.__default__", groupID)
-
-	// 测试模式 1: is_active 过滤
-	cfg.GlobalEnableTsMetricFilterByIsActive = true
-	tsInfoIsActive, err := spacePusher.filterTsInfo(tenant.DefaultTenantId, []string{tableID})
+	tsInfo, err := spacePusher.filterTsInfo(tenant.DefaultTenantId, []string{tableID})
 	assert.NoError(t, err)
-	assert.NotNil(t, tsInfoIsActive)
+	assert.NotNil(t, tsInfo)
 
-	// 测试模式 2: last_modify_time 过滤
-	cfg.GlobalEnableTsMetricFilterByIsActive = false
-	tsInfoLastModifyTime, err := spacePusher.filterTsInfo(tenant.DefaultTenantId, []string{tableID})
+	// V4 链路根据 last_modify_time OR is_active 过滤: 包含最近更新的或活跃的指标
+	fieldNames := tsInfo.GroupIdFieldsMap[groupID]
+	assert.Contains(t, fieldNames, "active_metric", "should contain active and recently updated metric")
+	assert.Contains(t, fieldNames, "inactive_metric", "should contain recently updated metric (even if inactive)")
+	assert.Contains(t, fieldNames, "expired_metric", "should contain expired but is_active=true metric")
+	assert.Equal(t, 3, len(fieldNames), "should have all 3 metrics (last_modify_time OR is_active)")
+}
+
+// TestFilterTsInfoV3V4Comparison 测试 V3 和 V4 链路的行为差异
+func TestFilterTsInfoV3V4Comparison(t *testing.T) {
+	v3GroupID := uint(302)
+	v4GroupID := uint(303)
+	cleanupV3 := setupFilterTsInfoTestData(t, v3GroupID, common.DataIdFromBkGse)
+	defer cleanupV3()
+	cleanupV4 := setupFilterTsInfoTestData(t, v4GroupID, common.DataIdFromBkData)
+	defer cleanupV4()
+
+	spacePusher := &SpacePusher{}
+	v3TableID := fmt.Sprintf("test_filter_%d.__default__", v3GroupID)
+	v4TableID := fmt.Sprintf("test_filter_%d.__default__", v4GroupID)
+
+	// 同时查询 V3 和 V4 的结果表
+	tsInfo, err := spacePusher.filterTsInfo(tenant.DefaultTenantId, []string{v3TableID, v4TableID})
 	assert.NoError(t, err)
-	assert.NotNil(t, tsInfoLastModifyTime)
+	assert.NotNil(t, tsInfo)
 
-	// 比较两种模式的结果
-	isActiveFields := tsInfoIsActive.GroupIdFieldsMap[groupID]
-	lastModifyTimeFields := tsInfoLastModifyTime.GroupIdFieldsMap[groupID]
+	v3Fields := tsInfo.GroupIdFieldsMap[v3GroupID]
+	v4Fields := tsInfo.GroupIdFieldsMap[v4GroupID]
 
-	t.Logf("is_active mode returned fields: %v", isActiveFields)
-	t.Logf("last_modify_time mode returned fields: %v", lastModifyTimeFields)
+	t.Logf("V3 (bkgse) returned fields: %v", v3Fields)
+	t.Logf("V4 (bkdata) returned fields: %v", v4Fields)
 
-	// 验证 is_active 模式的结果
-	assert.Equal(t, 2, len(isActiveFields), "is_active mode should return 2 metrics")
-	assert.Contains(t, isActiveFields, "active_metric", "is_active mode should contain active_metric")
-	assert.Contains(t, isActiveFields, "expired_metric", "is_active mode should contain expired_metric (still active)")
-	assert.NotContains(t, isActiveFields, "inactive_metric", "is_active mode should not contain inactive_metric")
+	// V3 链路: 严格 last_modify_time，只有最近更新的 2 个指标
+	assert.Equal(t, 2, len(v3Fields), "V3 should return 2 metrics (by last_modify_time only)")
+	assert.Contains(t, v3Fields, "active_metric")
+	assert.Contains(t, v3Fields, "inactive_metric")
+	assert.NotContains(t, v3Fields, "expired_metric")
 
-	// 验证 last_modify_time 模式的结果
-	assert.Equal(t, 2, len(lastModifyTimeFields), "last_modify_time mode should return 2 metrics")
-	assert.Contains(t, lastModifyTimeFields, "active_metric", "last_modify_time mode should contain active_metric")
-	assert.Contains(t, lastModifyTimeFields, "inactive_metric", "last_modify_time mode should contain inactive_metric (recently updated)")
-	assert.NotContains(t, lastModifyTimeFields, "expired_metric", "last_modify_time mode should not contain expired_metric")
-
-	// 两种模式应该返回不同的指标集合
-	assert.NotEqual(t, isActiveFields, lastModifyTimeFields,
-		"two filter modes should return different sets of metrics")
+	// V4 链路: last_modify_time OR is_active，包含所有 3 个指标
+	assert.Equal(t, 3, len(v4Fields), "V4 should return 3 metrics (by last_modify_time OR is_active)")
+	assert.Contains(t, v4Fields, "active_metric")
+	assert.Contains(t, v4Fields, "inactive_metric")
+	assert.Contains(t, v4Fields, "expired_metric")
 }

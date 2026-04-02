@@ -10,6 +10,7 @@
 package service
 
 import (
+	"encoding/json"
 	"fmt"
 	"regexp"
 	"slices"
@@ -22,6 +23,7 @@ import (
 	"github.com/jinzhu/gorm"
 	"github.com/pkg/errors"
 
+	"github.com/TencentBlueKing/bkmonitor-datalink/pkg/bk-monitor-worker/common"
 	cfg "github.com/TencentBlueKing/bkmonitor-datalink/pkg/bk-monitor-worker/config"
 	"github.com/TencentBlueKing/bkmonitor-datalink/pkg/bk-monitor-worker/internal/metadata/models"
 	"github.com/TencentBlueKing/bkmonitor-datalink/pkg/bk-monitor-worker/internal/metadata/models/bcs"
@@ -639,7 +641,12 @@ func (s *SpacePusher) PushTableIdDetail(bkTenantId string, tableIdList []string,
 	db := mysql.GetDBSession().DB
 	// 获取结果表类型
 	var rtList []resulttable.ResultTable
-	if err := resulttable.NewResultTableQuerySet(db).Select(resulttable.ResultTableDBSchema.TableId, resulttable.ResultTableDBSchema.SchemaType, resulttable.ResultTableDBSchema.DataLabel).BkTenantIdEq(bkTenantId).TableIdIn(tableIds...).All(&rtList); err != nil {
+	if err := resulttable.NewResultTableQuerySet(db).Select(
+		resulttable.ResultTableDBSchema.TableId,
+		resulttable.ResultTableDBSchema.SchemaType,
+		resulttable.ResultTableDBSchema.DataLabel,
+		resulttable.ResultTableDBSchema.Labels,
+	).BkTenantIdEq(bkTenantId).TableIdIn(tableIds...).All(&rtList); err != nil {
 		return err
 	}
 	tableIdRtMap := make(map[string]resulttable.ResultTable)
@@ -673,22 +680,45 @@ func (s *SpacePusher) PushTableIdDetail(bkTenantId string, tableIdList []string,
 		logger.Errorf("PushTableIdDetail: compose table id fields failed, err: %s", err.Error())
 		return err
 	}
+	recordRuleTableIdDetail, err := s.composeRecordRuleTableIdDetail(bkTenantId)
+	if err != nil {
+		logger.Errorf("PushTableIdDetail: compose record rule table id detail failed, err: %s", err.Error())
+		return err
+	}
+	for tableId, detail := range recordRuleTableIdDetail {
+		tableIdDetail[tableId] = detail
+	}
 
 	client := redis.GetStorageRedisInstance()
 	// 推送数据
 	rtDetailKey := cfg.ResultTableDetailKey
 	for tableId, detail := range tableIdDetail {
-		var ok bool
-		// fields
-		detail["fields"], ok = tableIdFields[tableId]
-		metricNum := 0
-		if !ok {
-			detail["fields"] = []string{}
+		if recordRuleDetail, ok := recordRuleTableIdDetail[tableId]; ok {
+			detail = recordRuleDetail
 		} else {
-			metricNum = len(tableIdFields[tableId])
+			var ok bool
+			// fields
+			detail["fields"], ok = tableIdFields[tableId]
+			if !ok {
+				detail["fields"] = []string{}
+			}
+
+			// data_label
+			rt, ok := tableIdRtMap[tableId]
+			if !ok {
+				detail["data_label"] = ""
+				detail["labels"] = map[string]any{}
+			} else {
+				detail["data_label"] = rt.DataLabel
+				detail["labels"] = normalizeResultTableLabels(tableId, rt.Labels)
+			}
+			detail["measurement_type"] = measurementTypeMap[tableId]
+			detail["bcs_cluster_id"] = tableIdClusterIdMap[tableId]
+			detail["bk_data_id"] = tableIdDataIdMap[tableId]
 		}
+
 		// 添加结果表的指标数量
-		metadataMetrics.RtMetricNum(tableId, float64(metricNum))
+		metadataMetrics.RtMetricNum(tableId, float64(getTableDetailMetricNum(detail["fields"])))
 
 		// 多租户模式下，需要加上租户ID后缀
 		var redisKey string
@@ -697,17 +727,6 @@ func (s *SpacePusher) PushTableIdDetail(bkTenantId string, tableIdList []string,
 		} else {
 			redisKey = tableId
 		}
-
-		// data_label
-		rt, ok := tableIdRtMap[tableId]
-		if !ok {
-			detail["data_label"] = ""
-		} else {
-			detail["data_label"] = rt.DataLabel
-		}
-		detail["measurement_type"] = measurementTypeMap[tableId]
-		detail["bcs_cluster_id"] = tableIdClusterIdMap[tableId]
-		detail["bk_data_id"] = tableIdDataIdMap[tableId]
 		detailStr, err := jsonx.MarshalString(detail)
 		if err != nil {
 			logger.Errorf("PushTableIdDetail:marshal result_table_detail failed, table_id: %s, err: %s", tableId, err.Error())
@@ -986,6 +1005,136 @@ func (s *SpacePusher) getFieldAliasMap(tableIDList []string) (map[string]map[str
 	return fieldAliasMap, nil
 }
 
+func normalizeResultTableLabels(tableId string, labels json.RawMessage) map[string]any {
+	if len(labels) == 0 {
+		return map[string]any{}
+	}
+
+	labelsStr := strings.TrimSpace(string(labels))
+	if labelsStr == "" || labelsStr == "null" {
+		return map[string]any{}
+	}
+
+	var parsed any
+	if err := json.Unmarshal([]byte(labelsStr), &parsed); err != nil {
+		logger.Errorf("normalizeResultTableLabels: unmarshal labels failed, table_id [%s], labels [%s], err [%s]", tableId, labelsStr, err)
+		return map[string]any{}
+	}
+
+	labelsMap, ok := parsed.(map[string]any)
+	if !ok {
+		logger.Errorf("normalizeResultTableLabels: labels is not object, table_id [%s], labels [%s]", tableId, labelsStr)
+		return map[string]any{}
+	}
+	return labelsMap
+}
+
+type recordRuleTableIdDetailRow struct {
+	TableId      string `gorm:"column:table_id"`
+	VmClusterId  int    `gorm:"column:vm_cluster_id"`
+	DstVmTableId string `gorm:"column:dst_vm_table_id"`
+	RuleMetrics  string `gorm:"column:rule_metrics"`
+}
+
+func getTableDetailMetricNum(fields any) int {
+	switch typed := fields.(type) {
+	case []string:
+		return len(typed)
+	case []any:
+		return len(typed)
+	default:
+		return 0
+	}
+}
+
+func parseRecordRuleMetricValues(ruleMetrics string) ([]string, error) {
+	ruleMetrics = strings.TrimSpace(ruleMetrics)
+	if ruleMetrics == "" || ruleMetrics == "null" {
+		return []string{}, nil
+	}
+
+	decoder := json.NewDecoder(strings.NewReader(ruleMetrics))
+	token, err := decoder.Token()
+	if err != nil {
+		return nil, err
+	}
+
+	delim, ok := token.(json.Delim)
+	if !ok || delim != '{' {
+		return nil, errors.Errorf("rule_metrics must be a json object")
+	}
+
+	metrics := make([]string, 0)
+	for decoder.More() {
+		if _, err := decoder.Token(); err != nil {
+			return nil, err
+		}
+
+		var metricName string
+		if err := decoder.Decode(&metricName); err != nil {
+			return nil, err
+		}
+		metrics = append(metrics, metricName)
+	}
+
+	if _, err := decoder.Token(); err != nil {
+		return nil, err
+	}
+	return metrics, nil
+}
+
+func (s *SpacePusher) composeRecordRuleTableIdDetail(bkTenantId string) (map[string]map[string]any, error) {
+	logger.Infof("composeRecordRuleTableIdDetail:start to compose record rule table detail, bk_tenant_id [%s]", bkTenantId)
+
+	db := mysql.GetDBSession().DB
+	var recordRuleList []recordRuleTableIdDetailRow
+	if err := db.Table(recordrule.RecordRule{}.TableName()).
+		Select("table_id, vm_cluster_id, dst_vm_table_id, rule_metrics").
+		Where("bk_tenant_id = ?", bkTenantId).
+		Scan(&recordRuleList).Error; err != nil {
+		return nil, err
+	}
+
+	var vmClusterList []storage.ClusterInfo
+	if err := storage.NewClusterInfoQuerySet(db).
+		Select(storage.ClusterInfoDBSchema.ClusterID, storage.ClusterInfoDBSchema.ClusterName).
+		ClusterTypeEq(models.StorageTypeVM).
+		All(&vmClusterList); err != nil {
+		return nil, err
+	}
+	vmClusterIdNameMap := make(map[int]string)
+	for _, cluster := range vmClusterList {
+		vmClusterIdNameMap[int(cluster.ClusterID)] = cluster.ClusterName
+	}
+
+	tableIdDetail := make(map[string]map[string]any, len(recordRuleList))
+	for _, recordRule := range recordRuleList {
+		fields, err := parseRecordRuleMetricValues(recordRule.RuleMetrics)
+		if err != nil {
+			return nil, err
+		}
+
+		tableIdDetail[recordRule.TableId] = map[string]any{
+			"vm_rt":            recordRule.DstVmTableId,
+			"storage_id":       recordRule.VmClusterId,
+			"cluster_name":     "",
+			"storage_name":     vmClusterIdNameMap[recordRule.VmClusterId],
+			"db":               "",
+			"measurement":      "",
+			"tags_key":         []string{},
+			"fields":           fields,
+			"measurement_type": models.MeasurementTypeBkSplit,
+			"bcs_cluster_id":   "",
+			"data_label":       "",
+			"labels":           map[string]any{},
+			"storage_type":     models.StorageTypeVM,
+			"bk_data_id":       nil,
+		}
+	}
+
+	return tableIdDetail, nil
+}
+
 func (s *SpacePusher) composeEsTableIdDetail(tableId string, options map[string]any, storageClusterId uint, sourceType, indexSet string, fieldAliasSettings map[string]string) (string, string, error) {
 	logger.Infof("compose es table id detail, table_id [%s], options [%+v], storage_cluster_id [%d], source_type [%s], index_set [%s]", tableId, options, storageClusterId, sourceType, indexSet)
 
@@ -1012,7 +1161,10 @@ func (s *SpacePusher) composeEsTableIdDetail(tableId string, options map[string]
 	}
 
 	var rt resulttable.ResultTable
-	if err := resulttable.NewResultTableQuerySet(db).Select(resulttable.ResultTableDBSchema.DataLabel).TableIdEq(tableId).One(&rt); err != nil {
+	if err := resulttable.NewResultTableQuerySet(db).Select(
+		resulttable.ResultTableDBSchema.DataLabel,
+		resulttable.ResultTableDBSchema.Labels,
+	).TableIdEq(tableId).One(&rt); err != nil {
 		return tableId, "", err
 	}
 
@@ -1030,6 +1182,7 @@ func (s *SpacePusher) composeEsTableIdDetail(tableId string, options map[string]
 		"options":                 options,
 		"storage_cluster_records": clusterRecords,
 		"data_label":              rt.DataLabel,
+		"labels":                  normalizeResultTableLabels(tableId, rt.Labels),
 		"field_alias":             fieldAliasSettings, // 添加字段别名
 	})
 	if err != nil {
@@ -1060,7 +1213,10 @@ func (s *SpacePusher) composeDorisTableIdDetail(tableId string, bkbaseTableId st
 	db := mysql.GetDBSession().DB
 
 	var rt resulttable.ResultTable
-	if err := resulttable.NewResultTableQuerySet(db).Select(resulttable.ResultTableDBSchema.DataLabel).TableIdEq(tableId).One(&rt); err != nil {
+	if err := resulttable.NewResultTableQuerySet(db).Select(
+		resulttable.ResultTableDBSchema.DataLabel,
+		resulttable.ResultTableDBSchema.Labels,
+	).TableIdEq(tableId).One(&rt); err != nil {
 		return tableId, "", err
 	}
 
@@ -1074,6 +1230,7 @@ func (s *SpacePusher) composeDorisTableIdDetail(tableId string, bkbaseTableId st
 		"db":           bkbaseTableId,
 		"measurement":  models.DorisMeasurement,
 		"data_label":   rt.DataLabel,
+		"labels":       normalizeResultTableLabels(tableId, rt.Labels),
 		"field_alias":  fieldAliasSettings, // 添加字段别名
 	})
 	if err != nil {
@@ -1462,6 +1619,8 @@ type TsInfo struct {
 }
 
 // 根据结果表获取对应的时序数据
+// V3 链路（created_from=bkgse）: 严格根据 last_modify_time 过滤
+// V4 链路（created_from=bkdata）: 根据 last_modify_time 或 is_active 过滤
 func (s *SpacePusher) filterTsInfo(bkTenantId string, tableIds []string) (*TsInfo, error) {
 	if len(tableIds) == 0 {
 		return nil, nil
@@ -1477,97 +1636,69 @@ func (s *SpacePusher) filterTsInfo(bkTenantId string, tableIds []string) (*TsInf
 
 	var tsGroupIdList []uint
 	TableIdTsGroupIdMap := make(map[string]uint)
-	var tsGroupTableId []string
+	groupIdDataIdMap := make(map[uint]uint)
 	for _, group := range tsGroupList {
 		tsGroupIdList = append(tsGroupIdList, group.TimeSeriesGroupID)
 		TableIdTsGroupIdMap[group.TableID] = group.TimeSeriesGroupID
-		tsGroupTableId = append(tsGroupTableId, group.TableID)
+		groupIdDataIdMap[group.TimeSeriesGroupID] = group.BkDataID
 	}
 
-	// NOTE: 针对自定义时序，过滤掉历史废弃的指标
-	// 根据特性开关决定过滤方式:
-	// 1. 启用 is_active 字段时: 只查询 is_active=true 的指标
-	// 2. 使用原有方式时: 查询时间在 TIME_SERIES_METRIC_EXPIRED_SECONDS 内的指标
+	// 查询 DataSource 获取 created_from，用于区分 V3/V4 链路
+	var dataIdList []uint
+	for _, dataId := range groupIdDataIdMap {
+		dataIdList = append(dataIdList, dataId)
+	}
+	dataIdList = slicex.RemoveDuplicate(&dataIdList)
+
+	dataIdCreatedFromMap := make(map[uint]string)
+	if len(dataIdList) > 0 {
+		var dsList []resulttable.DataSource
+		if err := resulttable.NewDataSourceQuerySet(db).
+			Select(resulttable.DataSourceDBSchema.BkDataId, resulttable.DataSourceDBSchema.CreatedFrom).
+			BkDataIdIn(dataIdList...).
+			All(&dsList); err != nil {
+			return nil, err
+		}
+		for _, ds := range dsList {
+			dataIdCreatedFromMap[ds.BkDataId] = ds.CreatedFrom
+		}
+	}
+
+	// 按 V3/V4 链路分组 tsGroupId
+	var v3GroupIdList, v4GroupIdList []uint
+	for _, groupId := range tsGroupIdList {
+		dataId := groupIdDataIdMap[groupId]
+		createdFrom := dataIdCreatedFromMap[dataId]
+		if createdFrom == common.DataIdFromBkData {
+			v4GroupIdList = append(v4GroupIdList, groupId)
+		} else {
+			v3GroupIdList = append(v3GroupIdList, groupId)
+		}
+	}
+
+	logger.Infof("filterTsInfo: group classification, v3(bkgse) groups: %d, v4(bkdata) groups: %d",
+		len(v3GroupIdList), len(v4GroupIdList))
+
 	beginTime := time.Now().UTC().Add(-time.Duration(cfg.GlobalTimeSeriesMetricExpiredSeconds) * time.Second)
 
-	// 分批查询 TimeSeriesMetric（优化部分
 	var tsmList []customreport.TimeSeriesMetric
 
-	if len(tsGroupIdList) != 0 {
-		// 分批查询配置
-		queryConfig := GetDefaultRTFBatchConfig()
-
-		filterMode := "last_modify_time"
-		if cfg.GlobalEnableTsMetricFilterByIsActive {
-			filterMode = "is_active"
+	// V3 链路: 严格根据 last_modify_time 过滤
+	if len(v3GroupIdList) > 0 {
+		v3Metrics, err := s.batchQueryTsMetrics(db, v3GroupIdList, "last_modify_time", beginTime)
+		if err != nil {
+			return nil, err
 		}
+		tsmList = append(tsmList, v3Metrics...)
+	}
 
-		logger.Infof("filterTsInfo: Starting batch query for TimeSeriesMetric records, target groups: %d, batch size: %d records per batch, filter_mode: %s",
-			len(tsGroupIdList), queryConfig.BatchSize, filterMode)
-
-		// 记录查询开始时间
-		startTime := time.Now()
-		offset := 0
-		batchNum := 1
-		totalRecords := 0
-
-		for {
-			logger.Infof("filterTsInfo: Querying TimeSeriesMetric batch %d, offset: %d, limit: %d",
-				batchNum, offset, queryConfig.BatchSize)
-
-			// 执行当前批次的查询，使用 Limit 和 Offset 进行分页
-			var batchTsmList []customreport.TimeSeriesMetric
-			query := customreport.NewTimeSeriesMetricQuerySet(db).
-				Select(customreport.TimeSeriesMetricDBSchema.FieldName, customreport.TimeSeriesMetricDBSchema.GroupID).
-				GroupIDIn(tsGroupIdList...).
-				Limit(queryConfig.BatchSize).
-				Offset(offset)
-
-			// 根据特性开关添加不同的过滤条件
-			if cfg.GlobalEnableTsMetricFilterByIsActive {
-				// 启用 is_active 字段过滤: 只查询活跃的指标
-				query = query.IsActiveEq(true)
-			} else {
-				// 使用原有方式: 根据最后修改时间过滤
-				query = query.LastModifyTimeGte(beginTime)
-			}
-
-			if err := query.All(&batchTsmList); err != nil {
-				logger.Errorf("filterTsInfo: Failed to query TimeSeriesMetric batch %d (offset: %d): %v", batchNum, offset, err)
-				return nil, err
-			}
-
-			// 如果当前批次没有数据，说明已经查询完毕
-			if len(batchTsmList) == 0 {
-				logger.Infof("filterTsInfo: No more TimeSeriesMetric records found, batch query completed")
-				break
-			}
-
-			// 合并当前批次的结果
-			tsmList = append(tsmList, batchTsmList...)
-			totalRecords += len(batchTsmList)
-
-			logger.Infof("filterTsInfo: Completed TimeSeriesMetric batch %d, retrieved %d records, total so far: %d",
-				batchNum, len(batchTsmList), totalRecords)
-
-			// 如果当前批次的记录数少于批次大小，说明这是最后一批
-			if len(batchTsmList) < queryConfig.BatchSize {
-				logger.Infof("filterTsInfo: Last batch detected (records: %d < batch_size: %d), query completed",
-					len(batchTsmList), queryConfig.BatchSize)
-				break
-			}
-
-			// 准备下一批次
-			offset += queryConfig.BatchSize
-			batchNum++
-
-			// 批次间延迟
-			time.Sleep(queryConfig.BatchDelay)
+	// V4 链路: 根据 last_modify_time 或 is_active 过滤
+	if len(v4GroupIdList) > 0 {
+		v4Metrics, err := s.batchQueryTsMetrics(db, v4GroupIdList, "last_modify_time_or_is_active", beginTime)
+		if err != nil {
+			return nil, err
 		}
-
-		queryDuration := time.Since(startTime)
-		logger.Infof("filterTsInfo: TimeSeriesMetric batch query completed, total records: %d, batches: %d, duration: %v",
-			totalRecords, batchNum, queryDuration)
+		tsmList = append(tsmList, v4Metrics...)
 	}
 
 	groupIdFieldsMap := make(map[uint][]string)
@@ -1585,37 +1716,119 @@ func (s *SpacePusher) filterTsInfo(bkTenantId string, tableIds []string) (*TsInf
 	}, nil
 }
 
+// batchQueryTsMetrics 分批查询 TimeSeriesMetric
+// filterMode: "last_modify_time" 仅按时间过滤, "last_modify_time_or_is_active" 按时间或活跃状态过滤
+func (s *SpacePusher) batchQueryTsMetrics(db *gorm.DB, groupIdList []uint, filterMode string, beginTime time.Time) ([]customreport.TimeSeriesMetric, error) {
+	if len(groupIdList) == 0 {
+		return nil, nil
+	}
+
+	queryConfig := GetDefaultRTFBatchConfig()
+
+	logger.Infof("batchQueryTsMetrics: Starting batch query, target groups: %d, batch size: %d, filter_mode: %s",
+		len(groupIdList), queryConfig.BatchSize, filterMode)
+
+	var tsmList []customreport.TimeSeriesMetric
+	startTime := time.Now()
+	offset := 0
+	batchNum := 1
+	totalRecords := 0
+
+	for {
+		logger.Infof("batchQueryTsMetrics: Querying batch %d, offset: %d, limit: %d, filter_mode: %s",
+			batchNum, offset, queryConfig.BatchSize, filterMode)
+
+		var batchTsmList []customreport.TimeSeriesMetric
+
+		switch filterMode {
+		case "last_modify_time_or_is_active":
+			// V4 链路: last_modify_time >= beginTime OR is_active = true
+			if err := db.Table("metadata_timeseriesmetric").
+				Select("field_name, group_id").
+				Where("group_id IN (?)", groupIdList).
+				Where("(last_modify_time >= ? OR is_active = ?)", beginTime, true).
+				Limit(queryConfig.BatchSize).
+				Offset(offset).
+				Find(&batchTsmList).Error; err != nil {
+				logger.Errorf("batchQueryTsMetrics: Failed to query batch %d (offset: %d, mode: %s): %v", batchNum, offset, filterMode, err)
+				return nil, err
+			}
+		default:
+			// V3 链路: 严格根据 last_modify_time 过滤
+			query := customreport.NewTimeSeriesMetricQuerySet(db).
+				Select(customreport.TimeSeriesMetricDBSchema.FieldName, customreport.TimeSeriesMetricDBSchema.GroupID).
+				GroupIDIn(groupIdList...).
+				LastModifyTimeGte(beginTime).
+				Limit(queryConfig.BatchSize).
+				Offset(offset)
+			if err := query.All(&batchTsmList); err != nil {
+				logger.Errorf("batchQueryTsMetrics: Failed to query batch %d (offset: %d, mode: %s): %v", batchNum, offset, filterMode, err)
+				return nil, err
+			}
+		}
+
+		if len(batchTsmList) == 0 {
+			logger.Infof("batchQueryTsMetrics: No more records found, batch query completed (mode: %s)", filterMode)
+			break
+		}
+
+		tsmList = append(tsmList, batchTsmList...)
+		totalRecords += len(batchTsmList)
+
+		logger.Infof("batchQueryTsMetrics: Completed batch %d, retrieved %d records, total so far: %d (mode: %s)",
+			batchNum, len(batchTsmList), totalRecords, filterMode)
+
+		if len(batchTsmList) < queryConfig.BatchSize {
+			logger.Infof("batchQueryTsMetrics: Last batch detected (records: %d < batch_size: %d), query completed (mode: %s)",
+				len(batchTsmList), queryConfig.BatchSize, filterMode)
+			break
+		}
+
+		offset += queryConfig.BatchSize
+		batchNum++
+
+		time.Sleep(queryConfig.BatchDelay)
+	}
+
+	queryDuration := time.Since(startTime)
+	logger.Infof("batchQueryTsMetrics: Batch query completed, total records: %d, batches: %d, duration: %v, filter_mode: %s",
+		totalRecords, batchNum, queryDuration, filterMode)
+
+	return tsmList, nil
+}
+
 // 获取结果表对应的集群 ID
 func (s *SpacePusher) getTableIdClusterId(bkTenantId string, tableIds []string) (map[string]string, error) {
 	if len(tableIds) == 0 {
 		return make(map[string]string), nil
 	}
 	db := mysql.GetDBSession().DB
+
+	// 根据BCS集群使用的数据源 ID，获取结果表与集群的映射关系
+	// 获取结果表对应的数据源 ID
 	var dsrtList []resulttable.DataSourceResultTable
 	if err := resulttable.NewDataSourceResultTableQuerySet(db).Select(resulttable.DataSourceResultTableDBSchema.BkDataId, resulttable.DataSourceResultTableDBSchema.TableId).BkTenantIdEq(bkTenantId).TableIdIn(tableIds...).All(&dsrtList); err != nil {
 		return nil, err
-	}
-	if len(dsrtList) == 0 {
-		return make(map[string]string), nil
 	}
 	var dataIds []uint
 	for _, dsrt := range dsrtList {
 		dataIds = append(dataIds, dsrt.BkDataId)
 	}
-	// 过滤到集群的数据源，仅包含两类，集群内置和集群自定义，已删除状态但是允许访问历史数据的集群依然进行推送
-	qs := bcs.NewBCSClusterInfoQuerySet(db)
-
 	dataIds = slicex.RemoveDuplicate(&dataIds)
 	var clusterListA []bcs.BCSClusterInfo
-	if err := qs.Select(bcs.BCSClusterInfoDBSchema.K8sMetricDataID, bcs.BCSClusterInfoDBSchema.ClusterID).BkTenantIdEq(bkTenantId).K8sMetricDataIDIn(dataIds...).All(&clusterListA); err != nil {
-		return nil, err
-	}
-
 	var clusterListB []bcs.BCSClusterInfo
-	if err := qs.Select(bcs.BCSClusterInfoDBSchema.CustomMetricDataID, bcs.BCSClusterInfoDBSchema.ClusterID).BkTenantIdEq(bkTenantId).CustomMetricDataIDIn(dataIds...).All(&clusterListB); err != nil {
-		return nil, err
+	if len(dataIds) > 0 {
+		// 过滤到集群的数据源，仅包含两类，集群内置和集群自定义，已删除状态但是允许访问历史数据的集群依然进行推送
+		qs := bcs.NewBCSClusterInfoQuerySet(db)
+		if err := qs.Select(bcs.BCSClusterInfoDBSchema.K8sMetricDataID, bcs.BCSClusterInfoDBSchema.ClusterID).BkTenantIdEq(bkTenantId).K8sMetricDataIDIn(dataIds...).All(&clusterListA); err != nil {
+			return nil, err
+		}
+		if err := qs.Select(bcs.BCSClusterInfoDBSchema.CustomMetricDataID, bcs.BCSClusterInfoDBSchema.ClusterID).BkTenantIdEq(bkTenantId).CustomMetricDataIDIn(dataIds...).All(&clusterListB); err != nil {
+			return nil, err
+		}
 	}
 
+	// 组装数据源 ID 到集群 ID 的映射
 	dataIdClusterIdMap := make(map[uint]string)
 	for _, c := range clusterListA {
 		dataIdClusterIdMap[c.K8sMetricDataID] = c.ClusterID
@@ -1628,6 +1841,19 @@ func (s *SpacePusher) getTableIdClusterId(bkTenantId string, tableIds []string) 
 	for _, dsrt := range dsrtList {
 		tableIdClusterIdMap[dsrt.TableId] = dataIdClusterIdMap[dsrt.BkDataId]
 	}
+
+	// 补充特殊配置，ResultTableOption中的binding_bcs_cluster_id
+	var rtoList []resulttable.ResultTableOption
+	if err := resulttable.NewResultTableOptionQuerySet(db).Select(resulttable.ResultTableOptionDBSchema.TableID, resulttable.ResultTableOptionDBSchema.Value).BkTenantIdEq(bkTenantId).TableIDIn(tableIds...).NameEq(models.BindingBcsClusterId).All(&rtoList); err != nil {
+		return nil, err
+	}
+	for _, rto := range rtoList {
+		if rto.Value == "" {
+			continue
+		}
+		tableIdClusterIdMap[rto.TableID] = rto.Value
+	}
+
 	return tableIdClusterIdMap, nil
 }
 

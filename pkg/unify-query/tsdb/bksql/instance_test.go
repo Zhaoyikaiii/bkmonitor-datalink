@@ -68,6 +68,121 @@ func TestInstance_ShowCreateTable(t *testing.T) {
 	}
 }
 
+// TestInstance_ShowCreateTable_HDFS 测试 HDFS 存储的 show create table 字段解析兼容性。
+// HDFS 使用 "Column" 作为字段名标识（而非 "Field"），且不包含 Null/Key/Default 字段。
+func TestInstance_ShowCreateTable_HDFS(t *testing.T) {
+	ctx := metadata.InitHashID(context.Background())
+	ins := createTestInstance(ctx)
+
+	// HDFS 返回格式：Column + Type + Extra + Comment（无 Null/Key/Default）
+	mock.BkSQL.Set(map[string]any{
+		"SHOW CREATE TABLE `bklog_hdfs_demo`.hdfs": `{"result":true,"message":"成功","code":"00","data":{"list":[{"Column":"process","Type":"varchar","Extra":"","Comment":""},{"Column":"level","Type":"varchar","Extra":"","Comment":""},{"Column":"bk_run_mode","Type":"varchar","Extra":"","Comment":""},{"Column":"message","Type":"varchar","Extra":"","Comment":""},{"Column":"____et","Type":"timestamp(6) with time zone","Extra":"","Comment":""},{"Column":"dteventtime","Type":"varchar","Extra":"","Comment":""},{"Column":"dteventtimestamp","Type":"bigint","Extra":"","Comment":""},{"Column":"localtime","Type":"varchar","Extra":"","Comment":""},{"Column":"thedate","Type":"integer","Extra":"","Comment":""}]},"errors":null,"trace_id":"db892000237c5900fc150bc508580573","span_id":"231d47dfa06f0ba2"}`,
+	})
+
+	end := time.UnixMilli(1730118889181)
+	start := time.UnixMilli(1730118589181)
+
+	query := &metadata.Query{
+		DB:          "bklog_hdfs_demo",
+		Measurement: "hdfs",
+	}
+
+	fieldsMap, err := ins.QueryFieldMap(ctx, query, start, end)
+	assert.Nil(t, err)
+	assert.NotNil(t, fieldsMap)
+
+	// 验证 Column 字段被正确解析为字段名
+	assert.Equal(t, "varchar", fieldsMap["process"].FieldType)
+	assert.Equal(t, "varchar", fieldsMap["level"].FieldType)
+	assert.Equal(t, "bigint", fieldsMap["dteventtimestamp"].FieldType)
+	assert.Equal(t, "integer", fieldsMap["thedate"].FieldType)
+	assert.Equal(t, "timestamp(6) with time zone", fieldsMap["____et"].FieldType)
+
+	// 验证 FieldName 和 OriginField 被正确设置
+	assert.Equal(t, "process", fieldsMap["process"].FieldName)
+	assert.Equal(t, "process", fieldsMap["process"].OriginField)
+	assert.Equal(t, "dteventtimestamp", fieldsMap["dteventtimestamp"].FieldName)
+	assert.Equal(t, "dteventtimestamp", fieldsMap["dteventtimestamp"].OriginField)
+	assert.Equal(t, "____et", fieldsMap["____et"].FieldName)
+	assert.Equal(t, "____et", fieldsMap["____et"].OriginField)
+
+	// 验证字段数量与 mock 数据一致
+	assert.Equal(t, 9, len(fieldsMap))
+
+	// 验证 HDFS 不返回 Analyzed 字段时，IsAnalyzed 默认为 false
+	assert.False(t, fieldsMap["process"].IsAnalyzed)
+	assert.False(t, fieldsMap["level"].IsAnalyzed)
+	assert.False(t, fieldsMap["____et"].IsAnalyzed)
+	assert.False(t, fieldsMap["dteventtimestamp"].IsAnalyzed)
+}
+
+// TestInstance_ShowCreateTable_TSpider 测试 TSpider 存储的 show create table 字段解析。
+// TSpider 使用 "Field" 作为字段名标识，Measurement 为空。
+// 注意：本测试直接调用 QueryFieldMap，覆盖的是底层字段解析能力；
+// TSpider 在正常 InitQueryFactory 路径中不会触发字段查询（见 TestInstance_InitQueryFactory_TSpider_NoFieldQuery）。
+func TestInstance_ShowCreateTable_TSpider(t *testing.T) {
+	ctx := metadata.InitHashID(context.Background())
+	ins := createTestInstance(ctx)
+
+	// TSpider 返回格式：Field + Type + Null + Key + Default + Extra
+	// TSpider 的 Measurement 为空，表名不带 .measurement 后缀
+	mock.BkSQL.Set(map[string]any{
+		"SHOW CREATE TABLE `132_lol_new_login_queue_login_1min`": `{"result":true,"message":"成功","code":"00","data":{"list":[{"Field":"thedate","Type":"int(11)","Null":"NO","Key":"","Default":null,"Extra":""},{"Field":"dtEventTime","Type":"varchar(32)","Null":"NO","Key":"","Default":null,"Extra":""},{"Field":"dtEventTimeStamp","Type":"bigint(20)","Null":"NO","Key":"MUL","Default":null,"Extra":""},{"Field":"localTime","Type":"varchar(32)","Null":"YES","Key":"","Default":null,"Extra":""},{"Field":"flow_id","Type":"bigint(20)","Null":"YES","Key":"MUL","Default":null,"Extra":""},{"Field":"flow_name","Type":"text","Null":"YES","Key":"","Default":null,"Extra":""},{"Field":"namespace","Type":"varchar(64)","Null":"YES","Key":"","Default":null,"Extra":""},{"Field":"login_rate","Type":"double","Null":"YES","Key":"","Default":null,"Extra":""}]},"errors":null,"trace_id":"00000000000000000000000000000000","span_id":"0000000000000000"}`,
+	})
+
+	end := time.UnixMilli(1730118889181)
+	start := time.UnixMilli(1730118589181)
+
+	// TSpider: Measurement 为空
+	query := &metadata.Query{
+		DB:          "132_lol_new_login_queue_login_1min",
+		Measurement: "",
+	}
+
+	fieldsMap, err := ins.QueryFieldMap(ctx, query, start, end)
+	assert.Nil(t, err)
+	assert.NotNil(t, fieldsMap)
+
+	// 验证 Field 字段被正确解析
+	assert.Equal(t, "int(11)", fieldsMap["thedate"].FieldType)
+	assert.Equal(t, "varchar(32)", fieldsMap["dtEventTime"].FieldType)
+	assert.Equal(t, "bigint(20)", fieldsMap["dtEventTimeStamp"].FieldType)
+	assert.Equal(t, "double", fieldsMap["login_rate"].FieldType)
+
+	// 验证字段数量
+	assert.Equal(t, 8, len(fieldsMap))
+}
+
+// TestInstance_InitQueryFactory_TSpider_NoFieldQuery 验证 TSpider 通过 InitQueryFactory 时不触发字段查询。
+// TSpider 的 Measurement 为空字符串，不满足 Doris/HDFS 的判断条件，因此不应执行 SHOW CREATE TABLE。
+// mock 中故意不注册任何 SHOW CREATE TABLE 的 SQL key，若代码误触发字段查询则测试报错。
+func TestInstance_InitQueryFactory_TSpider_NoFieldQuery(t *testing.T) {
+	ctx := metadata.InitHashID(context.Background())
+	ins := createTestInstance(ctx)
+
+	// 不设置任何 SHOW CREATE TABLE 的 mock 数据
+	// 若 TSpider 错误地触发字段查询，mock 会返回 error，导致 InitQueryFactory 失败
+	mock.BkSQL.Set(map[string]any{})
+
+	end := time.UnixMilli(1730118889181)
+	start := time.UnixMilli(1730118589181)
+
+	// TSpider: Measurement 为空，不触发字段查询
+	query := &metadata.Query{
+		DB:          "132_lol_new_login_queue_login_1min",
+		Measurement: "",
+		Field:       "login_rate",
+	}
+
+	fact, err := ins.InitQueryFactory(ctx, query, start, end)
+	// TSpider 不触发字段查询，InitQueryFactory 应成功返回
+	assert.Nil(t, err)
+	assert.NotNil(t, fact)
+
+	// TSpider 不走字段表结构路径，FieldMap 应为 nil
+	assert.Nil(t, fact.FieldMap())
+}
+
 func TestInstance_QuerySeriesSet(t *testing.T) {
 	ctx := metadata.InitHashID(context.Background())
 	ins := createTestInstance(ctx)
@@ -2316,4 +2431,85 @@ func createTestInstance(ctx context.Context) *bksql.Instance {
 		panic(err.Error())
 	}
 	return ins
+}
+
+func TestInstance_QuerySeries(t *testing.T) {
+	ctx := metadata.InitHashID(context.Background())
+	instance := createTestInstance(ctx)
+
+	end := time.Unix(1740553771, 0)
+	start := time.Unix(1740551971, 0)
+
+	mock.BkSQL.Set(map[string]any{
+		"SHOW CREATE TABLE `5000140_bklog_container_log_demo_analysis`.doris": `{"result":true,"message":"成功","code":"00","data":{"result_table_scan_range":{},"cluster":"doris-test","totalRecords":4,"external_api_call_time_mills":{},"resource_use_summary":{"cpu_time_mills":0,"memory_bytes":0,"processed_bytes":0,"processed_rows":0},"source":"","list":[{"Field":"thedate","Type":"int","Null":"NO","Key":"YES","Default":null,"Extra":""},{"Field":"dteventtimestamp","Type":"bigint","Null":"NO","Key":"YES","Default":null,"Extra":""},{"Field":"dteventtime","Type":"varchar(32)","Null":"NO","Key":"NO","Default":null,"Extra":"NONE"},{"Field":"localtime","Type":"varchar(32)","Null":"YES","Key":"NO","Default":null,"Extra":"NONE"},{"Field":"__shard_key__","Type":"bigint","Null":"YES","Key":"NO","Default":null,"Extra":"NONE"},{"Field":"path","Type":"text","Null":"YES","Key":"NO","Default":null,"Extra":"NONE"},{"Field":"log","Type":"text","Null":"YES","Key":"NO","Default":null,"Extra":"NONE"},{"Field":"serverip","Type":"text","Null":"YES","Key":"NO","Default":null,"Extra":"NONE"},{"Field":"cloudid","Type":"double","Null":"YES","Key":"NO","Default":null,"Extra":"NONE"},{"Field":"gseindex","Type":"double","Null":"YES","Key":"NO","Default":null,"Extra":"NONE"}],"select_fields_order":[],"total_record_size":0,"timetaken":0.0,"result_schema":[],"bksql_call_elapsed_time":0,"device":"doris","result_table_ids":[]},"errors":null,"trace_id":"","span_id":""}`,
+		// 第一次查询：获取字段名
+		"SELECT *, `dtEventTimeStamp` AS `_timestamp_` FROM `5000140_bklog_container_log_demo_analysis`.doris WHERE `dtEventTimeStamp` >= 1740551971000 AND `dtEventTimeStamp` <= 1740553771000 AND `dtEventTime` >= '2025-02-26 14:39:31' AND `dtEventTime` <= '2025-02-26 15:09:32' AND `thedate` = '20250226' LIMIT 1": `{"result":true,"message":"成功","code":"00","data":{"result_table_scan_range":{},"cluster":"doris-test","totalRecords":1,"external_api_call_time_mills":{},"resource_use_summary":{"cpu_time_mills":0,"memory_bytes":0,"processed_bytes":0,"processed_rows":0},"source":"","list":[{"path":"/var/log/test.log","log":"test log message","serverip":"10.0.0.1","cloudid":0,"gseindex":100,"_timestamp_":1740552000000}],"select_fields_order":["path","log","serverip","cloudid","gseindex","_timestamp_"],"total_record_size":100,"timetaken":0.01,"result_schema":[],"bksql_call_elapsed_time":0,"device":"doris","result_table_ids":["5000140_bklog_container_log_demo_analysis"]},"errors":null,"trace_id":"","span_id":""}`,
+		// 第二次查询：SELECT DISTINCT 获取唯一组合
+		"SELECT DISTINCT `path`, `log`, `serverip`, `cloudid`, `gseindex` FROM `5000140_bklog_container_log_demo_analysis`.doris WHERE `dtEventTimeStamp` >= 1740551971000 AND `dtEventTimeStamp` <= 1740553771000 AND `dtEventTime` >= '2025-02-26 14:39:31' AND `dtEventTime` <= '2025-02-26 15:09:32' AND `thedate` = '20250226' LIMIT 10": `{"result":true,"message":"成功","code":"00","data":{"result_table_scan_range":{},"cluster":"doris-test","totalRecords":3,"external_api_call_time_mills":{},"resource_use_summary":{"cpu_time_mills":0,"memory_bytes":0,"processed_bytes":0,"processed_rows":0},"source":"","list":[{"path":"/var/log/test.log","log":"msg1","serverip":"10.0.0.1","cloudid":0,"gseindex":100},{"path":"/var/log/test.log","log":"msg2","serverip":"10.0.0.2","cloudid":0,"gseindex":200},{"path":"/var/log/app.log","log":"msg3","serverip":"10.0.0.1","cloudid":1,"gseindex":300}],"select_fields_order":["path","log","serverip","cloudid","gseindex"],"total_record_size":300,"timetaken":0.05,"result_schema":[],"bksql_call_elapsed_time":0,"device":"doris","result_table_ids":["5000140_bklog_container_log_demo_analysis"]},"errors":null,"trace_id":"","span_id":""}`,
+		// 指定字段查询：SELECT DISTINCT path, serverip
+		"SELECT DISTINCT `path`, `serverip` FROM `5000140_bklog_container_log_demo_analysis`.doris WHERE `dtEventTimeStamp` >= 1740551971000 AND `dtEventTimeStamp` <= 1740553771000 AND `dtEventTime` >= '2025-02-26 14:39:31' AND `dtEventTime` <= '2025-02-26 15:09:32' AND `thedate` = '20250226' LIMIT 10": `{"result":true,"message":"成功","code":"00","data":{"result_table_scan_range":{},"cluster":"doris-test","totalRecords":2,"external_api_call_time_mills":{},"resource_use_summary":{"cpu_time_mills":0,"memory_bytes":0,"processed_bytes":0,"processed_rows":0},"source":"","list":[{"path":"/var/log/test.log","serverip":"10.0.0.1"},{"path":"/var/log/app.log","serverip":"10.0.0.1"}],"select_fields_order":["path","serverip"],"total_record_size":200,"timetaken":0.03,"result_schema":[],"bksql_call_elapsed_time":0,"device":"doris","result_table_ids":["5000140_bklog_container_log_demo_analysis"]},"errors":null,"trace_id":"","span_id":""}`,
+		// 包含不存在字段的查询：SELECT DISTINCT path, NULL AS non_existent_field（dimTransform 将不存在的字段替换为 NULL）
+		"SELECT DISTINCT `path`, NULL AS `non_existent_field` FROM `5000140_bklog_container_log_demo_analysis`.doris WHERE `dtEventTimeStamp` >= 1740551971000 AND `dtEventTimeStamp` <= 1740553771000 AND `dtEventTime` >= '2025-02-26 14:39:31' AND `dtEventTime` <= '2025-02-26 15:09:32' AND `thedate` = '20250226' LIMIT 10": `{"result":true,"message":"成功","code":"00","data":{"result_table_scan_range":{},"cluster":"doris-test","totalRecords":2,"external_api_call_time_mills":{},"resource_use_summary":{"cpu_time_mills":0,"memory_bytes":0,"processed_bytes":0,"processed_rows":0},"source":"","list":[{"path":"/var/log/test.log","non_existent_field":null},{"path":"/var/log/app.log","non_existent_field":null}],"select_fields_order":["path","non_existent_field"],"total_record_size":200,"timetaken":0.03,"result_schema":[],"bksql_call_elapsed_time":0,"device":"doris","result_table_ids":["5000140_bklog_container_log_demo_analysis"]},"errors":null,"trace_id":"","span_id":""}`,
+	})
+
+	tests := []struct {
+		name     string
+		query    *metadata.Query
+		expected []map[string]string
+	}{
+		{
+			name: "normal series query",
+			query: &metadata.Query{
+				DB:          "5000140_bklog_container_log_demo_analysis",
+				Measurement: "doris",
+				Size:        10,
+				Source:      []string{"path", "log", "serverip", "cloudid", "gseindex"},
+			},
+			expected: []map[string]string{
+				{"path": "/var/log/test.log", "log": "msg1", "serverip": "10.0.0.1", "cloudid": "0", "gseindex": "100"},
+				{"path": "/var/log/test.log", "log": "msg2", "serverip": "10.0.0.2", "cloudid": "0", "gseindex": "200"},
+				{"path": "/var/log/app.log", "log": "msg3", "serverip": "10.0.0.1", "cloudid": "1", "gseindex": "300"},
+			},
+		},
+		{
+			name: "series query with source fields",
+			query: &metadata.Query{
+				DB:          "5000140_bklog_container_log_demo_analysis",
+				Measurement: "doris",
+				Size:        10,
+				Source:      []string{"path", "serverip"},
+			},
+			expected: []map[string]string{
+				{"path": "/var/log/test.log", "serverip": "10.0.0.1"},
+				{"path": "/var/log/app.log", "serverip": "10.0.0.1"},
+			},
+		},
+		{
+			name: "series query with non-existent field replaced by null",
+			query: &metadata.Query{
+				DB:          "5000140_bklog_container_log_demo_analysis",
+				Measurement: "doris",
+				Size:        10,
+				Source:      []string{"path", "non_existent_field"},
+			},
+			expected: []map[string]string{
+				{"path": "/var/log/test.log"},
+				{"path": "/var/log/app.log"},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx = metadata.InitHashID(ctx)
+			series, err := instance.QuerySeries(ctx, tt.query, start, end)
+			assert.NoError(t, err)
+			assert.Equal(t, len(tt.expected), len(series))
+			for idx, expected := range tt.expected {
+				for k, v := range expected {
+					assert.Equal(t, v, series[idx][k], fmt.Sprintf("series[%d][%s]", idx, k))
+				}
+			}
+		})
+	}
 }

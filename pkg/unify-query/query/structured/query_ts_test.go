@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/TencentBlueKing/bkmonitor-datalink/pkg/unify-query/influxdb"
 	"github.com/TencentBlueKing/bkmonitor-datalink/pkg/unify-query/internal/query"
@@ -289,6 +290,103 @@ func TestQueryToMetric(t *testing.T) {
 	}
 }
 
+// TestE2E_Query_TableIDConditions_ToQueryMetric_GetTsDBList 端到端：Query 带 TableIDConditions → ToQueryMetric(tsDBs=nil) → GetTsDBList 选表，链路打通；mock 下无匹配 Labels 时 QueryList 为空
+func TestE2E_Query_TableIDConditions_ToQueryMetric_GetTsDBList(t *testing.T) {
+	mock.Init()
+	ctx := md.InitHashID(context.Background())
+	influxdb.MockSpaceRouter(ctx)
+
+	query := &Query{
+		TableID:       "",
+		FieldName:     "kube_node_info",
+		ReferenceName: "a",
+		TableIDConditions: AllConditions{
+			{{DimensionName: "scene", Value: []string{"log"}, Operator: ConditionEqual}},
+		},
+	}
+	require.NotEmpty(t, query.TableIDConditions, "TableIDConditions 应有值")
+
+	metric, err := query.ToQueryMetric(ctx, influxdb.SpaceUid, nil)
+	assert.NoError(t, err)
+	assert.NotNil(t, metric)
+	// mock 中 result_table.influxdb 带 Labels scene=log，选表应命中
+	assert.NotEmpty(t, metric.QueryList, "表标签 scene=log 应匹配到带 Labels 的 RT")
+}
+
+// TestQueryTs_StructToPromQL_WithTableIDConditions 独立方向：从 QueryTs 结构体（带 TableIDConditions）转为 PromQL，
+// 单组 AND 输出 __bk_query_label_selector_<维度>；多组 OR 无法写进单条 PromQL，应报错。
+func TestQueryTs_StructToPromQL_WithTableIDConditions(t *testing.T) {
+	t.Run("single_eq", func(t *testing.T) {
+		ts := &QueryTs{
+			QueryList: []*Query{
+				{
+					FieldName:     "metric_name",
+					ReferenceName: "a",
+					TableIDConditions: AllConditions{
+						{{DimensionName: "scene", Value: []string{"log"}, Operator: ConditionEqual}},
+					},
+				},
+			},
+			MetricMerge: "a",
+		}
+		result, err := ts.ToPromQL(context.TODO())
+		require.NoError(t, err)
+		assert.Contains(t, result, `__bk_query_label_selector_scene="log"`)
+	})
+	t.Run("and_or_combined", func(t *testing.T) {
+		ts := &QueryTs{
+			QueryList: []*Query{
+				{
+					FieldName:     "metric_name",
+					ReferenceName: "a",
+					TableIDConditions: AllConditions{
+						{
+							{DimensionName: "scene", Value: []string{"log"}, Operator: ConditionEqual},
+							{DimensionName: "cluster_id", Value: []string{"1"}, Operator: ConditionEqual},
+						},
+						{{DimensionName: "scene", Value: []string{"k8s"}, Operator: ConditionEqual}},
+					},
+				},
+			},
+			MetricMerge: "a",
+		}
+		_, err := ts.ToPromQL(context.TODO())
+		require.Error(t, err, "多组 OR 的 table_id_conditions 不应能转为单条 PromQL")
+	})
+	t.Run("neq_operator", func(t *testing.T) {
+		ts := &QueryTs{
+			QueryList: []*Query{
+				{
+					FieldName:     "metric_name",
+					ReferenceName: "a",
+					TableIDConditions: AllConditions{
+						{{DimensionName: "env", Value: []string{"prod"}, Operator: ConditionNotEqual}},
+					},
+				},
+			},
+			MetricMerge: "a",
+		}
+		result, err := ts.ToPromQL(context.TODO())
+		require.NoError(t, err)
+		assert.Contains(t, result, `__bk_query_label_selector_env!="prod"`)
+	})
+	t.Run("empty_conditions_no_selector", func(t *testing.T) {
+		ts := &QueryTs{
+			QueryList: []*Query{
+				{
+					FieldName:     "metric_name",
+					ReferenceName: "a",
+				},
+			},
+			MetricMerge: "a",
+		}
+		result, err := ts.ToPromQL(context.TODO())
+		require.NoError(t, err)
+		assert.NotContains(t, result, "__query_label_selector")
+		assert.NotContains(t, result, "__bk_query_label_selector_")
+	})
+}
+
 func TestQueryTs_ToQueryReference(t *testing.T) {
 	mock.Init()
 	ctx := md.InitHashID(context.Background())
@@ -328,6 +426,10 @@ func TestQueryTs_ToQueryReference(t *testing.T) {
 				MetricFilterCondition: map[string]string{
 					"a": `bk_biz_id="2", result_table_id="100147_ieod_system_cpu_detail_raw", __name__="usage_value"`,
 					"b": `bk_biz_id="2", result_table_id="100147_ieod_system_disk_raw", __name__="usage_value"`,
+				},
+				RtDetailList: map[string]md.RtDetail{
+					"100147_ieod_system_cpu_detail_raw": {TableID: "system.cpu_detail"},
+					"100147_ieod_system_disk_raw":       {TableID: "system.disk"},
 				},
 			},
 			ref: md.QueryReference{
@@ -421,6 +523,9 @@ func TestQueryTs_ToQueryReference(t *testing.T) {
 				MetricFilterCondition: map[string]string{
 					"a": ``,
 					"b": `bk_biz_id="2", result_table_id="100147_ieod_system_disk_raw", __name__="usage_value"`,
+				},
+				RtDetailList: map[string]md.RtDetail{
+					"100147_ieod_system_disk_raw": {TableID: "system.disk"},
 				},
 			},
 			ref: md.QueryReference{
@@ -569,6 +674,9 @@ func TestQueryTs_ToQueryReference(t *testing.T) {
 				MetricFilterCondition: map[string]string{
 					"b": `bk_biz_id="2", bk_obj_id!="0", result_table_id="rt_by_cmdb_level", __name__="usage_value"`,
 				},
+				RtDetailList: map[string]md.RtDetail{
+					"rt_by_cmdb_level": {TableID: "system.disk"},
+				},
 			},
 			ref: md.QueryReference{
 				"b": {
@@ -635,6 +743,9 @@ func TestQueryTs_ToQueryReference(t *testing.T) {
 				ResultTableList: []string{"100147_ieod_system_cpu_detail_cmdb"},
 				MetricFilterCondition: map[string]string{
 					"b": `bk_biz_id="2", bk_obj_id!="0", result_table_id="100147_ieod_system_cpu_detail_cmdb", __name__="usage_value"`,
+				},
+				RtDetailList: map[string]md.RtDetail{
+					"100147_ieod_system_cpu_detail_cmdb": {TableID: "system.cpu_detail"},
 				},
 			},
 			ref: md.QueryReference{
@@ -707,6 +818,9 @@ func TestQueryTs_ToQueryReference(t *testing.T) {
 				MetricFilterCondition: map[string]string{
 					"b": `bk_biz_id="2", result_table_id="100147_ieod_system_cpu_detail_cmdb", __name__="usage_value"`,
 				},
+				RtDetailList: map[string]md.RtDetail{
+					"100147_ieod_system_cpu_detail_cmdb": {TableID: "system.cpu_detail"},
+				},
 			},
 			ref: md.QueryReference{
 				"b": {
@@ -773,6 +887,9 @@ func TestQueryTs_ToQueryReference(t *testing.T) {
 				ResultTableList: []string{"100147_ieod_system_cpu_detail_raw"},
 				MetricFilterCondition: map[string]string{
 					"a": `bk_biz_id="2", result_table_id="100147_ieod_system_cpu_detail_raw", __name__="usage_value"`,
+				},
+				RtDetailList: map[string]md.RtDetail{
+					"100147_ieod_system_cpu_detail_raw": {TableID: "system.cpu_detail"},
 				},
 			},
 			ref: md.QueryReference{
@@ -848,6 +965,9 @@ func TestQueryTs_ToQueryReference(t *testing.T) {
 				MetricFilterCondition: map[string]string{
 					"a": `bk_biz_id="2", result_table_id="100147_ieod_system_cpu_detail_raw", __name__="usage_value"`,
 				},
+				RtDetailList: map[string]md.RtDetail{
+					"100147_ieod_system_cpu_detail_raw": {TableID: "system.cpu_detail"},
+				},
 			},
 			ref: md.QueryReference{
 				"a": {
@@ -921,6 +1041,9 @@ func TestQueryTs_ToQueryReference(t *testing.T) {
 				ResultTableList: []string{"100147_ieod_system_cpu_detail_raw"},
 				MetricFilterCondition: map[string]string{
 					"a": `bk_biz_id="2", result_table_id="100147_ieod_system_cpu_detail_raw", __name__="usage_value"`,
+				},
+				RtDetailList: map[string]md.RtDetail{
+					"100147_ieod_system_cpu_detail_raw": {TableID: "system.cpu_detail"},
 				},
 			},
 			ref: md.QueryReference{
@@ -1513,6 +1636,9 @@ func TestQueryTs_ToQueryReference(t *testing.T) {
 				ResultTableList: []string{"2_bcs_prom_computation_result_table"},
 				MetricFilterCondition: map[string]string{
 					"a": `result_table_id="2_bcs_prom_computation_result_table", __name__="kube_pod_info_value"`,
+				},
+				RtDetailList: map[string]md.RtDetail{
+					"2_bcs_prom_computation_result_table": {TableID: "result_table.vm"},
 				},
 			},
 			refString: `{"a":[{"QueryList":[{"storage_type":"influxdb","storage_id":"2","cluster_name":"default","data_source":"bkmonitor","data_label":"influxdb","table_id":"result_table.influxdb","db":"result_table","measurement":"kube_pod_info","measurement_type":"bk_split_measurement","field":"value","time_field":{},"fields":["value"],"measurements":["kube_pod_info"],"metric_names":["kube_pod_info"],"vm_condition":"__name__=\"kube_pod_info_value\"","vm_condition_num":1,"offset_info":{"OffSet":0,"Limit":0,"SOffSet":0,"SLimit":0},"is_merge_db":false},{"storage_type":"victoria_metrics","storage_id":"2","data_source":"bkmonitor","data_label":"vm","table_id":"result_table.vm","vm_rt":"2_bcs_prom_computation_result_table","measurement":"kube_pod_info","measurement_type":"bk_split_measurement","field":"value","time_field":{},"fields":["value"],"measurements":["kube_pod_info"],"metric_names":["kube_pod_info"],"vm_condition":"result_table_id=\"2_bcs_prom_computation_result_table\", __name__=\"kube_pod_info_value\"","vm_condition_num":2,"offset_info":{"OffSet":0,"Limit":0,"SOffSet":0,"SLimit":0},"is_merge_db":false}],"ReferenceName":"a","MetricName":"kube_pod_info","IsCount":false}]}`,

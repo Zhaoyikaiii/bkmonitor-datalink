@@ -51,9 +51,11 @@ EOF
 # ============================= Resource ==================================
 EOF
     cat <<EOF >> "$path"
-{% if cmdb_instance.host.bk_cpu and cmdb_instance.host.bk_mem %}
-{%- set resource_limit = resource_limit | default({}) -%}
 resource_limit:
+{%- if extra_vars is defined and extra_vars.disable_resource_limit is defined and extra_vars.disable_resource_limit == "true" %}
+  enabled: false
+{%- elif cmdb_instance.host.bk_cpu and cmdb_instance.host.bk_mem %}
+{%- set resource_limit = resource_limit | default({}) -%}
   enabled: true
   cpu: {{
     [
@@ -73,7 +75,11 @@ resource_limit:
         resource_limit.get('mem', {}).get('max', 1000)
     ] | min | int
   }}
-{% endif %}
+{%- else %}
+  enabled: true
+  cpu: 1
+  mem: -1
+{%- endif %}
 
 EOF
   fi
@@ -157,6 +163,7 @@ EOF
       check_period: 1m
       report_period: 6h
       virtual_iface_whitelist: ["bond1"]
+      virtual_iface_blacklist: []
 
   # 主机性能数据采集
 EOF
