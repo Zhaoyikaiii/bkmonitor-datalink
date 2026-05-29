@@ -349,7 +349,7 @@ func TestMergeSeriesSet(t *testing.T) {
 					},
 				},
 			},
-			fn: function.NewMergeSeriesSetWithFuncAndSort("max"),
+			fn: function.NewMergeSeriesSetWithFuncAndSort(function.Max),
 		},
 		"two queryResult with mergeSeriesSetWithFuncAndSort min": {
 			qrs: []*prompb.QueryResult{
@@ -415,6 +415,71 @@ func TestMergeSeriesSet(t *testing.T) {
 				},
 			},
 			fn: function.NewMergeSeriesSetWithFuncAndSort("min"),
+		},
+		"two queryResult with mergeSeriesSetWithFuncAndSort avg": {
+			qrs: []*prompb.QueryResult{
+				{
+					Timeseries: []*prompb.TimeSeries{
+						ts1, ts2,
+					},
+				},
+				{
+					Timeseries: []*prompb.TimeSeries{
+						ts3, ts4,
+					},
+				},
+			},
+			ts: mock.TimeSeriesList{
+				{
+					Labels: []prompb.Label{
+						{
+							Name:  "__name__",
+							Value: "up",
+						},
+						{
+							Name:  "job",
+							Value: "elasticsearch",
+						},
+					},
+					Samples: []prompb.Sample{
+						{
+							Value:     5,
+							Timestamp: 60,
+						},
+						{
+							Value:     6,
+							Timestamp: 120,
+						},
+					},
+				},
+				{
+					Labels: []prompb.Label{
+						{
+							Name:  "__name__",
+							Value: "up",
+						},
+						{
+							Name:  "job",
+							Value: "prometheus",
+						},
+					},
+					Samples: []prompb.Sample{
+						{
+							Value:     2.5,
+							Timestamp: 0,
+						},
+						{
+							Value:     5,
+							Timestamp: 60,
+						},
+						{
+							Value:     3,
+							Timestamp: 120,
+						},
+					},
+				},
+			},
+			fn: function.NewMergeSeriesSetWithFuncAndSort(function.Avg),
 		},
 	}
 

@@ -101,6 +101,22 @@ func (q *Querier) getQueryList(referenceName string) []*Query {
 	return queryList
 }
 
+func mergeFuncName(hints *storage.SelectHints, queryList []*Query) string {
+	if hints != nil && hints.Func != "" {
+		return hints.Func
+	}
+
+	for _, query := range queryList {
+		if query == nil || query.qry == nil {
+			continue
+		}
+		if name := query.qry.Aggregates.LastAggName(); name != "" {
+			return name
+		}
+	}
+	return ""
+}
+
 // selectFn 获取原始数据
 func (q *Querier) selectFn(hints *storage.SelectHints, matchers ...*labels.Matcher) storage.SeriesSet {
 	var (
@@ -127,20 +143,6 @@ func (q *Querier) selectFn(hints *storage.SelectHints, matchers ...*labels.Match
 
 	qp := metadata.GetQueryParams(ctx)
 
-	go func() {
-		defer func() {
-			recvDone <- struct{}{}
-		}()
-		var sets []storage.SeriesSet
-		for s := range setCh {
-			if s != nil {
-				sets = append(sets, s)
-			}
-		}
-
-		set = storage.NewMergeSeriesSet(sets, function.NewMergeSeriesSetWithFuncAndSort(hints.Func))
-	}()
-
 	for _, m := range matchers {
 		if m.Name == labels.MetricName {
 			referenceName = m.Value
@@ -152,6 +154,22 @@ func (q *Querier) selectFn(hints *storage.SelectHints, matchers ...*labels.Match
 	span.Set("reference_name", referenceName)
 
 	queryList := q.getQueryList(referenceName)
+	mergeFunc := mergeFuncName(hints, queryList)
+	span.Set("merge_func", mergeFunc)
+
+	go func() {
+		defer func() {
+			recvDone <- struct{}{}
+		}()
+		var sets []storage.SeriesSet
+		for s := range setCh {
+			if s != nil {
+				sets = append(sets, s)
+			}
+		}
+
+		set = storage.NewMergeSeriesSet(sets, function.NewMergeSeriesSetWithFuncAndSort(mergeFunc))
+	}()
 
 	p, _ := ants.NewPool(q.maxRouting)
 	defer p.Release()

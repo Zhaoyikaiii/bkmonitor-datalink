@@ -23,6 +23,7 @@ import (
 	promRemote "github.com/prometheus/prometheus/storage/remote"
 	"github.com/stretchr/testify/assert"
 
+	"github.com/TencentBlueKing/bkmonitor-datalink/pkg/unify-query/internal/function"
 	"github.com/TencentBlueKing/bkmonitor-datalink/pkg/unify-query/metadata"
 	"github.com/TencentBlueKing/bkmonitor-datalink/pkg/unify-query/mock"
 )
@@ -41,6 +42,28 @@ var _ storage.Queryable = (*queryable)(nil)
 
 func (q *queryable) Querier(ctx context.Context, mint, maxt int64) (storage.Querier, error) {
 	return &querier{}, nil
+}
+
+func TestMergeFuncName(t *testing.T) {
+	assert.Equal(t, function.Max, mergeFuncName(&storage.SelectHints{Func: function.Max}, []*Query{
+		{
+			qry: &metadata.Query{
+				Aggregates: metadata.Aggregates{
+					{Name: function.Avg},
+				},
+			},
+		},
+	}))
+
+	assert.Equal(t, function.Avg, mergeFuncName(&storage.SelectHints{}, []*Query{
+		{
+			qry: &metadata.Query{
+				Aggregates: metadata.Aggregates{
+					{Name: function.Avg},
+				},
+			},
+		},
+	}))
 }
 
 type querier struct{}

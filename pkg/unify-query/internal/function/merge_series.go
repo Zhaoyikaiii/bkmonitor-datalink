@@ -48,6 +48,10 @@ func NewMergeSeriesSetWithFuncAndSort(name string) func(...storage.Series) stora
 				}
 				return b
 			}
+		case Avg, AvgOT, Mean:
+			aggFunc = func(a, b float64) float64 {
+				return a + b
+			}
 		default: // 默认使用sum
 			aggFunc = func(a, b float64) float64 {
 				return a + b
@@ -56,6 +60,7 @@ func NewMergeSeriesSetWithFuncAndSort(name string) func(...storage.Series) stora
 
 		// 按时间戳合并值
 		valueMap := make(map[int64]float64)
+		countMap := make(map[int64]float64)
 		for _, s := range series {
 			it := s.Iterator(nil)
 			for it.Next() == chunkenc.ValFloat {
@@ -65,6 +70,7 @@ func NewMergeSeriesSetWithFuncAndSort(name string) func(...storage.Series) stora
 				} else {
 					valueMap[t] = v
 				}
+				countMap[t]++
 			}
 			if err := it.Err(); err != nil {
 				return &storage.SeriesEntry{
@@ -80,6 +86,11 @@ func NewMergeSeriesSetWithFuncAndSort(name string) func(...storage.Series) stora
 
 		sortedData := make([]prompb.Sample, 0, len(valueMap))
 		for t, v := range valueMap {
+			if isAvgFunc(name) {
+				if count := countMap[t]; count > 0 {
+					v = v / count
+				}
+			}
 			sortedData = append(sortedData, prompb.Sample{Timestamp: t, Value: v})
 		}
 		sort.Slice(sortedData, func(i, j int) bool {
